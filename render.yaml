@@ -1,0 +1,48 @@
+# Render blueprint — provisions web service + background worker + Postgres + Redis
+# in one declarative file. Apply via Render dashboard "New Blueprint Instance"
+# pointed at this repository.
+#
+# NOTE: Postgres and Redis are already provisioned and populated via the
+# srj-mcp deployment. This blueprint declares the web + worker tier of the
+# stack. Reference the existing managed-database connection strings via
+# environment variables in the Render dashboard rather than declaring new ones.
+
+services:
+  - type: web
+    name: srj-audit-web
+    runtime: python
+    region: oregon
+    plan: starter
+    branch: main
+    buildCommand: |
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate --fake-initial
+    startCommand: gunicorn audit_platform.wsgi:application --workers 3 --threads 2 --timeout 90
+    healthCheckPath: /healthz/
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: audit_platform.settings.production
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: WEB_CONCURRENCY
+        value: "3"
+      # The following are set in the Render dashboard, not committed:
+      # SECRET_KEY, DATABASE_URL, REDIS_URL, ALLOWED_HOSTS,
+      # STRIPE_*, POSTMARK_*, B2_*, SENTRY_DSN, PLATFORM_BASE_URL
+
+  - type: worker
+    name: srj-audit-worker
+    runtime: python
+    region: oregon
+    plan: starter
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py rqworker default reports email
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: audit_platform.settings.production
+      - key: PYTHON_VERSION
+        value: 3.12.0

@@ -1,0 +1,43 @@
+# SRJ AI Audit Platform — Tier 1 dependencies
+# Locked versions per Part A v1.1 Appendix B.1, refreshed 2026-06-23
+
+Django==5.1.4
+psycopg[binary]==3.2.3
+django-environ==0.11.2
+gunicorn==23.0.0
+whitenoise==6.8.2
+
+# Background jobs
+redis==5.2.1
+django-rq==2.10.2
+rq==1.16.2
+
+# PDF generation
+WeasyPrint==62.3
+
+# S3-compatible storage (Backblaze B2)
+boto3==1.35.0
+django-storages==1.14.4
+
+# Payments
+stripe==11.4.0
+
+# Email (Postmark)
+postmarker==1.0
+
+# Monitoring
+sentry-sdk==2.19.0
+
+# Auth helpers
+django-allauth==65.3.0
+
+# Frontend
+django-htmx==1.21.0
+django-crispy-forms==2.3
+crispy-bootstrap5==2024.10
+
+# Dev / test
+django-debug-toolbar==4.4.6
+pytest==8.3.4
+pytest-django==4.9.0
+factory-boy==3.3.1
