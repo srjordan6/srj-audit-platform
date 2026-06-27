@@ -62,3 +62,6 @@ coverage.xml
 
 # Render / deployment artifacts
 .render-build-cache/
+
+# Local backup files from one-shot patches
+*.bak
