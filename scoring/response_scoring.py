@@ -559,6 +559,17 @@ def score_response(
     records which path produced the value, so coverage of heuristic-vs-
     tuned scoring can be measured at the engagement level.
     """
+    # Auto-consult OPTION_WEIGHTS when no override is supplied.
+    # The caller-supplied option_weight_override still wins (precedence
+    # inside _resolve_option_value is: per-question explicit map -> external
+    # override -> DK default -> heuristic). This just makes the curated
+    # weights in option_weights.py the default external override.
+    if option_weight_override is None:
+        try:
+            from .option_weights import OPTION_WEIGHTS
+            option_weight_override = OPTION_WEIGHTS.get(question.id)
+        except ImportError:
+            pass
     scorer = SCORERS.get(question.question_type)
     if scorer is None:
         logger.warning(
