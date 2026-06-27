@@ -12,7 +12,7 @@ Scores are normalized 0.0 to 1.0 where:
 
     0.0  = worst signal (lowest maturity / highest risk)
     1.0  = best signal (highest maturity / lowest risk)
-    0.25 = canonical "Don't know" weight per OD-12 (25% of "No" penalty)
+    0.75 = canonical "Don't know" score per Part A 4.6 / OD-12 (DK penalty is 25% of a No answer's full penalty, so DK score = 1.0 - 0.25 = 0.75)
 
 For risk_exposure dimension questions, V1's framework aggregator
 INVERTS the score (high risk = low aggregate score). DO NOT pre-invert
@@ -78,7 +78,7 @@ from __future__ import annotations
 
 
 # Canonical Don't Know penalty per OD-12
-DK_WEIGHT = 0.25
+DK_WEIGHT = 0.75
 
 # Canonical neutral weight for N/A, Decline-to-answer, etc.
 NEUTRAL = 0.5
