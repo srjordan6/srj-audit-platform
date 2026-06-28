@@ -11,8 +11,8 @@ DIMENSIONS (canonical, production-aligned)
     tool_inventory          21 sub-components, weight 0.20
     cost_mapping            13 sub-components, weight 0.20
     performance_measurement 15 sub-components, weight 0.20
-    risk_exposure           29 sub-components, weight 0.25  (INVERTED)
-    governance_gaps         12 sub-components, weight 0.15
+    risk_exposure           33 sub-components, weight 0.25  (INVERTED)
+    governance_gaps         17 sub-components, weight 0.15
 
 Composite = 0.20·inv + 0.20·cost + 0.20·perf + 0.25·risk + 0.15·gov
 All terms are post-inversion. The composite weight on risk is higher than
