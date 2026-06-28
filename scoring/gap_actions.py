@@ -355,6 +355,70 @@ _add(
     "AI Decision Accountability Framework™",
 )
 
+_add(
+    "v1_audit.risk_exposure.incident_communication_protocol",
+    "No tested communication protocol exists for AI incidents covering "
+    "internal stakeholders, regulators, and customers",
+    "During an AI incident (data leak, regulator inquiry, customer-facing "
+    "error) the first hours determine the outcome. Without a tested "
+    "protocol, short regulatory notification windows (DORA 4-hour, NIS2 "
+    "24-hour early warning, GDPR 72-hour) will be missed and internal, "
+    "regulator, and customer messages will conflict.",
+    "Draft and tabletop-test an AI communication protocol within 90 days: "
+    "internal escalation (legal, board, executives), regulator "
+    "notification with the timing windows applicable to your sectors, and "
+    "customer-affecting messages reviewed by legal before send.",
+    "AI Operational Risk Assessment™",
+)
+
+_add(
+    "v1_audit.risk_exposure.subprocessor_disclosure",
+    "No customer-facing list of AI sub-processors is maintained or "
+    "available on request",
+    "Enterprise customers, insurers, and regulators increasingly require "
+    "visible AI sub-processor disclosure. Without it, the company fails "
+    "customer security questionnaires, DORA third-party oversight "
+    "expectations, and EU Product Liability Directive value-chain "
+    "transparency.",
+    "Publish a customer-facing AI sub-processor list — publicly or on "
+    "request — with a named owner and a change-notification commitment "
+    "in customer contracts. Refresh whenever a sub-processor is added or "
+    "removed.",
+    "AI Operational Risk Categories™",
+)
+
+_add(
+    "v1_audit.risk_exposure.procurement_discipline",
+    "No standard AI-specific procurement rider is applied to new AI "
+    "vendor agreements",
+    "AI vendor contracts default to vendor-favorable terms: no data-"
+    "handling restrictions, no flow-down to downstream regulations (BAA, "
+    "GLBA Safeguards, DFARS, DTSA), no indemnification for AI errors. "
+    "Each contract becomes a unique remediation problem and supply-chain "
+    "obligations (NIS2 Article 21(2)(d)) are unmet.",
+    "Adopt a standard AI procurement rider covering data handling, "
+    "sub-processor disclosure, training-data restrictions, "
+    "indemnification for AI errors, right to audit, and termination on "
+    "material AI policy change. Apply to every new AI vendor agreement.",
+    "AI Integration Checklist™",
+)
+
+_add(
+    "v1_audit.risk_exposure.human_oversight_per_use_case",
+    "Human override capability is not designed into AI use cases "
+    "affecting fundamental rights",
+    "Decisions in employment, credit, healthcare, education, housing, "
+    "and public benefits without a designed override fail meaningful "
+    "human control expectations under the Council of Europe Framework "
+    "Convention on AI, EU AI Act Article 14, and emerging US state laws "
+    "(Colorado AI Act, California ADMT).",
+    "For every fundamental-rights AI use case, design and test a human "
+    "override path. Document the trigger conditions, the reviewer's "
+    "authority, and the rollback steps. Tabletop-test the override "
+    "annually.",
+    "AI Decision Accountability Framework™",
+)
+
 # --- V1 Audit: governance_gaps -------------------------------------------
 
 _add(
@@ -426,6 +490,79 @@ _add(
     "approved tools, prohibited uses, and incident reporting. Track "
     "completion in the LMS.",
     "Standing AI Adoption Policy™",
+)
+
+_add(
+    "v1_audit.governance_gaps.risk_taxonomy",
+    "No AI-specific operational risk taxonomy is mapped to the corporate "
+    "risk register",
+    "The risk register treats AI as a generic technology risk. The "
+    "specific exposure categories (model, data, third-party, vendor "
+    "concentration, decision/agentic, regulatory) are invisible to ERM, "
+    "to the audit committee, and to insurance underwriting.",
+    "Adopt an AI operational risk taxonomy (the V1 Ch 7 AI Operational "
+    "Risk Categories or equivalent). Map every category to a named risk "
+    "register entry with owner, treatment plan, and review cadence.",
+    "AI Operational Risk Categories™",
+)
+
+_add(
+    "v1_audit.governance_gaps.internal_audit_evidence",
+    "No documented AI internal audit log captures scope, findings, and "
+    "evidence",
+    "When a regulator, acquirer, or external auditor asks for the audit "
+    "trail of AI reviews, no defensible workpapers exist. Internal "
+    "audit assertions cannot be substantiated and EU Product Liability "
+    "Directive evidence-disclosure obligations are unmet.",
+    "Stand up an AI internal audit log covering scope, period, findings, "
+    "evidence references, and remediation status. Maintain one entry "
+    "per audit cycle and retain per the company's records policy.",
+    "AI Operational Risk Assessment™",
+)
+
+_add(
+    "v1_audit.governance_gaps.management_review_evidence",
+    "Management review of AI risk, performance, and incidents is not "
+    "captured in formal minutes",
+    "When the board, regulator, or acquirer asks how often management "
+    "reviews AI, the company has no documentation trail. Caremark "
+    "fiduciary expectations and ISO 42001 management-review requirements "
+    "are unsupported.",
+    "Add AI risk, performance, and incidents as a standing item on the "
+    "executive management review. Capture minutes including attendees, "
+    "decisions, and corrective-action assignments. File minutes with "
+    "the same retention as board minutes.",
+    "AI Operating Calendar™",
+)
+
+_add(
+    "v1_audit.governance_gaps.corrective_action_register",
+    "Corrective actions from AI incidents and audit findings are not "
+    "tracked in a formal register",
+    "Incidents close without verified remediation. Repeat failures are "
+    "invisible. NIS2 incident-reporting follow-through expectations and "
+    "ISO 42001 nonconformity tracking are unsupported.",
+    "Stand up an AI corrective action register with named owners, "
+    "target dates, and a verification step that confirms the action "
+    "actually closed the gap. Review status at every management review "
+    "of AI.",
+    "AI Operational Risk Assessment™",
+)
+
+_add(
+    "v1_audit.governance_gaps.decision_influence_documentation",
+    "AI decision influence has not been documented per use case "
+    "(advisory / recommendation / autonomous)",
+    "Without documented decision-influence tiers, the company cannot "
+    "demonstrate meaningful human control under the EU AI Act, the EU "
+    "Product Liability Directive, or the Council of Europe Framework "
+    "Convention on AI. Liability allocation between vendor, deployer, "
+    "and operator is ambiguous.",
+    "Apply a decision-influence framework (the V1 Ch 5 Decision Influence "
+    "Matrix or equivalent) to every AI use case. Document the tier "
+    "(advisory, recommendation-with-confirmation, autonomous) and the "
+    "named approver. Refresh quarterly.",
+    "AI Decision Accountability Framework™",
 )
 
 # --- V2 Readiness: by module ---------------------------------------------
