@@ -29,9 +29,9 @@ questions without explicit mappings (T1-G-010, T1-G-011).
 
 SECTION RULES (Part A §4.5)
 ---------------------------
-    outcome_alignment       D.1 (metric existence), G.1 (outcome alignment)
-    process_optimization    D.2 (output quality), D.3 (comparative perf),
-                            G.2 (process redesign), G.3 (confidence signals)
+    outcome_alignment     D.1 (metric existence), G.1 (outcome alignment)
+    process_optimization  D.2 (output quality), D.3 (comparative perf),
+                          G.2 (process redesign), G.3 (confidence signals)
 
 BRACKETS
 --------
@@ -48,6 +48,21 @@ top-level components.
 PURE AGGREGATION, NO DB
 -----------------------
 Same pattern as v1_audit / v2_readiness / v3_governance.
+
+CONFIDENCE (two-factor model, OD-16/OD-17)
+------------------------------------------
+Component-level confidence delegates to scoring.confidence.compute_confidence:
+per-component counts of non-DK responses backed by attached evidence
+(OD-17) or qualifying notes (OD-16) are fed into the two-factor model.
+Tier 1 has no notes or attachments per the locked capability ceiling,
+so both counters stay at 0 and the result is identical to the
+one-factor DK-only label.
+
+Composite / framework-level confidence remains on the one-factor
+`confidence_for_dk_ratio` helper since it aggregates component DK
+ratios; per-response documentation signals are captured at the
+component level and exposed on EfficiencyComponentScore for future
+composite-level rollup.
 """
 
 from __future__ import annotations
@@ -58,6 +73,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from questionnaire.question_bank import Question
+from scoring.confidence import ConfidenceSignal, compute_confidence
 from scoring.response_scoring import ResponseScore, score_response
 
 logger = logging.getLogger(__name__)
@@ -76,14 +92,14 @@ EFFICIENCY_COMPONENTS: tuple[str, ...] = (
 
 # Composite weights per Part A §4.5: 50/50.
 COMPOSITE_WEIGHTS: dict[str, float] = {
-    "outcome_alignment":    0.5,
+    "outcome_alignment": 0.5,
     "process_optimization": 0.5,
 }
 
 # Section-rule fallback. Applied per Part A §4.5 to questions that have
 # NO explicit efficiency mapping in their framework_mappings.
 EFFICIENCY_SECTION_RULES: dict[str, list[str]] = {
-    "outcome_alignment":    ["D.1", "G.1"],
+    "outcome_alignment": ["D.1", "G.1"],
     "process_optimization": ["D.2", "D.3", "G.2", "G.3"],
 }
 
@@ -96,7 +112,7 @@ _BRACKET_THRESHOLDS: tuple[tuple[float, str], ...] = (
 )
 _BRACKET_TOP_LABEL = "Mature"
 
-# Confidence thresholds (consistent across frameworks)
+# Confidence thresholds — used at composite / framework level
 _CONFIDENCE_HIGH_MAX = 0.15
 _CONFIDENCE_MEDIUM_MAX = 0.35
 
@@ -110,7 +126,12 @@ ContributionSource = Literal["explicit", "section_rule"]
 
 @dataclass(frozen=True)
 class ResponseRecord:
-    """One normalized response row. Shape-compatible with V1 / V2 / V3."""
+    """One normalized response row. Shape-compatible with V1 / V2 / V3.
+
+    has_note / has_attachments are OD-16 / OD-17 signals consumed by the
+    two-factor confidence model. On Tier 1 they are always False per the
+    locked capability ceiling; the model degrades gracefully.
+    """
     question_id: str
     answer_value: Any
     is_dont_know: bool = False
@@ -137,8 +158,15 @@ class EfficiencyContribution:
 
 @dataclass(frozen=True)
 class EfficiencyComponentScore:
-    """Aggregated score for one of the two efficiency components."""
-    name: str                               # outcome_alignment | process_optimization
+    """Aggregated score for one of the two efficiency components.
+
+    attached_non_dk_count and noted_only_non_dk_count are the OD-16 /
+    OD-17 signal counts fed into compute_confidence; they default to 0
+    so callers built before the documentation-boost integration remain
+    valid, and they're available for composite-level rollup in a future
+    pass.
+    """
+    name: str   # outcome_alignment | process_optimization
     contributions: list[EfficiencyContribution]
     weighted_mean_0_1: float
     score_0_100: float
@@ -149,18 +177,20 @@ class EfficiencyComponentScore:
     answered_count: int
     explicit_contribution_count: int
     section_rule_contribution_count: int
+    attached_non_dk_count: int = 0
+    noted_only_non_dk_count: int = 0
 
 
 @dataclass(frozen=True)
 class EfficiencyFrameworkResult:
     """Full efficiency result."""
     framework: str
-    composite_score_0_100: float            # 0.5 × outcome + 0.5 × process
+    composite_score_0_100: float   # 0.5 × outcome + 0.5 × process
     composite_bracket: str
     overall_confidence_level: str
     overall_dk_ratio: float
     components: list[EfficiencyComponentScore]
-    top_gaps: list[EfficiencyComponentScore]  # 1 or 2 — whichever components scored lowest
+    top_gaps: list[EfficiencyComponentScore]   # 1 or 2 — whichever components scored lowest
 
 
 # ----------------------------------------------------------------------------
@@ -175,6 +205,13 @@ def bracket_for_score(score_0_100: float) -> str:
 
 
 def confidence_for_dk_ratio(dk_ratio: float) -> str:
+    """One-factor confidence label from a DK ratio.
+
+    Used at composite / framework level where only an aggregate DK
+    ratio is available. Component-level confidence delegates to
+    scoring.confidence.compute_confidence (two-factor with OD-16/OD-17
+    documentation boost).
+    """
     if dk_ratio <= _CONFIDENCE_HIGH_MAX:
         return "high"
     if dk_ratio <= _CONFIDENCE_MEDIUM_MAX:
@@ -269,12 +306,20 @@ def _score_component(
     responses_by_qid: dict[str, ResponseRecord],
     option_weight_override_map: dict[str, dict[str, float]] | None,
 ) -> EfficiencyComponentScore:
-    """Compute one component's score from its assigned questions."""
+    """Compute one component's score from its assigned questions.
+
+    Tracks `attached_non_dk_count` and `noted_only_non_dk_count` —
+    disjoint counts of non-DK responses backed by attached evidence or
+    qualifying notes — and feeds them to compute_confidence for the
+    two-factor confidence label.
+    """
     contributions: list[EfficiencyContribution] = []
     expected = len(question_assignments)
     dk_count = 0
     explicit_count = 0
     section_rule_count = 0
+    attached_non_dk_count = 0
+    noted_only_non_dk_count = 0
 
     for question, assignment in question_assignments:
         response = responses_by_qid.get(question.id)
@@ -301,6 +346,10 @@ def _score_component(
         ))
         if score.is_dont_know:
             dk_count += 1
+        elif response.has_attachments:
+            attached_non_dk_count += 1
+        elif response.has_note:
+            noted_only_non_dk_count += 1
         if assignment.source == "explicit":
             explicit_count += 1
         else:
@@ -321,6 +370,8 @@ def _score_component(
             answered_count=0,
             explicit_contribution_count=0,
             section_rule_contribution_count=0,
+            attached_non_dk_count=0,
+            noted_only_non_dk_count=0,
         )
 
     total_weight = sum(c.weight for c in contributions)
@@ -335,6 +386,13 @@ def _score_component(
     score_0_100 = weighted_mean * 100.0
     dk_ratio = dk_count / answered
 
+    signal = ConfidenceSignal(
+        answered_count=answered,
+        dk_count=dk_count,
+        attached_non_dk_count=attached_non_dk_count,
+        noted_only_non_dk_count=noted_only_non_dk_count,
+    )
+
     return EfficiencyComponentScore(
         name=component_name,
         contributions=contributions,
@@ -342,11 +400,13 @@ def _score_component(
         score_0_100=score_0_100,
         bracket=bracket_for_score(score_0_100),
         dk_ratio=dk_ratio,
-        confidence_level=confidence_for_dk_ratio(dk_ratio),
+        confidence_level=compute_confidence(signal).level,
         expected_count=expected,
         answered_count=answered,
         explicit_contribution_count=explicit_count,
         section_rule_contribution_count=section_rule_count,
+        attached_non_dk_count=attached_non_dk_count,
+        noted_only_non_dk_count=noted_only_non_dk_count,
     )
 
 

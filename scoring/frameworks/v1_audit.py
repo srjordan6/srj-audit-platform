@@ -8,11 +8,11 @@ top gaps, and produces a composite 0-100 score.
 
 DIMENSIONS (canonical, production-aligned)
 ------------------------------------------
-    tool_inventory          21 sub-components, weight 0.20
-    cost_mapping            13 sub-components, weight 0.20
-    performance_measurement 15 sub-components, weight 0.20
-    risk_exposure           33 sub-components, weight 0.25  (INVERTED)
-    governance_gaps         17 sub-components, weight 0.15
+    tool_inventory             21 sub-components, weight 0.20
+    cost_mapping               13 sub-components, weight 0.20
+    performance_measurement    15 sub-components, weight 0.20
+    risk_exposure              33 sub-components, weight 0.25 (INVERTED)
+    governance_gaps            17 sub-components, weight 0.15
 
 Composite = 0.20·inv + 0.20·cost + 0.20·perf + 0.25·risk + 0.15·gov
 All terms are post-inversion. The composite weight on risk is higher than
@@ -35,20 +35,35 @@ warning. Backport fix to question_bank.py and production data deferred.
 
 SCORE BRACKETS (Part A §4.2)
 ----------------------------
-    0-20    Critical
-    21-40   Concerning
-    41-60   Developing
-    61-80   Sound
-    81-100  Mature
+    0-20      Critical
+    21-40     Concerning
+    41-60     Developing
+    61-80     Sound
+    81-100    Mature
 
-CONFIDENCE
-----------
-Per-sub-component confidence = function of Don't Know ratio:
-    0-15%    high
-    16-35%   medium
-    36%+     low
-Dimension confidence aggregates DK ratios across active sub-components,
-weighted by answered_question_count.
+CONFIDENCE (two-factor model, OD-16/OD-17)
+------------------------------------------
+Sub-component confidence delegates to scoring.confidence.compute_confidence,
+which combines the Don't Know ratio with the share of non-DK responses
+backed by attached evidence (OD-17) or qualifying notes (OD-16) into a
+single effective DK ratio, then maps that to high / medium / low. See
+scoring/confidence.py for the model's full semantics and tunable weights.
+
+Dimension- and framework-level confidence remain on the one-factor
+helper `confidence_for_dk_ratio` because at that level the aggregator
+has only DK ratios to combine — the per-response documentation signal
+is captured in sub-component confidence and surfaced separately via the
+attached_non_dk_count / noted_only_non_dk_count fields on
+SubComponentScore. A future tuning pass can roll those counts up to a
+dimension-level documentation share.
+
+TIER 1 NOTE
+-----------
+Per the locked Tier 1 capability ceiling, Tier 1 responses never set
+`has_note` or `has_attachments`. Both new counters stay at 0, the
+documentation boost is 0, and effective_dk_ratio equals raw_dk_ratio.
+The confidence string is therefore identical to the v0.1 one-factor
+model. No special-casing required.
 
 TOP GAPS
 --------
@@ -84,6 +99,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from questionnaire.question_bank import Question
+from scoring.confidence import ConfidenceSignal, compute_confidence
 from scoring.response_scoring import ResponseScore, score_response
 
 logger = logging.getLogger(__name__)
@@ -110,11 +126,11 @@ INVERTED_DIMENSIONS = frozenset({"risk_exposure"})
 
 # Composite weights per Part A §4.2. Sum to 1.0.
 COMPOSITE_WEIGHTS: dict[str, float] = {
-    "tool_inventory":          0.20,
-    "cost_mapping":            0.20,
+    "tool_inventory": 0.20,
+    "cost_mapping": 0.20,
     "performance_measurement": 0.20,
-    "risk_exposure":           0.25,
-    "governance_gaps":         0.15,
+    "risk_exposure": 0.25,
+    "governance_gaps": 0.15,
 }
 
 # Production data has one orphan: T1-A-014 maps to "governance" (singular,
@@ -132,7 +148,8 @@ _BRACKET_THRESHOLDS: tuple[tuple[float, str], ...] = (
 )
 _BRACKET_TOP_LABEL = "Mature"
 
-# Confidence thresholds (% Don't Know responses)
+# Confidence thresholds (% Don't Know responses) — used at dimension and
+# framework levels where only an aggregate DK ratio is available.
 _CONFIDENCE_HIGH_MAX = 0.15
 _CONFIDENCE_MEDIUM_MAX = 0.35
 
@@ -149,11 +166,9 @@ class ResponseRecord:
     and passes them to score_v1_audit. This decouples the aggregator
     from Django/ORM specifics.
 
-    has_note / has_attachments are OD-16 / OD-17 hooks for the
-    confidence-boost path; the aggregator records them but the v0.1
-    confidence model does not yet bump confidence for documented
-    responses. Wiring that into the confidence calculation is a later
-    tuning pass.
+    has_note / has_attachments are OD-16 / OD-17 signals consumed by the
+    two-factor confidence model. On Tier 1 they are always False per the
+    locked capability ceiling; the model degrades gracefully.
     """
     question_id: str
     answer_value: Any
@@ -166,7 +181,7 @@ class ResponseRecord:
 class QuestionContribution:
     """One question's contribution to a sub-component score."""
     question_id: str
-    weight: float                # from framework_mappings.weight (0.5 / 1.0 / 2.0)
+    weight: float  # from framework_mappings.weight (0.5 / 1.0 / 2.0)
     response_score: ResponseScore
 
 
@@ -177,6 +192,12 @@ class SubComponentScore:
     weighted_mean_0_1 is the LITERAL signal (0=respondent picked the
     negative end, 1=respondent picked the positive end). Inversion is
     handled at the dimension level, not here.
+
+    attached_non_dk_count and noted_only_non_dk_count are the OD-16 /
+    OD-17 signal counts fed into compute_confidence; they default to 0
+    so callers built before the documentation-boost integration remain
+    valid, and they're available for dimension-level rollup in a future
+    pass.
     """
     dimension: str
     sub_component: str
@@ -185,7 +206,9 @@ class SubComponentScore:
     answered_question_count: int    # how many had a non-excluded response
     weighted_mean_0_1: float
     dk_ratio: float
-    confidence_level: str           # "high" / "medium" / "low"
+    confidence_level: str  # "high" / "medium" / "low"
+    attached_non_dk_count: int = 0
+    noted_only_non_dk_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -194,9 +217,9 @@ class V1DimensionScore:
     name: str
     inverted: bool
     sub_components: list[SubComponentScore]
-    raw_score_0_100: float          # pre-inversion mean of sub-components
-    final_score_0_100: float        # post-inversion (== raw if not inverted)
-    bracket: str                    # Critical / Concerning / Developing / Sound / Mature
+    raw_score_0_100: float    # pre-inversion mean of sub-components
+    final_score_0_100: float  # post-inversion (== raw if not inverted)
+    bracket: str  # Critical / Concerning / Developing / Sound / Mature
     confidence_level: str
     dk_ratio: float
     answered_count: int
@@ -212,7 +235,7 @@ class V1FrameworkResult:
     overall_confidence_level: str
     overall_dk_ratio: float
     dimensions: list[V1DimensionScore]
-    top_gaps: list[SubComponentScore]   # 3 sub-components farthest from target
+    top_gaps: list[SubComponentScore]  # 3 sub-components farthest from target
 
 
 # ----------------------------------------------------------------------------
@@ -227,6 +250,13 @@ def bracket_for_score(score_0_100: float) -> str:
 
 
 def confidence_for_dk_ratio(dk_ratio: float) -> str:
+    """One-factor confidence label from a DK ratio.
+
+    Used at dimension and framework levels where only an aggregate DK
+    ratio is available. Sub-component-level confidence delegates to
+    scoring.confidence.compute_confidence (two-factor with OD-16/OD-17
+    documentation boost).
+    """
     if dk_ratio <= _CONFIDENCE_HIGH_MAX:
         return "high"
     if dk_ratio <= _CONFIDENCE_MEDIUM_MAX:
@@ -308,10 +338,17 @@ def _score_sub_component(
     don't contribute). Excluded response types (TEXT, RANK) are also
     skipped. expected_question_count reflects the total assigned;
     answered_question_count reflects what actually contributed.
+
+    Tracks `attached_non_dk_count` and `noted_only_non_dk_count` —
+    disjoint counts of non-DK responses backed by attached evidence or
+    qualifying notes — and feeds them to compute_confidence for the
+    two-factor confidence label.
     """
     contributions: list[QuestionContribution] = []
     expected = len(questions_with_weights)
     dk_count = 0
+    attached_non_dk_count = 0
+    noted_only_non_dk_count = 0
 
     for question, weight in questions_with_weights:
         response = responses_by_qid.get(question.id)
@@ -337,6 +374,10 @@ def _score_sub_component(
         ))
         if score.is_dont_know:
             dk_count += 1
+        elif response.has_attachments:
+            attached_non_dk_count += 1
+        elif response.has_note:
+            noted_only_non_dk_count += 1
 
     answered = len(contributions)
 
@@ -350,6 +391,8 @@ def _score_sub_component(
             weighted_mean_0_1=0.0,
             dk_ratio=0.0,
             confidence_level="low",
+            attached_non_dk_count=0,
+            noted_only_non_dk_count=0,
         )
 
     total_weight = sum(c.weight for c in contributions)
@@ -363,6 +406,12 @@ def _score_sub_component(
         )
 
     dk_ratio = dk_count / answered
+    signal = ConfidenceSignal(
+        answered_count=answered,
+        dk_count=dk_count,
+        attached_non_dk_count=attached_non_dk_count,
+        noted_only_non_dk_count=noted_only_non_dk_count,
+    )
     return SubComponentScore(
         dimension=dimension,
         sub_component=sub_component,
@@ -371,7 +420,9 @@ def _score_sub_component(
         answered_question_count=answered,
         weighted_mean_0_1=weighted_mean,
         dk_ratio=dk_ratio,
-        confidence_level=confidence_for_dk_ratio(dk_ratio),
+        confidence_level=compute_confidence(signal).level,
+        attached_non_dk_count=attached_non_dk_count,
+        noted_only_non_dk_count=noted_only_non_dk_count,
     )
 
 
@@ -441,7 +492,7 @@ def _aggregate_dimension(
 def _gap_magnitude(sub: SubComponentScore) -> float:
     """Distance from target.
 
-    Non-inverted dimensions: target=1.0; gap = 1.0 − signal.
+    Non-inverted dimensions: target=1.0; gap = 1.0 - signal.
     Inverted dimensions: target=0.0; gap = signal.
     """
     if sub.dimension in INVERTED_DIMENSIONS:

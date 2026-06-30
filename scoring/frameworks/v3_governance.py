@@ -22,11 +22,11 @@ weights.
 
 GOVERNANCE MATURITY SCALE (Part A §4.4)
 ---------------------------------------
-    0-20    Level 1  Absent
-    21-40   Level 2  Reactive
-    41-60   Level 3  Defined
-    61-80   Level 4  Integrated
-    81-100  Level 5  Continuous
+    0-20      Level 1   Absent
+    21-40     Level 2   Reactive
+    41-60     Level 3   Defined
+    61-80     Level 4   Integrated
+    81-100    Level 5   Continuous
 
 These labels are distinct from the V2 readiness scale (Ad hoc / Emerging
 / Defined / Managed / Optimizing). Reports must use the correct labels
@@ -40,11 +40,11 @@ a step. These don't roll into any of the 6 steps; they're diagnostic
 overlays surfaced separately in V3 reports. Production currently has
 5 signal categories:
 
-    autonomous_execution_readiness  (4 questions, weights 2.0–2.5)
-    personal_defensibility          (3 questions, weights 1.5–2.0)
-    governance_cadence              (1 question)
-    per_system_documentation        (1 question)
-    regulatory_confidence           (1 question)
+    autonomous_execution_readiness    (4 questions, weights 2.0-2.5)
+    personal_defensibility            (3 questions, weights 1.5-2.0)
+    governance_cadence                (1 question)
+    per_system_documentation          (1 question)
+    regulatory_confidence             (1 question)
 
 The aggregator produces V3CrossCuttingSignalScore for each populated
 category. They contribute to the result for report rendering but are
@@ -60,6 +60,22 @@ signal (higher = more mature governance). No inversion at aggregation.
 PURE AGGREGATION, NO DB
 -----------------------
 Same architecture as v1_audit.py / v2_readiness.py.
+
+CONFIDENCE (two-factor model, OD-16/OD-17)
+------------------------------------------
+Step and cross-cutting-signal confidence delegate to
+scoring.confidence.compute_confidence. The shared inner helper
+`_aggregate_contributions` accumulates the OD-16 / OD-17 signal counts
+alongside DK counts and returns a ConfidenceSignal directly; both
+scoring paths feed that signal to compute_confidence for the two-factor
+label. Tier 1 has no notes or attachments per the locked capability
+ceiling, so both counters stay at 0 and the result is identical to the
+one-factor DK-only label.
+
+Composite / framework-level confidence remains on the one-factor
+`confidence_for_dk_ratio` helper since it aggregates step DK ratios;
+per-response documentation signals are captured at the step level and
+exposed on V3StepScore for future composite-level rollup.
 """
 
 from __future__ import annotations
@@ -70,6 +86,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from questionnaire.question_bank import Question
+from scoring.confidence import ConfidenceSignal, compute_confidence
 from scoring.response_scoring import ResponseScore, score_response
 
 logger = logging.getLogger(__name__)
@@ -100,7 +117,7 @@ _MATURITY_THRESHOLDS: tuple[tuple[float, int, str], ...] = (
     (100.0, 5, "Continuous"),
 )
 
-# Confidence thresholds (consistent across frameworks)
+# Confidence thresholds — used at composite / framework level
 _CONFIDENCE_HIGH_MAX = 0.15
 _CONFIDENCE_MEDIUM_MAX = 0.35
 
@@ -113,8 +130,9 @@ _CONFIDENCE_MEDIUM_MAX = 0.35
 class ResponseRecord:
     """One normalized response row. Shape-compatible with V1 / V2.
 
-    has_note / has_attachments are OD-16 / OD-17 hooks; not yet wired
-    into V3 confidence calculation in v0.1.
+    has_note / has_attachments are OD-16 / OD-17 signals consumed by the
+    two-factor confidence model. On Tier 1 they are always False per the
+    locked capability ceiling; the model degrades gracefully.
     """
     question_id: str
     answer_value: Any
@@ -133,17 +151,26 @@ class V3StepContribution:
 
 @dataclass(frozen=True)
 class V3StepScore:
-    """Aggregated score for one of the 6 V3 review steps."""
+    """Aggregated score for one of the 6 V3 review steps.
+
+    attached_non_dk_count and noted_only_non_dk_count are the OD-16 /
+    OD-17 signal counts fed into compute_confidence; they default to 0
+    so callers built before the documentation-boost integration remain
+    valid, and they're available for composite-level rollup in a future
+    pass.
+    """
     name: str
     contributions: list[V3StepContribution]
     weighted_mean_0_1: float
     score_0_100: float
-    maturity_level: int            # 1–5
-    maturity_label: str            # Absent / Reactive / Defined / Integrated / Continuous
+    maturity_level: int   # 1-5
+    maturity_label: str   # Absent / Reactive / Defined / Integrated / Continuous
     dk_ratio: float
     confidence_level: str
     expected_count: int
     answered_count: int
+    attached_non_dk_count: int = 0
+    noted_only_non_dk_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -161,20 +188,22 @@ class V3CrossCuttingSignalScore:
     confidence_level: str
     expected_count: int
     answered_count: int
+    attached_non_dk_count: int = 0
+    noted_only_non_dk_count: int = 0
 
 
 @dataclass(frozen=True)
 class V3FrameworkResult:
     """Full V3 governance result."""
     framework: str
-    composite_score_0_100: float       # mean of 6 active step scores
+    composite_score_0_100: float   # mean of 6 active step scores
     composite_maturity_level: int
     composite_maturity_label: str
     overall_confidence_level: str
     overall_dk_ratio: float
     steps: list[V3StepScore]
     cross_cutting_signals: list[V3CrossCuttingSignalScore]
-    top_gaps: list[V3StepScore]        # 3 lowest-scoring active steps
+    top_gaps: list[V3StepScore]   # 3 lowest-scoring active steps
 
 
 # ----------------------------------------------------------------------------
@@ -182,7 +211,7 @@ class V3FrameworkResult:
 # ----------------------------------------------------------------------------
 
 def maturity_for_score(score_0_100: float) -> tuple[int, str]:
-    """Return (level_int_1_5, label) for a 0–100 governance score."""
+    """Return (level_int_1_5, label) for a 0-100 governance score."""
     for threshold, level, label in _MATURITY_THRESHOLDS:
         if score_0_100 <= threshold:
             return (level, label)
@@ -190,6 +219,13 @@ def maturity_for_score(score_0_100: float) -> tuple[int, str]:
 
 
 def confidence_for_dk_ratio(dk_ratio: float) -> str:
+    """One-factor confidence label from a DK ratio.
+
+    Used at composite / framework level where only an aggregate DK
+    ratio is available. Step and cross-cutting-signal confidence
+    delegate to scoring.confidence.compute_confidence (two-factor with
+    OD-16/OD-17 documentation boost).
+    """
     if dk_ratio <= _CONFIDENCE_HIGH_MAX:
         return "high"
     if dk_ratio <= _CONFIDENCE_MEDIUM_MAX:
@@ -255,15 +291,23 @@ def _aggregate_contributions(
     questions_with_weights: list[tuple[Question, float]],
     responses_by_qid: dict[str, ResponseRecord],
     option_weight_override_map: dict[str, dict[str, float]] | None,
-) -> tuple[list[V3StepContribution], float, float, int, int]:
+) -> tuple[list[V3StepContribution], float, ConfidenceSignal, int]:
     """Score a bag of (question, weight) tuples.
 
-    Returns (contributions, weighted_mean_0_1, dk_ratio, expected, answered).
-    Common helper used by both step scoring and cross-cutting signal scoring.
+    Returns (contributions, weighted_mean_0_1, confidence_signal, expected).
+
+    The ConfidenceSignal carries answered_count, dk_count, and the
+    OD-16 / OD-17 documentation counts (attached_non_dk, noted_only_non_dk).
+    Callers pass it directly to compute_confidence for the two-factor
+    confidence label.
+
+    Empty case: returns ([], 0.0, ConfidenceSignal(0, 0, 0, 0), expected).
     """
     contributions: list[V3StepContribution] = []
     expected = len(questions_with_weights)
     dk_count = 0
+    attached_non_dk_count = 0
+    noted_only_non_dk_count = 0
 
     for question, weight in questions_with_weights:
         response = responses_by_qid.get(question.id)
@@ -289,10 +333,21 @@ def _aggregate_contributions(
         ))
         if score.is_dont_know:
             dk_count += 1
+        elif response.has_attachments:
+            attached_non_dk_count += 1
+        elif response.has_note:
+            noted_only_non_dk_count += 1
 
     answered = len(contributions)
+    signal = ConfidenceSignal(
+        answered_count=answered,
+        dk_count=dk_count,
+        attached_non_dk_count=attached_non_dk_count,
+        noted_only_non_dk_count=noted_only_non_dk_count,
+    )
+
     if answered == 0:
-        return ([], 0.0, 0.0, expected, 0)
+        return ([], 0.0, signal, expected)
 
     total_weight = sum(c.weight for c in contributions)
     if total_weight <= 0:
@@ -302,9 +357,8 @@ def _aggregate_contributions(
             sum(c.weight * c.response_score.value for c in contributions)
             / total_weight
         )
-    dk_ratio = dk_count / answered
 
-    return (contributions, weighted_mean, dk_ratio, expected, answered)
+    return (contributions, weighted_mean, signal, expected)
 
 
 # ----------------------------------------------------------------------------
@@ -317,9 +371,10 @@ def _score_step(
     responses_by_qid: dict[str, ResponseRecord],
     option_weight_override_map: dict[str, dict[str, float]] | None,
 ) -> V3StepScore:
-    contributions, weighted_mean, dk_ratio, expected, answered = _aggregate_contributions(
+    contributions, weighted_mean, signal, expected = _aggregate_contributions(
         questions_with_weights, responses_by_qid, option_weight_override_map,
     )
+    answered = signal.answered_count
 
     if answered == 0:
         return V3StepScore(
@@ -333,6 +388,8 @@ def _score_step(
             confidence_level="low",
             expected_count=expected,
             answered_count=0,
+            attached_non_dk_count=0,
+            noted_only_non_dk_count=0,
         )
 
     score_0_100 = weighted_mean * 100.0
@@ -345,10 +402,12 @@ def _score_step(
         score_0_100=score_0_100,
         maturity_level=level,
         maturity_label=label,
-        dk_ratio=dk_ratio,
-        confidence_level=confidence_for_dk_ratio(dk_ratio),
+        dk_ratio=signal.dk_ratio,
+        confidence_level=compute_confidence(signal).level,
         expected_count=expected,
         answered_count=answered,
+        attached_non_dk_count=signal.attached_non_dk_count,
+        noted_only_non_dk_count=signal.noted_only_non_dk_count,
     )
 
 
@@ -362,19 +421,24 @@ def _score_cross_cutting_signal(
     responses_by_qid: dict[str, ResponseRecord],
     option_weight_override_map: dict[str, dict[str, float]] | None,
 ) -> V3CrossCuttingSignalScore:
-    contributions, weighted_mean, dk_ratio, expected, answered = _aggregate_contributions(
+    contributions, weighted_mean, conf_signal, expected = _aggregate_contributions(
         questions_with_weights, responses_by_qid, option_weight_override_map,
     )
+    answered = conf_signal.answered_count
+
+    confidence_level = compute_confidence(conf_signal).level if answered > 0 else "low"
 
     return V3CrossCuttingSignalScore(
         name=signal_name,
         contributions=contributions,
         weighted_mean_0_1=weighted_mean,
         score_0_100=weighted_mean * 100.0,
-        dk_ratio=dk_ratio,
-        confidence_level=confidence_for_dk_ratio(dk_ratio) if answered > 0 else "low",
+        dk_ratio=conf_signal.dk_ratio,
+        confidence_level=confidence_level,
         expected_count=expected,
         answered_count=answered,
+        attached_non_dk_count=conf_signal.attached_non_dk_count,
+        noted_only_non_dk_count=conf_signal.noted_only_non_dk_count,
     )
 
 
