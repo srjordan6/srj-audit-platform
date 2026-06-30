@@ -1,36 +1,33 @@
 {% comment %}
-Single-select question partial.
+Likert 1-5 question partial.
 
-Renders YN, SS, and NR question types. All three present the same UI
-contract: choose exactly one option from a list. The question_type
-distinction matters for scoring (response_scoring.py heuristics), not
-for rendering. Production data shows YN options are not always literal
-Yes/No — e.g., T1-B-013 has "Yes — regularly / Yes — occasionally /
-No / I'm not sure / Decline to answer".
+Renders L5 question type. Visually distinct from single-select: a
+horizontal 5-point scale with the endpoints labeled. Production data
+shows two L5 option styles:
+  - Numeric only:        ["1", "2", "3", "4", "5"]
+  - Anchored endpoints:  ["1 (not at all)", "2", "3", "4", "5 (strongly trust)"]
+The partial renders whichever the question carries — the labels are
+drawn straight from question.options.
 
 Context contract
 ----------------
-question        Question dict from the DB. Required keys:
-                  id (str), question_type (str), question_text (str),
-                  options (list[str]), required (bool).
-prior_answer    Optional dict from `responses.answer_value` JSONB for
-                save-and-resume. Recognized shape:
+question        Question dict. Required keys: id, question_type,
+                question_text, options (must have exactly 5),
+                required.
+prior_answer    Optional dict.
+                Recognized shape:
                   {"selected": "<option label>"}
-submit_url      URL to POST the answer to (HTMX hx-post target).
-swap_target     CSS selector the response should be swapped into
-                (HTMX hx-target). Typical: "#question-shell".
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
 
-The partial is a pure HTML fragment — does NOT extend base.html.
-Designed to be the swap target of an HTMX request: the full page
-includes it via {% include %} on first load, and the server returns
-the next question's rendering of this partial for subsequent swaps.
-
-The "Don't know" / "Decline to answer" / "I'm not sure" options appear
-inside `options` per production data — no separate UI affordance is
-needed. The scoring engine identifies don't-know responses by string
-match per scoring/response_scoring.py.
+Each radio gets a numeric value (1-5) AND carries the full option
+label for posting back to the server. The server stores the literal
+label string in `responses.answer_value`; scoring then maps via the
+option_weight system. Storing the numeric value separately would
+require teaching response_scoring.py to handle two storage shapes —
+not worth it.
 {% endcomment %}
-<form class="srj-question srj-question--single-select"
+<form class="srj-question srj-question--likert"
       hx-post="{{ submit_url }}"
       hx-target="{{ swap_target|default:'#question-shell' }}"
       hx-swap="innerHTML"
@@ -47,10 +44,10 @@ match per scoring/response_scoring.py.
         <span class="visually-hidden">required</span>
       {% endif %}
     </legend>
-    <div class="srj-question__options">
+    <div class="srj-question__likert d-flex flex-wrap gap-3 justify-content-start align-items-start">
       {% for option in question.options %}
         {% with input_id="opt-"|add:question.id|add:"-"|add:forloop.counter|stringformat:"s" %}
-        <div class="form-check">
+        <div class="form-check srj-question__likert-item text-center">
           <input class="form-check-input"
                  type="radio"
                  name="answer"
@@ -58,7 +55,7 @@ match per scoring/response_scoring.py.
                  value="{{ option }}"
                  {% if question.required %}required{% endif %}
                  {% if prior_answer and prior_answer.selected == option %}checked{% endif %}>
-          <label class="form-check-label" for="{{ input_id }}">
+          <label class="form-check-label d-block" for="{{ input_id }}">
             {{ option }}
           </label>
         </div>
