@@ -1,0 +1,74 @@
+{% comment %}
+Multi-select question partial.
+
+Renders MS question type. The respondent may select zero or more
+options (subject to question.required validation server-side — when
+required, the view should reject empty submissions).
+
+Context contract
+----------------
+question        Question dict. Required keys: id, question_type,
+                question_text, options, required.
+prior_answer    Optional dict from `responses.answer_value` JSONB.
+                Recognized shape:
+                  {"selected": ["option a", "option b"]}
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+
+Multiple checkboxes share name="answer" so the standard form-encoded
+POST submits one `answer` value per checked box. Django's
+request.POST.getlist('answer') retrieves the full list.
+
+The "None of these" option appears as a regular checkbox per production
+data (e.g. T1-B-002). Mutual exclusivity with other options (selecting
+"None of these" should clear the rest) is NOT enforced here — that's a
+client-side UX nicety to ship later, not a v1 concern. The scoring
+engine treats {"selected": ["None of these"]} correctly regardless.
+{% endcomment %}
+<form class="srj-question srj-question--multi-select"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="{{ question.question_type }}">
+  {% csrf_token %}
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+      {% if question.required %}
+        <span class="srj-question__required text-danger" aria-hidden="true">*</span>
+        <span class="visually-hidden">required</span>
+      {% endif %}
+      <span class="srj-question__hint text-muted small d-block mt-1">
+        Select all that apply
+      </span>
+    </legend>
+    <div class="srj-question__options">
+      {% for option in question.options %}
+        {% with input_id="opt-"|add:question.id|add:"-"|add:forloop.counter|stringformat:"s" %}
+        <div class="form-check">
+          <input class="form-check-input"
+                 type="checkbox"
+                 name="answer"
+                 id="{{ input_id }}"
+                 value="{{ option }}"
+                 {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
+          <label class="form-check-label" for="{{ input_id }}">
+            {{ option }}
+          </label>
+        </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+  </fieldset>
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      Press Enter to continue
+    </span>
+  </div>
+</form>
