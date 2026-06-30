@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tier 1 question bank for SRJ AI Audit Platform.
 
 Generated from production database 2026-06-28.
@@ -4973,6 +4973,11 @@ TIER_1_QUESTIONS = [
 
 # Convenience aliases
 QUESTIONS = TIER_1_QUESTIONS
+
+# Type alias for question dicts; used as a type hint in scoring.frameworks.*
+# (annotations are lazy under `from __future__ import annotations`, so this
+# alias only needs to be importable, not strictly correct as a generic).
+Question = dict
 
 
 def get_questions_by_section(section: str) -> list:
