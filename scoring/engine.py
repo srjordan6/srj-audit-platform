@@ -63,6 +63,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -70,6 +71,26 @@ from django.db import connection
 
 from questionnaire.question_bank import QUESTIONS
 from scoring.frameworks import efficiency, v1_audit, v2_readiness, v3_governance
+
+
+def _wrap_for_aggregator(q: dict) -> SimpleNamespace:
+    """Adapt a dict-shaped question row to the attribute-access shape the
+    framework aggregators expect (e.g. `question.framework_mappings`,
+    `question.id`, `question.subsection`).
+
+    The four framework modules were written against a Question dataclass
+    that was never materialized; production `QUESTIONS` is a list of
+    plain dicts. SimpleNamespace gives attribute access with no
+    behavior change.
+    """
+    return SimpleNamespace(**q)
+
+
+# Cached once at module import. The aggregators are pure (no mutation),
+# so a single shared sequence per process is correct.
+_QUESTIONS_AS_NS: tuple[SimpleNamespace, ...] = tuple(
+    _wrap_for_aggregator(q) for q in QUESTIONS
+)
 
 # Use v1_audit's ResponseRecord as the canonical engine type. All four
 # framework modules accept this shape at runtime.
@@ -174,19 +195,19 @@ def _score_for_responses(
 ]:
     """Run all four framework scorers against one response set."""
     v1_result = v1_audit.score_v1_audit(
-        QUESTIONS, responses_by_qid,
+        _QUESTIONS_AS_NS, responses_by_qid,
         option_weight_override_map=option_weight_override_map,
     )
     v2_result = v2_readiness.score_v2_readiness(
-        QUESTIONS, responses_by_qid,
+        _QUESTIONS_AS_NS, responses_by_qid,
         option_weight_override_map=option_weight_override_map,
     )
     v3_result = v3_governance.score_v3_governance(
-        QUESTIONS, responses_by_qid,
+        _QUESTIONS_AS_NS, responses_by_qid,
         option_weight_override_map=option_weight_override_map,
     )
     eff_result = efficiency.score_efficiency(
-        QUESTIONS, responses_by_qid,
+        _QUESTIONS_AS_NS, responses_by_qid,
         option_weight_override_map=option_weight_override_map,
     )
     return v1_result, v2_result, v3_result, eff_result
