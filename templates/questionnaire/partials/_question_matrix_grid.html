@@ -1,0 +1,156 @@
+{% comment %}
+Matrix question partial — Pattern A: cell-independent tri-state,
+respondent-editable row names.
+
+Handles the T1-B-017 (tools) and T1-D-001 (use cases) shape:
+  - matrix_rows is a list of placeholder labels (e.g. "Tool 1")
+    the respondent overwrites with real names via text inputs
+  - matrix_columns is a list of yes/no/dont-know attribute questions
+  - Each cell is an independent selector — the respondent picks one
+    of matrix_cell_options (typically ["Yes", "No", "Don't know"])
+    per (row, column) pair
+
+Pattern discriminator: extended_metadata does NOT include
+matrix_input_pattern="single_selection_per_row". Pattern B uses
+that key; the view layer selects between _question_matrix_grid.html
+(this file) and _question_matrix_choice.html by inspecting it.
+
+Context contract
+----------------
+question        Question dict. Required keys: id, question_type,
+                question_text, required, matrix_rows, matrix_columns,
+                extended_metadata.
+                extended_metadata.matrix_cell_options drives the
+                per-cell selector options (defaults to
+                ["Yes", "No", "Don't know"]).
+prior_answer    Currently ignored for the Grid pattern (see v1 limitation
+                below). The view layer's response persistence still
+                captures full submissions correctly; only save-and-resume
+                pre-fill is deferred.
+
+                v1 LIMITATION: Restoring a partially-completed matrix
+                (row names + cell selections) requires either a custom
+                template filter (|get_item) or pre-flattening the
+                nested prior_answer.rows structure into the flat context
+                the view already passes down. Neither is worth the churn
+                to ship tonight; the practical impact is minor because
+                MATRIX questions come late in the questionnaire (T1-B-017,
+                T1-D-001) and respondents typically complete them in one
+                sitting. A follow-up PR adds a template filter and full
+                save-and-resume for grid matrices.
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+
+Server contract
+---------------
+On submit, each row emits:
+  - A text input named "row_name_<row_index>" (respondent-provided name)
+  - For each column, a radio group named "cell_<row_index>_<col_index>"
+    with values from matrix_cell_options
+The view layer reconstructs the JSONB rows structure from the flat POST
+fields. Row/column indices (rather than labels) are used because column
+labels can be very long and become unreadable form field names.
+
+Mobile note
+-----------
+Matrix layouts don't fit on narrow viewports. The wrapper is
+horizontally scrollable (overflow-x:auto via Bootstrap's .table-responsive)
+so the grid remains usable on mobile without cropping cells.
+{% endcomment %}
+{% with cell_options=question.extended_metadata.matrix_cell_options %}
+<form class="srj-question srj-question--matrix srj-question--matrix-grid"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="MATRIX"
+      data-matrix-pattern="grid">
+  {% csrf_token %}
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+      {% if question.required %}
+        <span class="srj-question__required text-danger" aria-hidden="true">*</span>
+        <span class="visually-hidden">required</span>
+      {% endif %}
+      <span class="srj-question__hint text-muted small d-block mt-1">
+        Enter each row's name, then indicate which apply.
+      </span>
+    </legend>
+
+    <div class="table-responsive">
+      <table class="table table-bordered srj-question__matrix-table">
+        <thead>
+          <tr>
+            <th scope="col" class="srj-question__matrix-row-header">Item</th>
+            {% for column in question.matrix_columns %}
+              <th scope="col" class="srj-question__matrix-col-header">
+                {{ column }}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in question.matrix_rows %}
+            {% with row_index=forloop.counter0 %}
+            <tr data-row-index="{{ row_index }}" data-row-placeholder="{{ row }}">
+              <th scope="row" class="srj-question__matrix-row-name">
+                <label class="visually-hidden"
+                       for="row-name-{{ question.id }}-{{ row_index }}">
+                  Name for {{ row }}
+                </label>
+                <input type="text"
+                       class="form-control form-control-sm"
+                       id="row-name-{{ question.id }}-{{ row_index }}"
+                       name="row_name_{{ row_index }}"
+                       placeholder="{{ row }}"
+                       maxlength="120">
+              </th>
+              {% for column in question.matrix_columns %}
+                {% with col_index=forloop.counter0 %}
+                <td class="srj-question__matrix-cell"
+                    data-col-index="{{ col_index }}"
+                    data-col-label="{{ column }}">
+                  <fieldset class="srj-question__matrix-cell-fieldset">
+                    <legend class="visually-hidden">
+                      {{ row }} — {{ column }}
+                    </legend>
+                    {% for opt in cell_options %}
+                      {% with input_id="cell-"|add:question.id|add:"-"|add:row_index|stringformat:"s"|add:"-"|add:col_index|stringformat:"s"|add:"-"|add:forloop.counter|stringformat:"s" %}
+                      <div class="form-check form-check-inline srj-question__matrix-cell-option">
+                        <input type="radio"
+                               class="form-check-input"
+                               id="{{ input_id }}"
+                               name="cell_{{ row_index }}_{{ col_index }}"
+                               value="{{ opt }}"
+                               {% if question.required %}required{% endif %}>
+                        <label class="form-check-label small" for="{{ input_id }}">
+                          {{ opt }}
+                        </label>
+                      </div>
+                      {% endwith %}
+                    {% endfor %}
+                  </fieldset>
+                </td>
+                {% endwith %}
+              {% endfor %}
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </fieldset>
+
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      All cells must be answered
+    </span>
+  </div>
+</form>
+{% endwith %}

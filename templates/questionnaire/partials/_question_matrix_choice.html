@@ -1,0 +1,123 @@
+{% comment %}
+Matrix question partial — Pattern B: single-selection-per-row,
+fixed row labels.
+
+Handles the T1-F-002 shape (AI governance structures grid):
+  - matrix_rows is a list of fixed governance-item labels (respondent
+    does NOT edit them)
+  - matrix_columns lists the choice options for each row
+    (e.g. "Yes — formal", "Yes — informal", "No", "Don't know")
+  - Each row is a single radio group across the columns; the columns
+    aren't independent selectors, they're mutually exclusive choices
+    for that row's question
+
+Pattern discriminator: extended_metadata.matrix_input_pattern ==
+"single_selection_per_row". The view layer selects this partial by
+inspecting that key.
+
+Context contract
+----------------
+question        Question dict. Required keys: id, question_type,
+                question_text, required, matrix_rows, matrix_columns,
+                extended_metadata.
+prior_answer    Optional dict for save-and-resume.
+                Recognized shape:
+                  {"rows": {"<row label>": "<selected column label>", ...}}
+                For each row present in prior_answer.rows, the matching
+                column radio is pre-selected. Rows not in prior_answer
+                render with no selection.
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+
+Server contract
+---------------
+On submit, each row emits ONE radio group named "row_<row_index>" with
+value equal to the selected column label. The view layer reconstructs
+the JSONB rows structure by mapping row_index → matrix_rows[i] and
+using the posted column label as the answer.
+
+Prior-answer restore uses index-based lookups (via Django's forloop
+counters) rather than a custom filter — the trade-off is that the
+respondent must not have shifted rows between saves. Production data
+has fixed row labels, so this is safe.
+{% endcomment %}
+<form class="srj-question srj-question--matrix srj-question--matrix-choice"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="MATRIX"
+      data-matrix-pattern="choice">
+  {% csrf_token %}
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+      {% if question.required %}
+        <span class="srj-question__required text-danger" aria-hidden="true">*</span>
+        <span class="visually-hidden">required</span>
+      {% endif %}
+      <span class="srj-question__hint text-muted small d-block mt-1">
+        Choose one option per row.
+      </span>
+    </legend>
+
+    <div class="table-responsive">
+      <table class="table table-bordered srj-question__matrix-table">
+        <thead>
+          <tr>
+            <th scope="col" class="srj-question__matrix-row-header"></th>
+            {% for column in question.matrix_columns %}
+              <th scope="col" class="srj-question__matrix-col-header text-center">
+                {{ column }}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in question.matrix_rows %}
+            {% with row_index=forloop.counter0 %}
+            <tr data-row-index="{{ row_index }}" data-row-label="{{ row }}">
+              <th scope="row" class="srj-question__matrix-row-label">
+                {{ row }}
+              </th>
+              {% for column in question.matrix_columns %}
+                {% with col_index=forloop.counter0 %}
+                <td class="srj-question__matrix-cell text-center"
+                    data-col-index="{{ col_index }}"
+                    data-col-label="{{ column }}">
+                  {% with input_id="cell-"|add:question.id|add:"-"|add:row_index|stringformat:"s"|add:"-"|add:col_index|stringformat:"s" %}
+                  <div class="form-check d-inline-block">
+                    <input type="radio"
+                           class="form-check-input"
+                           id="{{ input_id }}"
+                           name="row_{{ row_index }}"
+                           value="{{ column }}"
+                           {% if question.required %}required{% endif %}
+                           aria-label="{{ row }} — {{ column }}">
+                    <label class="visually-hidden" for="{{ input_id }}">
+                      {{ row }} — {{ column }}
+                    </label>
+                  </div>
+                  {% endwith %}
+                </td>
+                {% endwith %}
+              {% endfor %}
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </fieldset>
+
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      All rows must be answered
+    </span>
+  </div>
+</form>
