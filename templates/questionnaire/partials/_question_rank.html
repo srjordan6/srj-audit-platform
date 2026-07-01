@@ -1,0 +1,151 @@
+{% comment %}
+Ranked-order question partial.
+
+Renders RANK question type. Production has 2 RANK questions:
+  T1-F-012 — rank top 3 (rank_max=3, 10 options)
+  T1-G-001 — rank top 5 (rank_max=5, 10 options)
+
+Two-column layout:
+  - LEFT ("Available"): unranked options, drag source
+  - RIGHT ("Your ranking"): ordered drop zone with numbered slots
+
+Drag-and-drop is handled by SortableJS (loaded once in base.html). The
+partial itself is functional-but-degraded without JS: the hidden input
+`ranked_order` is server-side canonical, and a small piece of JS
+concatenates the current DOM order into that hidden input on submit.
+Without JS the respondent can't submit a meaningful ranking, so the
+partial also emits a <noscript> notice.
+
+Context contract
+----------------
+question        Question dict. Required keys: id, question_type,
+                question_text, options, required.
+                question.extended_metadata.rank_max drives the top-N
+                cap; defaults to len(options) if absent.
+prior_answer    Optional dict for save-and-resume.
+                Recognized shape:
+                  {"ranked": ["option a", "option b", ...]}
+                On restore, the prior ranking populates the right list
+                in order; remaining options populate the left list.
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+
+Server contract
+---------------
+Client posts a single form field named "answer" containing the ordered
+option labels concatenated with "||" as a separator (e.g. "Speed||Quality||Risk reduction").
+The view layer splits on "||" and validates against question.options
+and rank_max before persisting as {"ranked": [...]}.
+
+Why "||" as separator: option labels can contain commas (e.g., "Regulatory
+uncertainty"), pipes are extremely uncommon in normal prose, and double-pipe
+is unambiguous. A dedicated hidden input per position was rejected because
+SortableJS reorders the DOM but not the input names — recomputing them
+server-side from a single joined string is simpler than tracking N inputs.
+
+Testing note
+------------
+Unit tests verify the rendered DOM structure — the two lists, correct
+option distribution based on prior_answer, hidden input presence, and
+data attrs SortableJS needs. JS behavior is manually verified in the
+Sprint C browser walkthrough.
+{% endcomment %}
+{% with options_length=question.options|length %}
+{% with rank_max=question.extended_metadata.rank_max|default:options_length %}
+<form class="srj-question srj-question--rank"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="RANK"
+      data-rank-max="{{ rank_max }}"
+      onsubmit="return srjRankPrepareSubmit(this);">
+  {% csrf_token %}
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+      {% if question.required %}
+        <span class="srj-question__required text-danger" aria-hidden="true">*</span>
+        <span class="visually-hidden">required</span>
+      {% endif %}
+      <span class="srj-question__hint text-muted small d-block mt-1">
+        Drag your top {{ rank_max }} into the ranking column. Order matters.
+      </span>
+    </legend>
+
+    <noscript>
+      <div class="alert alert-warning" role="alert">
+        This question requires JavaScript to complete.
+      </div>
+    </noscript>
+
+    {% comment %}
+    Split options into two lists based on prior_answer. If prior_answer
+    exists, options in prior_answer.ranked go into the right column in
+    that order; remaining options go into the left. Otherwise all
+    options start in the left column.
+    {% endcomment %}
+    <div class="srj-question__rank-columns row g-3">
+      <div class="col-md-6">
+        <div class="srj-question__rank-label small text-muted mb-2">
+          Available options
+        </div>
+        <ol id="rank-available-{{ question.id }}"
+            class="srj-question__rank-list list-group"
+            data-role="rank-source">
+          {% for option in question.options %}
+            {% if prior_answer and option in prior_answer.ranked %}
+              {# option is in prior ranking — will render in the right column, skip here #}
+            {% else %}
+              <li class="list-group-item srj-question__rank-item"
+                  data-option="{{ option }}"
+                  draggable="true">
+                <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
+                <span class="srj-question__rank-label-text">{{ option }}</span>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ol>
+      </div>
+
+      <div class="col-md-6">
+        <div class="srj-question__rank-label small text-muted mb-2">
+          Your ranking (top {{ rank_max }})
+        </div>
+        <ol id="rank-selected-{{ question.id }}"
+            class="srj-question__rank-list srj-question__rank-list--target list-group"
+            data-role="rank-target"
+            data-max="{{ rank_max }}">
+          {% if prior_answer %}
+            {% for option in prior_answer.ranked %}
+              {% if option in question.options %}
+                <li class="list-group-item srj-question__rank-item"
+                    data-option="{{ option }}"
+                    draggable="true">
+                  <span class="srj-question__rank-position badge bg-secondary me-2">{{ forloop.counter }}</span>
+                  <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
+                  <span class="srj-question__rank-label-text">{{ option }}</span>
+                </li>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        </ol>
+      </div>
+    </div>
+
+    <input type="hidden" name="answer" value="" data-role="rank-hidden-input">
+  </fieldset>
+
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      Drag from the left column to rank
+    </span>
+  </div>
+</form>
+{% endwith %}
+{% endwith %}
