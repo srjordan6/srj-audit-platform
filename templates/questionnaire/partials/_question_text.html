@@ -1,0 +1,78 @@
+{% comment %}
+Free-text question partial.
+
+Renders TEXT question type. Production has ONE TEXT question today
+(T1-H-006, the optional closing "anything else?" prompt with a
+300-character limit). The partial is written to handle any future
+TEXT questions the bank might grow — max_length is read from
+`question.extended_metadata.max_length`, not hardcoded.
+
+Context contract
+----------------
+question        Question dict. Required keys: id, question_type,
+                question_text, required, extended_metadata.
+                extended_metadata.max_length drives the maxlength
+                attribute; defaults to 1000 if absent.
+prior_answer    Optional dict for save-and-resume.
+                Recognized shape:
+                  {"text": "prior response text"}
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+
+Character limit is enforced two ways for defense in depth:
+  1. HTML5 `maxlength` attribute — browser blocks typing past the cap
+  2. Server-side validation (in the view layer, later PR) — clip or reject
+Both need the same number, so the partial exposes the effective cap
+in a data attribute for JavaScript enhancement to read if we add a
+live counter later.
+
+The partial does NOT extend base.html — pure fragment, same swap-target
+pattern as the other question partials.
+{% endcomment %}
+{% with max_length=question.extended_metadata.max_length|default:1000 %}
+<form class="srj-question srj-question--text"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="{{ question.question_type }}"
+      data-max-length="{{ max_length }}">
+  {% csrf_token %}
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+      {% if question.required %}
+        <span class="srj-question__required text-danger" aria-hidden="true">*</span>
+        <span class="visually-hidden">required</span>
+      {% endif %}
+    </legend>
+    <div class="srj-question__textarea-wrap">
+      <label for="text-{{ question.id }}" class="visually-hidden">
+        Your response
+      </label>
+      <textarea class="form-control"
+                id="text-{{ question.id }}"
+                name="answer"
+                rows="5"
+                maxlength="{{ max_length }}"
+                {% if question.required %}required{% endif %}
+                aria-describedby="text-hint-{{ question.id }}"
+      >{% if prior_answer %}{{ prior_answer.text }}{% endif %}</textarea>
+      <div id="text-hint-{{ question.id }}"
+           class="form-text text-muted small mt-1">
+        Maximum {{ max_length }} characters
+      </div>
+    </div>
+  </fieldset>
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      {% if question.required %}Save &amp; continue{% else %}Save &amp; finish{% endif %}
+    </button>
+    <span class="srj-question__hint text-muted small">
+      Press Enter to insert a line break
+    </span>
+  </div>
+</form>
+{% endwith %}
