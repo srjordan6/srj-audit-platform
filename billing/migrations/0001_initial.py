@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('credit_type', models.CharField(choices=[
-                    ('tier_1_upgrade', 'Tier 1 → Tier 2 Upgrade Credit ($199)'),
+                    ('tier_1_upgrade', 'Tier 1 → Tier 2 Upgrade Credit ($399)'),
                     ('nurture_15pct', 'Nurture Sequence 15% Discount'),
                     ('manual', 'Manual / Goodwill Credit'),
                 ], max_length=50)),

@@ -7,7 +7,7 @@ from django.db import models
 class Report(models.Model):
     """A generated PDF report for one framework of one engagement.
 
-    A Tier 1 engagement that pays for the $199 report produces 4 Report rows
+    A Tier 1 engagement that pays for the $399 report produces 4 Report rows
     (one per framework). Tier 2 produces 4 board-grade reports. Tier 3 produces
     additional engagement-specific deliverables.
     """

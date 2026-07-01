@@ -12,14 +12,14 @@ class DiscountCredit(models.Model):
     """A credit applied to a user's account, valid for one engagement purchase.
 
     Two primary sources:
-    - Tier 1 → Tier 2 upgrade: $199 credit, 90-day validity (Decision B-5)
+    - Tier 1 → Tier 2 upgrade: $399 credit, 90-day validity (Decision B-5)
     - Nurture sequence: 15% off Tier 2, 14-day validity (Decision 7-7)
 
     Credits can stack — both may apply to the same purchase.
     """
 
     CREDIT_TYPE_CHOICES = [
-        ('tier_1_upgrade', 'Tier 1 → Tier 2 Upgrade Credit ($199)'),
+        ('tier_1_upgrade', 'Tier 1 → Tier 2 Upgrade Credit ($399)'),
         ('nurture_15pct', 'Nurture Sequence 15% Discount'),
         ('manual', 'Manual / Goodwill Credit'),
     ]
