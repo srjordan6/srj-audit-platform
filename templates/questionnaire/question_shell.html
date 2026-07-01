@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% comment %}
+Questionnaire container page.
+
+This is the full-page shell that gets loaded ONCE at the start of a
+respondent's session. Inside it lives <div id="question-shell">, the
+target of every HTMX swap for question navigation. When the respondent
+submits an answer, the view returns the NEXT question's partial HTML
+directly — it replaces the innerHTML of #question-shell without a page
+reload.
+
+The initial question is rendered server-side via {% include %} into
+the shell. Subsequent questions arrive via HTMX response.
+
+Context contract
+----------------
+initial_question_template   Path to the question partial to render as
+                            the initial question (e.g.,
+                            "questionnaire/partials/_question_single_select.html").
+                            Chosen by the view based on the current
+                            question's type.
+question                    The initial question dict (same context as
+                            the partial expects).
+submit_url                  HTMX hx-post target for the initial question.
+swap_target                 CSS selector for HTMX swap — always
+                            "#question-shell" here; passed through so
+                            future flexibility (e.g., subsection
+                            swaps) works.
+progress                    Optional dict with keys `current` and `total`
+                            for progress display. Empty progress bar
+                            renders if absent.
+
+Why this file is small
+----------------------
+Layout, brand, CDN loading, and HTMX/Sortable JS all live in base.html.
+This file is just the questionnaire-specific container — a centered
+column, an empty progress hint, and the swap target. Keeping it thin
+means adding pages (dashboard, marketing, admin) doesn't fork the base.
+{% endcomment %}
+
+{% block title %}Complete your audit · SRJ Audit{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-7">
+
+      <div class="mb-4 text-center">
+        <span class="srj-brand-mark">SRJ Audit</span>
+      </div>
+
+      {% if progress %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center small text-muted mb-1">
+            <span>Question {{ progress.current }} of {{ progress.total }}</span>
+            <span>{{ progress.percent }}%</span>
+          </div>
+          <div class="progress" style="height: 4px;">
+            <div class="progress-bar"
+                 role="progressbar"
+                 style="width: {{ progress.percent }}%; background-color: var(--srj-brand);"
+                 aria-valuenow="{{ progress.percent }}"
+                 aria-valuemin="0"
+                 aria-valuemax="100"></div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4 p-md-5">
+          <div id="question-shell">
+            {% if initial_question_template %}
+              {% include initial_question_template %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center mt-4">
+        <small class="text-muted">
+          Answers are saved automatically. You can close this window and return via the link in your email.
+        </small>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
