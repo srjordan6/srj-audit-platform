@@ -1,4 +1,4 @@
-"""Base settings for SRJ AI Audit Platform.
+﻿"""Base settings for SRJ AI Audit Platform.
 
 Imported by development.py and production.py. Defaults to development-friendly
 values; production.py hardens the security-sensitive ones.
@@ -120,7 +120,7 @@ STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
 STRIPE_IDENTITY_WEBHOOK_SECRET = env('STRIPE_IDENTITY_WEBHOOK_SECRET', default='')
-TIER_1_REPORT_PRICE_CENTS = env.int('TIER_1_REPORT_PRICE_CENTS', default=19900)
+TIER_1_REPORT_PRICE_CENTS = env.int('TIER_1_REPORT_PRICE_CENTS', default=39900)
 STRIPE_IDENTITY_REQUIRED_THRESHOLD_EMPLOYEES = env.int(
     'STRIPE_IDENTITY_REQUIRED_THRESHOLD_EMPLOYEES', default=501
 )
@@ -161,7 +161,7 @@ TEMPLATES = [
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-     'OPTIONS': {'min_length': 12}},  # Per Part A §2.8 security baseline
+     'OPTIONS': {'min_length': 12}},  # Per Part A Â§2.8 security baseline
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
