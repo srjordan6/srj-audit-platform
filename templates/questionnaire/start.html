@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Start your AI audit — SRJ AI Audit Platform{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 640px;">
+    <h1 class="mb-3">AI Audit Snapshot</h1>
+    <p class="text-muted mb-4">
+        Free 30-minute assessment across five dimensions. Get your top-line
+        scores immediately.
+    </p>
+
+    <form method="post" action="{% url 'questionnaire:start' %}">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label for="email" class="form-label">Your email</label>
+            <input type="email" id="email" name="email" class="form-control"
+                   required autocomplete="email">
+        </div>
+
+        <div class="mb-3">
+            <label for="name" class="form-label">Your name</label>
+            <input type="text" id="name" name="name" class="form-control"
+                   required autocomplete="name">
+        </div>
+
+        <div class="mb-3">
+            <label for="role" class="form-label">Your role</label>
+            <select id="role" name="role" class="form-select" required>
+                <option value="">Select…</option>
+                <option value="BOARD">Board Member</option>
+                <option value="CEO">CEO or Owner</option>
+                <option value="CFO">CFO</option>
+                <option value="CIO">CIO</option>
+                <option value="CISO">CISO</option>
+                <option value="COO">COO</option>
+                <option value="VP">VP</option>
+                <option value="DIR">Director</option>
+                <option value="MGR">Line Manager</option>
+                <option value="IC">Individual Contributor</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="company_name" class="form-label">Company name</label>
+            <input type="text" id="company_name" name="company_name"
+                   class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="company_industry" class="form-label">Industry</label>
+            <input type="text" id="company_industry" name="company_industry"
+                   class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="company_size_bracket" class="form-label">Company size</label>
+            <select id="company_size_bracket" name="company_size_bracket"
+                    class="form-select" required>
+                <option value="">Select…</option>
+                <option value="1-25">1-25 employees</option>
+                <option value="26-100">26-100</option>
+                <option value="101-500">101-500</option>
+                <option value="501-2000">501-2,000</option>
+                <option value="2001-5000">2,001-5,000</option>
+                <option value="5000+">5,000+</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg">
+            Begin assessment →
+        </button>
+    </form>
+</div>
+{% endblock %}

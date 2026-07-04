@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Attestation — SRJ AI Audit Platform{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 640px;">
+    <h2 class="mb-3">Before you begin</h2>
+
+    <div class="alert alert-light border p-4 mb-4">
+        <p class="mb-0">{{ attestation_text }}</p>
+    </div>
+
+    <form method="post" action="{% url 'questionnaire:attest' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-lg">
+            I attest — begin questionnaire
+        </button>
+    </form>
+</div>
+{% endblock %}
