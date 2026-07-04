@@ -63,11 +63,12 @@ def test_landing_references_srj_consulting_footer():
 
 
 def test_landing_trademark_forms_correct():
-    """Per locked trademark master list — V1 with 'The', V2/V4 with 'The', V3 without."""
+    """Per locked trademark master list — V1/V2/V4 with 'The', V3 without."""
     html = _render()
     assert "The AI Business Enablement Audit" in html
-    assert "AI Readiness &amp; Performance Assessment" in html
+    assert "The AI Readiness &amp; Performance Assessment" in html
     assert "AI Risk &amp; Governance Review" in html
+    assert "The AI Efficiency &amp; Process Optimization" in html
     # V3 must NOT have leading "The"
     assert "The AI Risk" not in html
 
