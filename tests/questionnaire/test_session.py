@@ -8,17 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from django.conf import settings
-
-
-if not settings.configured:
-    settings.configure(
-        SECRET_KEY="test-secret-not-for-production-use",
-        USE_TZ=True,
-    )
-
-
-from questionnaire import services, session  # noqa: E402
+from questionnaire import services, session
 from questionnaire.attestation import (  # noqa: E402
     CURRENT_TIER_1_ATTESTATION,
     TIER_1_ATTESTATION_V1,
