@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tier 1 question bank for SRJ AI Audit Platform.
 
 Generated from production database 2026-06-28.
