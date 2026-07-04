@@ -12,6 +12,7 @@ Top-level routing. App URLs are included by prefix:
 """
 from django.contrib import admin
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render
 from django.urls import include, path
 
 
@@ -21,15 +22,8 @@ def healthz(request):
 
 
 def root(request):
-    """Placeholder root view until the engagements app provides landing pages.
-    Returns minimal JSON so curl checks against deployed instance produce
-    machine-readable output rather than an empty Django 404."""
-    return JsonResponse({
-        "service": "srj-audit-platform",
-        "status": "skeleton",
-        "version": "0.1.0",
-        "next_apps_to_build": ["engagements", "questionnaire", "scoring", "reports"],
-    })
+    """Marketing landing page — hero + value bullets + CTA to /q/start/."""
+    return render(request, "marketing/landing.html", {})
 
 
 urlpatterns = [
