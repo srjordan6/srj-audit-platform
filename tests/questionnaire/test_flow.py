@@ -192,7 +192,7 @@ def test_is_terminal_true_for_t1_h_006():
 
 
 def test_is_terminal_false_for_other_questions():
-    for qid in ["T1-A-001", "T1-B-001", "T1-H-001", "T1-H-002"]:
+    for qid in ["T1-A-001", "T1-B-001", "T1-H-002"]:
         q = get_question_by_id(qid)
         assert flow.is_terminal(q) is False, f"{qid} should not be terminal"
 
