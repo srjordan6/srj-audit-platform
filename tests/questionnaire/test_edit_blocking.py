@@ -8,6 +8,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
+if not settings.configured:
+    settings.configure(
+        DEFAULT_CHARSET="utf-8",
+        DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
+    )
+
 from questionnaire import services
 
 
