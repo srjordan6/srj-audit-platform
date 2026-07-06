@@ -64,13 +64,16 @@ def test_landing_references_srj_consulting_footer():
 
 def test_landing_trademark_forms_correct():
     """Per locked trademark master list — V1/V2/V4 with 'The', V3 without."""
-    html = _render()
-    assert "The AI Business Enablement Audit" in html
-    assert "The AI Readiness &amp; Performance Assessment" in html
-    assert "AI Risk &amp; Governance Review" in html
-    assert "The AI Efficiency &amp; Process Optimization" in html
+    import re
+    raw = (TEMPLATES_DIR / "marketing" / "landing.html").read_text(encoding="utf-8")
+    # Collapse whitespace so multi-line phrases match
+    flat = re.sub(r"\s+", " ", raw)
+    assert "The AI Business Enablement Audit" in flat
+    assert "The AI Readiness & Performance Assessment" in flat
+    assert "AI Risk & Governance Review" in flat
+    assert "The AI Efficiency & Process Optimization" in flat
     # V3 must NOT have leading "The"
-    assert "The AI Risk" not in html
+    assert "The AI Risk" not in flat
 
 
 def test_landing_trademark_symbols_present():
