@@ -1,0 +1,19 @@
+{% comment %}
+Rendered inside #question-shell when engagements.snapshot_state = 'Locked'.
+Per OD-18 §2.3 + §8: reports remain viewable/printable/downloadable, but
+questionnaire is read-only. Purchase a new snapshot to reassess.
+{% endcomment %}
+<div class="alert alert-warning border border-warning p-4">
+    <h3 class="mb-3">Snapshot Locked</h3>
+    <p class="mb-2">
+        Your 7-day edit window has closed. This snapshot is now a permanent record.
+    </p>
+    <p class="mb-3 text-muted">
+        Your reports remain available to view, print, and download from your account.
+        To reassess your AI posture, purchase a new $399 snapshot — your prior
+        snapshot is preserved as history indefinitely.
+    </p>
+    <a href="{% url 'questionnaire:start' %}" class="btn btn-primary">
+        Start a new snapshot →
+    </a>
+</div>

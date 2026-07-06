@@ -1,12 +1,4 @@
-"""Service layer for questionnaire orchestration.
-
-Pure functions that combine flow.py logic with DB access via a cursor
-parameter. Views are thin wrappers over these. Testable with mocked
-cursors — no Django settings required for unit tests.
-
-All DB access uses parameterized queries; no ORM. Callers are responsible
-for wrapping multi-statement operations in a transaction.
-"""
+"""Service layer for questionnaire orchestration."""
 
 from __future__ import annotations
 
@@ -22,7 +14,6 @@ from questionnaire import flow
 
 
 def load_answered_by_id(cursor, respondent_id: str) -> dict[str, Any]:
-    """Return {question_id: answer_value} for every response by this respondent."""
     cursor.execute(
         "SELECT question_id, answer_value FROM responses "
         "WHERE respondent_id = %s",
@@ -32,7 +23,6 @@ def load_answered_by_id(cursor, respondent_id: str) -> dict[str, Any]:
 
 
 def get_respondent_role(cursor, respondent_id: str) -> Optional[str]:
-    """Return the role string for this respondent, or None if not found."""
     cursor.execute(
         "SELECT role FROM respondents WHERE id = %s",
         (respondent_id,),
@@ -50,11 +40,6 @@ def save_response(
     answer_value: dict,
     is_dont_know: bool = False,
 ) -> None:
-    """Upsert a response row.
-
-    UNIQUE(respondent_id, question_id) means re-answering the same
-    question updates the existing row rather than creating a duplicate.
-    """
     cursor.execute(
         """
         INSERT INTO responses
@@ -74,7 +59,6 @@ def get_next_question_context(
     cursor,
     respondent_id: str,
 ) -> Optional[dict]:
-    """Return context for rendering next question, or None if done."""
     role = get_respondent_role(cursor, respondent_id)
     if role is None:
         return None
@@ -104,7 +88,6 @@ def create_engagement_and_respondent(
     company_industry: str,
     company_size_bracket: str,
 ) -> str:
-    """Create or find company + user, then create engagement + respondent."""
     cursor.execute(
         "SELECT id FROM companies WHERE name = %s LIMIT 1",
         (company_name,),
@@ -157,7 +140,6 @@ def sign_attestation(
     respondent_id: str,
     attestation_text: str,
 ) -> None:
-    """Record attestation timestamp and text version on the respondent row."""
     cursor.execute(
         "UPDATE respondents "
         "SET attestation_signed_at = NOW(), attestation_text = %s "
@@ -167,7 +149,6 @@ def sign_attestation(
 
 
 def is_attestation_signed(cursor, respondent_id: str) -> bool:
-    """Return True if respondent has already signed the attestation."""
     cursor.execute(
         "SELECT attestation_signed_at IS NOT NULL "
         "FROM respondents WHERE id = %s",
@@ -180,16 +161,12 @@ def is_attestation_signed(cursor, respondent_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Lifecycle state lookup (Sprint D PR 3)
+# Lifecycle state lookup (Sprint D PR 3 + PR 5)
 # ---------------------------------------------------------------------------
 
 
 def get_engagement_state(cursor, respondent_id: str) -> Optional[str]:
-    """Return the snapshot_state of the engagement owning this respondent.
-
-    Used by the edit-blocking decorator to enforce OD-18 §2.3/§2.4:
-    Locked and Expired snapshots reject all writes.
-    """
+    """Return the snapshot_state of the engagement owning this respondent."""
     cursor.execute(
         "SELECT e.snapshot_state FROM engagements e "
         "JOIN respondents r ON r.engagement_id = e.id "
@@ -198,3 +175,25 @@ def get_engagement_state(cursor, respondent_id: str) -> Optional[str]:
     )
     row = cursor.fetchone()
     return row[0] if row else None
+
+
+def get_lifecycle_context(cursor, respondent_id: str) -> Optional[dict]:
+    """Return snapshot_state + window_end_ts + purchase_ts for lifecycle rendering.
+
+    Used by views to dispatch to Locked/Expired banners and compute countdown.
+    """
+    cursor.execute(
+        "SELECT e.snapshot_state, e.window_end_timestamp, e.created_at "
+        "FROM engagements e "
+        "JOIN respondents r ON r.engagement_id = e.id "
+        "WHERE r.id = %s",
+        (respondent_id,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "state": row[0],
+        "window_end_ts": row[1],
+        "purchase_ts": row[2],
+    }

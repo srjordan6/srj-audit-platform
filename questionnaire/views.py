@@ -1,12 +1,16 @@
 """HTTP layer for questionnaire flow.
 
-Thin views over questionnaire.services. Write endpoints wrapped by
-@require_writable_state (Sprint D PR 3) to enforce OD-18 lifecycle.
+Sprint D PR 5: lifecycle-aware rendering. State-based dispatch:
+- Locked  → _locked.html
+- Expired → _expired.html
+- Editable → include countdown_text in context
+- Draft   → standard question rendering
 """
 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from django.db import connection, transaction
 from django.http import HttpResponseBadRequest, HttpResponseNotFound
@@ -14,57 +18,81 @@ from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
+from engagements import lifecycle
 from questionnaire import services, session as session_module
 from questionnaire.attestation import CURRENT_TIER_1_ATTESTATION
 from questionnaire.decorators import require_writable_state
 
 
 COMPLETE_TEMPLATE = "questionnaire/partials/_questionnaire_complete.html"
+LOCKED_TEMPLATE = "questionnaire/partials/_locked.html"
+EXPIRED_TEMPLATE = "questionnaire/partials/_expired.html"
 
 
 def _resolve_respondent_id(request) -> str | None:
-    """Return respondent_id from session, then query param, then None."""
     rid = request.session.get("respondent_id")
     if not rid:
         rid = request.GET.get("respondent_id")
     return rid
 
 
-def _render_context(request, ctx: dict | None):
-    """Render either the next-question partial or the completion partial."""
+def _dispatch_by_state(request, cursor, respondent_id: str):
+    """Render Locked/Expired/complete/next-question based on lifecycle state.
+
+    Returns an HttpResponse. Locked/Expired short-circuit before question
+    lookup. Editable adds countdown_text to context. Draft renders normally.
+    """
+    lifecycle_ctx = services.get_lifecycle_context(cursor, respondent_id)
+    if lifecycle_ctx is None:
+        return HttpResponseNotFound("respondent not found")
+
+    state = lifecycle_ctx["state"]
+    if state == lifecycle.LOCKED:
+        return render(request, LOCKED_TEMPLATE, {})
+    if state == lifecycle.EXPIRED:
+        return render(request, EXPIRED_TEMPLATE, {})
+
+    ctx = services.get_next_question_context(cursor, respondent_id)
     if ctx is None:
         return render(request, COMPLETE_TEMPLATE, {})
+
+    countdown_text = None
+    if state == lifecycle.EDITABLE:
+        countdown_text = lifecycle.format_countdown(
+            lifecycle_ctx["window_end_ts"],
+            datetime.now(timezone.utc),
+        )
+
     return render(
         request,
         ctx["partial"],
         {
             "question": ctx["question"],
             "progress": ctx["progress"],
+            "countdown_text": countdown_text,
         },
     )
 
 
 # ---------------------------------------------------------------------------
-# Questionnaire flow (PR 6 + PR 3 edit-blocking)
+# Questionnaire flow
 # ---------------------------------------------------------------------------
 
 
 @require_http_methods(["GET"])
 def next_question(request):
-    """Return the current respondent's next question, or completion state."""
+    """Return the current respondent's next question or lifecycle banner."""
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
     with connection.cursor() as cursor:
-        ctx = services.get_next_question_context(cursor, rid)
-    return _render_context(request, ctx)
+        return _dispatch_by_state(request, cursor, rid)
 
 
 @require_http_methods(["POST"])
 @csrf_protect
 @require_writable_state
 def submit_response(request):
-    """Persist the submitted answer, then return the next question."""
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
@@ -88,20 +116,17 @@ def submit_response(request):
         services.save_response(
             cursor, rid, question_id, answer_value, is_dont_know
         )
-        ctx = services.get_next_question_context(cursor, rid)
-
-    return _render_context(request, ctx)
+        return _dispatch_by_state(request, cursor, rid)
 
 
 # ---------------------------------------------------------------------------
-# Session bootstrap (PR 7)
+# Session bootstrap
 # ---------------------------------------------------------------------------
 
 
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def start(request):
-    """Landing page for a new Tier 1 questionnaire."""
     if request.method == "GET":
         return render(request, "questionnaire/start.html", {})
 
@@ -139,11 +164,6 @@ def start(request):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def attest(request):
-    """Attestation modal (GET) and signing (POST). Per Decision 7-8.
-
-    POST is gated by @require_writable_state — Locked/Expired reject.
-    Applied via _attest_post to keep GET path unblocked.
-    """
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
@@ -160,7 +180,6 @@ def attest(request):
 
 @require_writable_state
 def _attest_post(request):
-    """Sign attestation — separated so require_writable_state gates POST only."""
     rid = _resolve_respondent_id(request)
     with connection.cursor() as cursor:
         services.sign_attestation(cursor, rid, CURRENT_TIER_1_ATTESTATION)
@@ -169,7 +188,6 @@ def _attest_post(request):
 
 @require_http_methods(["GET"])
 def resume(request, token: str):
-    """Parse resume token, re-establish session, redirect to next question."""
     rid = session_module.parse_resume_token(token)
     if rid is None:
         return HttpResponseNotFound("resume link invalid or expired")

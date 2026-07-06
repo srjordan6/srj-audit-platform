@@ -1,0 +1,12 @@
+{% comment %}
+Rendered above the question during Editable state. countdown_text is
+computed server-side by lifecycle.format_countdown() and included in the
+render context by views._dispatch_by_state.
+
+If countdown_text is None/empty, this include renders nothing.
+{% endcomment %}
+{% if countdown_text %}
+<div class="alert alert-info d-flex align-items-center mb-3">
+    <strong>{{ countdown_text }}</strong>
+</div>
+{% endif %}

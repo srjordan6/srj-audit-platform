@@ -1,0 +1,18 @@
+{% comment %}
+Rendered inside #question-shell when engagements.snapshot_state = 'Expired'.
+Per OD-18 §4: 180 days after purchase without report generation, the
+entitlement forfeits. Aligned with Stripe chargeback window (no dispute
+exposure past this point).
+{% endcomment %}
+<div class="alert alert-danger border border-danger p-4">
+    <h3 class="mb-3">Snapshot Expired</h3>
+    <p class="mb-2">
+        Your 180-day entitlement has expired. This snapshot was never generated.
+    </p>
+    <p class="mb-3 text-muted">
+        To assess your AI posture, purchase a new $399 snapshot.
+    </p>
+    <a href="{% url 'questionnaire:start' %}" class="btn btn-primary">
+        Start a new snapshot →
+    </a>
+</div>
