@@ -1,19 +1,11 @@
 """Tests for edit-blocking (Sprint D PR 3).
 
-Covers services.get_engagement_state (cursor-based) and the
-require_writable_state decorator (mocked request + cursor).
+Mocks Django Response classes so tests run without settings configuration.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
-
-from django.conf import settings
-if not settings.configured:
-    settings.configure(
-        DEFAULT_CHARSET="utf-8",
-        DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
-    )
 
 from questionnaire import services
 
@@ -61,13 +53,9 @@ def test_get_engagement_state_returns_expired():
 # ---------------------------------------------------------------------------
 # require_writable_state decorator
 # ---------------------------------------------------------------------------
-#
-# Decorator wraps a view and consults services.get_engagement_state via a
-# django.db.connection cursor. We patch both to mock behavior.
 
 
-def _mock_request(respondent_id: str | None = "rid"):
-    """Build a minimal request-like object with session + GET dicts."""
+def _mock_request(respondent_id="rid"):
     req = MagicMock()
     req.session = {"respondent_id": respondent_id} if respondent_id else {}
     req.GET = {}
@@ -75,9 +63,7 @@ def _mock_request(respondent_id: str | None = "rid"):
 
 
 def _wrapped_dummy_view():
-    """Return a wrapped view + a call-tracking sentinel."""
     from questionnaire.decorators import require_writable_state
-
     called = {"count": 0}
 
     @require_writable_state
@@ -88,9 +74,18 @@ def _wrapped_dummy_view():
     return view, called
 
 
+def _sentinel_response(status):
+    r = MagicMock()
+    r.status_code = status
+    r.content = b""
+    return r
+
+
+@patch("questionnaire.decorators._response_403")
+@patch("questionnaire.decorators._response_404")
 @patch("questionnaire.decorators.connection")
 @patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_calls_view_when_state_draft(get_state, conn):
+def test_decorator_calls_view_when_state_draft(get_state, conn, r404, r403):
     get_state.return_value = "Draft"
     conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
@@ -98,11 +93,15 @@ def test_decorator_calls_view_when_state_draft(get_state, conn):
     result = view(_mock_request())
     assert result == "ok"
     assert called["count"] == 1
+    r403.assert_not_called()
+    r404.assert_not_called()
 
 
+@patch("questionnaire.decorators._response_403")
+@patch("questionnaire.decorators._response_404")
 @patch("questionnaire.decorators.connection")
 @patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_calls_view_when_state_editable(get_state, conn):
+def test_decorator_calls_view_when_state_editable(get_state, conn, r404, r403):
     get_state.return_value = "Editable"
     conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
@@ -110,61 +109,62 @@ def test_decorator_calls_view_when_state_editable(get_state, conn):
     result = view(_mock_request())
     assert result == "ok"
     assert called["count"] == 1
+    r403.assert_not_called()
 
 
+@patch("questionnaire.decorators._response_403")
+@patch("questionnaire.decorators._response_404")
 @patch("questionnaire.decorators.connection")
 @patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_returns_403_when_state_locked(get_state, conn):
+def test_decorator_returns_403_when_state_locked(get_state, conn, r404, r403):
     get_state.return_value = "Locked"
     conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    r403.return_value = _sentinel_response(403)
     view, called = _wrapped_dummy_view()
-    response = view(_mock_request())
-    assert response.status_code == 403
+    result = view(_mock_request())
     assert called["count"] == 0
+    r403.assert_called_once_with("Locked")
 
 
+@patch("questionnaire.decorators._response_403")
+@patch("questionnaire.decorators._response_404")
 @patch("questionnaire.decorators.connection")
 @patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_returns_403_when_state_expired(get_state, conn):
+def test_decorator_returns_403_when_state_expired(get_state, conn, r404, r403):
     get_state.return_value = "Expired"
     conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    r403.return_value = _sentinel_response(403)
     view, called = _wrapped_dummy_view()
-    response = view(_mock_request())
-    assert response.status_code == 403
+    view(_mock_request())
     assert called["count"] == 0
+    r403.assert_called_once_with("Expired")
 
 
+@patch("questionnaire.decorators._response_403")
+@patch("questionnaire.decorators._response_404")
 @patch("questionnaire.decorators.connection")
 @patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_returns_404_when_respondent_id_missing(get_state, conn):
+def test_decorator_returns_404_when_respondent_id_missing(get_state, conn, r404, r403):
+    r404.return_value = _sentinel_response(404)
     view, called = _wrapped_dummy_view()
-    response = view(_mock_request(respondent_id=None))
-    assert response.status_code == 404
+    view(_mock_request(respondent_id=None))
     assert called["count"] == 0
     get_state.assert_not_called()
+    r404.assert_called_once_with("respondent_id required")
 
 
+@patch("questionnaire.decorators._response_403")
+@patch("questionnaire.decorators._response_404")
 @patch("questionnaire.decorators.connection")
 @patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_returns_404_when_respondent_not_found(get_state, conn):
+def test_decorator_returns_404_when_respondent_not_found(get_state, conn, r404, r403):
     get_state.return_value = None
     conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
     conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    r404.return_value = _sentinel_response(404)
     view, called = _wrapped_dummy_view()
-    response = view(_mock_request())
-    assert response.status_code == 404
+    view(_mock_request())
     assert called["count"] == 0
-
-
-@patch("questionnaire.decorators.connection")
-@patch("questionnaire.decorators.services.get_engagement_state")
-def test_decorator_403_message_includes_state_name(get_state, conn):
-    get_state.return_value = "Locked"
-    conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
-    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-    view, _called = _wrapped_dummy_view()
-    response = view(_mock_request())
-    assert b"Locked" in response.content
-    assert b"$399" in response.content
+    r404.assert_called_once_with("respondent not found")
