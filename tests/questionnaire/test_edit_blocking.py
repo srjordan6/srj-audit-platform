@@ -83,12 +83,12 @@ def _sentinel_response(status):
 
 @patch("questionnaire.decorators._response_403")
 @patch("questionnaire.decorators._response_404")
-@patch("questionnaire.decorators.connection")
+@patch("questionnaire.decorators._get_cursor_ctx")
 @patch("questionnaire.decorators.services.get_engagement_state")
 def test_decorator_calls_view_when_state_draft(get_state, conn, r404, r403):
     get_state.return_value = "Draft"
-    conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
-    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    conn.return_value.__enter__ = MagicMock(return_value=MagicMock())
+    conn.return_value.__exit__ = MagicMock(return_value=False)
     view, called = _wrapped_dummy_view()
     result = view(_mock_request())
     assert result == "ok"
@@ -99,12 +99,12 @@ def test_decorator_calls_view_when_state_draft(get_state, conn, r404, r403):
 
 @patch("questionnaire.decorators._response_403")
 @patch("questionnaire.decorators._response_404")
-@patch("questionnaire.decorators.connection")
+@patch("questionnaire.decorators._get_cursor_ctx")
 @patch("questionnaire.decorators.services.get_engagement_state")
 def test_decorator_calls_view_when_state_editable(get_state, conn, r404, r403):
     get_state.return_value = "Editable"
-    conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
-    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    conn.return_value.__enter__ = MagicMock(return_value=MagicMock())
+    conn.return_value.__exit__ = MagicMock(return_value=False)
     view, called = _wrapped_dummy_view()
     result = view(_mock_request())
     assert result == "ok"
@@ -114,12 +114,12 @@ def test_decorator_calls_view_when_state_editable(get_state, conn, r404, r403):
 
 @patch("questionnaire.decorators._response_403")
 @patch("questionnaire.decorators._response_404")
-@patch("questionnaire.decorators.connection")
+@patch("questionnaire.decorators._get_cursor_ctx")
 @patch("questionnaire.decorators.services.get_engagement_state")
 def test_decorator_returns_403_when_state_locked(get_state, conn, r404, r403):
     get_state.return_value = "Locked"
-    conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
-    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    conn.return_value.__enter__ = MagicMock(return_value=MagicMock())
+    conn.return_value.__exit__ = MagicMock(return_value=False)
     r403.return_value = _sentinel_response(403)
     view, called = _wrapped_dummy_view()
     result = view(_mock_request())
@@ -129,12 +129,12 @@ def test_decorator_returns_403_when_state_locked(get_state, conn, r404, r403):
 
 @patch("questionnaire.decorators._response_403")
 @patch("questionnaire.decorators._response_404")
-@patch("questionnaire.decorators.connection")
+@patch("questionnaire.decorators._get_cursor_ctx")
 @patch("questionnaire.decorators.services.get_engagement_state")
 def test_decorator_returns_403_when_state_expired(get_state, conn, r404, r403):
     get_state.return_value = "Expired"
-    conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
-    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    conn.return_value.__enter__ = MagicMock(return_value=MagicMock())
+    conn.return_value.__exit__ = MagicMock(return_value=False)
     r403.return_value = _sentinel_response(403)
     view, called = _wrapped_dummy_view()
     view(_mock_request())
@@ -144,7 +144,7 @@ def test_decorator_returns_403_when_state_expired(get_state, conn, r404, r403):
 
 @patch("questionnaire.decorators._response_403")
 @patch("questionnaire.decorators._response_404")
-@patch("questionnaire.decorators.connection")
+@patch("questionnaire.decorators._get_cursor_ctx")
 @patch("questionnaire.decorators.services.get_engagement_state")
 def test_decorator_returns_404_when_respondent_id_missing(get_state, conn, r404, r403):
     r404.return_value = _sentinel_response(404)
@@ -157,12 +157,12 @@ def test_decorator_returns_404_when_respondent_id_missing(get_state, conn, r404,
 
 @patch("questionnaire.decorators._response_403")
 @patch("questionnaire.decorators._response_404")
-@patch("questionnaire.decorators.connection")
+@patch("questionnaire.decorators._get_cursor_ctx")
 @patch("questionnaire.decorators.services.get_engagement_state")
 def test_decorator_returns_404_when_respondent_not_found(get_state, conn, r404, r403):
     get_state.return_value = None
-    conn.cursor.return_value.__enter__ = MagicMock(return_value=MagicMock())
-    conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    conn.return_value.__enter__ = MagicMock(return_value=MagicMock())
+    conn.return_value.__exit__ = MagicMock(return_value=False)
     r404.return_value = _sentinel_response(404)
     view, called = _wrapped_dummy_view()
     view(_mock_request())
