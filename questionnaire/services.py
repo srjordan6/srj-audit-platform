@@ -74,17 +74,7 @@ def get_next_question_context(
     cursor,
     respondent_id: str,
 ) -> Optional[dict]:
-    """Return context for rendering next question, or None if done.
-
-    Returns:
-        {
-            "question": SimpleNamespace,
-            "partial": str,
-            "progress": (int, int, float),
-            "role": str,
-        }
-        or None if respondent unknown OR all visible questions answered.
-    """
+    """Return context for rendering next question, or None if done."""
     role = get_respondent_role(cursor, respondent_id)
     if role is None:
         return None
@@ -114,16 +104,7 @@ def create_engagement_and_respondent(
     company_industry: str,
     company_size_bracket: str,
 ) -> str:
-    """Create or find company + user, then create engagement + respondent.
-
-    Returns the new respondent_id (str UUID). Caller is responsible for
-    wrapping in a transaction — this function issues up to 5 statements.
-
-    Company match is exact-name; user match is exact-email. Duplicates by
-    slight variations (extra spaces, casing) create new rows. Enhance later
-    if needed.
-    """
-    # Company: find or create
+    """Create or find company + user, then create engagement + respondent."""
     cursor.execute(
         "SELECT id FROM companies WHERE name = %s LIMIT 1",
         (company_name,),
@@ -138,7 +119,6 @@ def create_engagement_and_respondent(
         row = cursor.fetchone()
     company_id = row[0]
 
-    # User: find or create (Tier 1 anonymous-then-claimed per Part A §2.6)
     cursor.execute(
         "SELECT id FROM users WHERE email = %s LIMIT 1",
         (email,),
@@ -153,7 +133,6 @@ def create_engagement_and_respondent(
         row = cursor.fetchone()
     user_id = row[0]
 
-    # Engagement: always new (each Tier 1 purchase = new snapshot per OD-18)
     cursor.execute(
         "INSERT INTO engagements "
         "(company_id, buyer_user_id, tier, status, payment_status, price_cents) "
@@ -162,7 +141,6 @@ def create_engagement_and_respondent(
     )
     engagement_id = cursor.fetchone()[0]
 
-    # Respondent: for Tier 1, one respondent per engagement (Decision 7-5)
     cursor.execute(
         "INSERT INTO respondents "
         "(engagement_id, user_id, email, name, role) "
@@ -199,3 +177,24 @@ def is_attestation_signed(cursor, respondent_id: str) -> bool:
     if row is None:
         return False
     return bool(row[0])
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle state lookup (Sprint D PR 3)
+# ---------------------------------------------------------------------------
+
+
+def get_engagement_state(cursor, respondent_id: str) -> Optional[str]:
+    """Return the snapshot_state of the engagement owning this respondent.
+
+    Used by the edit-blocking decorator to enforce OD-18 §2.3/§2.4:
+    Locked and Expired snapshots reject all writes.
+    """
+    cursor.execute(
+        "SELECT e.snapshot_state FROM engagements e "
+        "JOIN respondents r ON r.engagement_id = e.id "
+        "WHERE r.id = %s",
+        (respondent_id,),
+    )
+    row = cursor.fetchone()
+    return row[0] if row else None

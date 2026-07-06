@@ -1,18 +1,7 @@
 """HTTP layer for questionnaire flow.
 
-Thin views over questionnaire.services. All orchestration lives in
-services.py so views stay focused on HTTP concerns.
-
-HTMX contract:
-- GET /q/next/  returns a partial that swaps into #question-shell
-- POST /q/submit/ returns the next question partial
-
-Full-page views:
-- GET  /q/start/            landing form (email/role/company)
-- POST /q/start/            creates rows, redirects to attestation
-- GET  /q/attest/           attestation modal
-- POST /q/attest/           records attestation, redirects to /q/next/
-- GET  /q/resume/<token>/   parses token, re-establishes session
+Thin views over questionnaire.services. Write endpoints wrapped by
+@require_writable_state (Sprint D PR 3) to enforce OD-18 lifecycle.
 """
 
 from __future__ import annotations
@@ -27,6 +16,7 @@ from django.views.decorators.http import require_http_methods
 
 from questionnaire import services, session as session_module
 from questionnaire.attestation import CURRENT_TIER_1_ATTESTATION
+from questionnaire.decorators import require_writable_state
 
 
 COMPLETE_TEMPLATE = "questionnaire/partials/_questionnaire_complete.html"
@@ -55,7 +45,7 @@ def _render_context(request, ctx: dict | None):
 
 
 # ---------------------------------------------------------------------------
-# Questionnaire flow (PR 6)
+# Questionnaire flow (PR 6 + PR 3 edit-blocking)
 # ---------------------------------------------------------------------------
 
 
@@ -72,6 +62,7 @@ def next_question(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+@require_writable_state
 def submit_response(request):
     """Persist the submitted answer, then return the next question."""
     rid = _resolve_respondent_id(request)
@@ -110,15 +101,10 @@ def submit_response(request):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def start(request):
-    """Landing page for a new Tier 1 questionnaire.
-
-    GET renders the email/role/company form.
-    POST creates engagement + respondent, sets session, redirects to attest.
-    """
+    """Landing page for a new Tier 1 questionnaire."""
     if request.method == "GET":
         return render(request, "questionnaire/start.html", {})
 
-    # POST: validate + create
     required = [
         "email",
         "name",
@@ -153,7 +139,11 @@ def start(request):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def attest(request):
-    """Attestation modal (GET) and signing (POST). Per Decision 7-8."""
+    """Attestation modal (GET) and signing (POST). Per Decision 7-8.
+
+    POST is gated by @require_writable_state — Locked/Expired reject.
+    Applied via _attest_post to keep GET path unblocked.
+    """
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
@@ -165,9 +155,15 @@ def attest(request):
             {"attestation_text": CURRENT_TIER_1_ATTESTATION},
         )
 
+    return _attest_post(request)
+
+
+@require_writable_state
+def _attest_post(request):
+    """Sign attestation — separated so require_writable_state gates POST only."""
+    rid = _resolve_respondent_id(request)
     with connection.cursor() as cursor:
         services.sign_attestation(cursor, rid, CURRENT_TIER_1_ATTESTATION)
-
     return redirect("questionnaire:next_question")
 
 
