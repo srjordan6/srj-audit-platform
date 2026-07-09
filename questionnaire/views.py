@@ -63,7 +63,7 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
             datetime.now(timezone.utc),
         )
 
-template = ctx["partial"]
+    template = ctx["partial"]
     is_htmx = request.headers.get("HX-Request") == "true"
     if not is_htmx and request.method == "GET":
         template = "questionnaire/question_shell.html"
