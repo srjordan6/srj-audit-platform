@@ -63,17 +63,21 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
             datetime.now(timezone.utc),
         )
 
+template = ctx["partial"]
+    is_htmx = request.headers.get("HX-Request") == "true"
+    if not is_htmx and request.method == "GET":
+        template = "questionnaire/question_shell.html"
     return render(
         request,
-        ctx["partial"],
+        template,
         {
             "question": ctx["question"],
             "progress": ctx["progress"],
             "countdown_text": countdown_text,
             "submit_url": "/q/submit/",
+            "initial_question_template": ctx["partial"],
         },
     )
-
 
 # ---------------------------------------------------------------------------
 # Questionnaire flow
