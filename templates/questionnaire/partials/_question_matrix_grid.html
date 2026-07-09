@@ -67,6 +67,7 @@ so the grid remains usable on mobile without cropping cells.
       data-question-type="MATRIX"
       data-matrix-pattern="grid">
   {% csrf_token %}
+  <input type="hidden" name="question_id" value="{{ question.id }}">
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
       <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>

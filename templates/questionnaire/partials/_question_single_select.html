@@ -38,6 +38,7 @@ match per scoring/response_scoring.py.
       data-question-id="{{ question.id }}"
       data-question-type="{{ question.question_type }}">
   {% csrf_token %}
+  <input type="hidden" name="question_id" value="{{ question.id }}">
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
       <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
