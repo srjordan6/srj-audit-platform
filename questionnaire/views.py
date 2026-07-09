@@ -102,21 +102,33 @@ def submit_response(request):
     if not rid:
         return HttpResponseNotFound("respondent_id required")
 
-    question_id = request.POST.get("question_id")
+question_id = request.POST.get("question_id") or request.POST.get("data-question-id")
+    if not question_id:
+        # Fallback: derive from question header
+        question_id = request.META.get("HTTP_X_QUESTION_ID")
     if not question_id:
         return HttpResponseBadRequest("question_id required")
 
+    # Accept multiple forms of answer input from partials
     answer_value_json = request.POST.get("answer_value_json")
-    if not answer_value_json:
-        return HttpResponseBadRequest("answer_value_json required")
-
-    try:
-        answer_value = json.loads(answer_value_json)
-    except json.JSONDecodeError:
-        return HttpResponseBadRequest("invalid answer_value_json")
+    if answer_value_json:
+        try:
+            answer_value = json.loads(answer_value_json)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("invalid answer_value_json")
+    else:
+        # Partials post name="answer" for single-select, multi-select
+        # Rank/matrix posts multiple values
+        answer = request.POST.get("answer")
+        answers = request.POST.getlist("answer")
+        if len(answers) > 1:
+            answer_value = {"selected": answers}
+        elif answer:
+            answer_value = {"selected": answer}
+        else:
+            return HttpResponseBadRequest("answer required")
 
     is_dont_know = request.POST.get("is_dont_know") == "true"
-
     with connection.cursor() as cursor:
         services.save_response(
             cursor, rid, question_id, answer_value, is_dont_know
