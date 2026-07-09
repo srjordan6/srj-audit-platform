@@ -36,12 +36,21 @@ def _resolve_respondent_id(request) -> str | None:
     return rid
 
 
-def _dispatch_by_state(request, cursor, respondent_id: str):
-    """Render Locked/Expired/complete/next-question based on lifecycle state.
+def _normalize_progress(progress):
+    """Coerce a progress dict into {current, total, percent} with safe ints."""
+    if not progress:
+        return {}
+    current = int(progress.get("current") or 0)
+    total = int(progress.get("total") or 0)
+    if "percent" in progress and progress["percent"] is not None:
+        percent = int(progress["percent"])
+    else:
+        percent = int(round((current / total) * 100)) if total else 0
+    return {"current": current, "total": total, "percent": percent}
 
-    Returns an HttpResponse. Locked/Expired short-circuit before question
-    lookup. Editable adds countdown_text to context. Draft renders normally.
-    """
+
+def _dispatch_by_state(request, cursor, respondent_id: str):
+    """Render Locked/Expired/complete/next-question based on lifecycle state."""
     lifecycle_ctx = services.get_lifecycle_context(cursor, respondent_id)
     if lifecycle_ctx is None:
         return HttpResponseNotFound("respondent not found")
@@ -63,6 +72,8 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
             datetime.now(timezone.utc),
         )
 
+    progress = _normalize_progress(ctx.get("progress"))
+
     template = ctx["partial"]
     is_htmx = request.headers.get("HX-Request") == "true"
     if not is_htmx and request.method == "GET":
@@ -72,16 +83,12 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
         template,
         {
             "question": ctx["question"],
-            "progress": ctx["progress"],
+            "progress": progress,
             "countdown_text": countdown_text,
             "submit_url": "/q/submit/",
             "initial_question_template": ctx["partial"],
         },
     )
-
-# ---------------------------------------------------------------------------
-# Questionnaire flow
-# ---------------------------------------------------------------------------
 
 
 @require_http_methods(["GET"])
@@ -104,12 +111,10 @@ def submit_response(request):
 
     question_id = request.POST.get("question_id") or request.POST.get("data-question-id")
     if not question_id:
-        # Fallback: derive from question header
         question_id = request.META.get("HTTP_X_QUESTION_ID")
     if not question_id:
         return HttpResponseBadRequest("question_id required")
 
-    # Accept multiple forms of answer input from partials
     answer_value_json = request.POST.get("answer_value_json")
     if answer_value_json:
         try:
@@ -117,8 +122,6 @@ def submit_response(request):
         except json.JSONDecodeError:
             return HttpResponseBadRequest("invalid answer_value_json")
     else:
-        # Partials post name="answer" for single-select, multi-select
-        # Rank/matrix posts multiple values
         answer = request.POST.get("answer")
         answers = request.POST.getlist("answer")
         if len(answers) > 1:
@@ -134,11 +137,6 @@ def submit_response(request):
             cursor, rid, question_id, answer_value, is_dont_know
         )
         return _dispatch_by_state(request, cursor, rid)
-
-
-# ---------------------------------------------------------------------------
-# Session bootstrap
-# ---------------------------------------------------------------------------
 
 
 @require_http_methods(["GET", "POST"])
