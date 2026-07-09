@@ -36,5 +36,5 @@ urlpatterns = [
     # path('', include('engagements.urls')),
     path('q/', include('questionnaire.urls', namespace='questionnaire')),
     # path('r/', include('questionnaire.respondent_urls')),
-    # path('billing/', include('billing.urls')),
+    path('billing/', include('billing.urls', namespace='billing')),
 ]
