@@ -102,7 +102,7 @@ def submit_response(request):
     if not rid:
         return HttpResponseNotFound("respondent_id required")
 
-question_id = request.POST.get("question_id") or request.POST.get("data-question-id")
+    question_id = request.POST.get("question_id") or request.POST.get("data-question-id")
     if not question_id:
         # Fallback: derive from question header
         question_id = request.META.get("HTTP_X_QUESTION_ID")
