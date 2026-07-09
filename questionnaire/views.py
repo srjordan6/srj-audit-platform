@@ -70,6 +70,7 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
             "question": ctx["question"],
             "progress": ctx["progress"],
             "countdown_text": countdown_text,
+            "submit_url": "/q/submit/",
         },
     )
 
