@@ -37,17 +37,28 @@ def _resolve_respondent_id(request) -> str | None:
 
 
 def _normalize_progress(progress):
-    """Coerce a progress dict into {current, total, percent} with safe ints."""
+    """Coerce progress into {current, total, percent} with safe ints.
+
+    services.get_next_question_context returns progress as a tuple
+    (current, total). We also accept a dict shape for future-proofing.
+    """
     if not progress:
         return {}
-    current = int(progress.get("current") or 0)
-    total = int(progress.get("total") or 0)
-    if "percent" in progress and progress["percent"] is not None:
-        percent = int(progress["percent"])
+    if isinstance(progress, tuple):
+        if len(progress) < 2:
+            return {}
+        current = int(progress[0] or 0)
+        total = int(progress[1] or 0)
+    elif isinstance(progress, dict):
+        current = int(progress.get("current") or 0)
+        total = int(progress.get("total") or 0)
+        if "percent" in progress and progress["percent"] is not None:
+            percent = int(progress["percent"])
+            return {"current": current, "total": total, "percent": percent}
     else:
-        percent = int(round((current / total) * 100)) if total else 0
+        return {}
+    percent = int(round((current / total) * 100)) if total else 0
     return {"current": current, "total": total, "percent": percent}
-
 
 def _dispatch_by_state(request, cursor, respondent_id: str):
     """Render Locked/Expired/complete/next-question based on lifecycle state."""
