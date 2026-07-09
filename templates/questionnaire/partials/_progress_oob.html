@@ -1,0 +1,20 @@
+{% comment %}
+Out-of-band progress swap. Included by every question partial so HTMX
+updates #srj-progress in the shell on each response.
+{% endcomment %}
+<div id="srj-progress" hx-swap-oob="true" class="mb-3">
+  {% if progress and progress.total %}
+    <div class="d-flex justify-content-between align-items-center small text-muted mb-1">
+      <span>Question {{ progress.current }} of {{ progress.total }}</span>
+      <span>{{ progress.percent }}%</span>
+    </div>
+    <div class="progress" style="height: 6px;">
+      <div class="progress-bar"
+           role="progressbar"
+           style="width: {{ progress.percent }}%; background-color: var(--srj-orange);"
+           aria-valuenow="{{ progress.percent }}"
+           aria-valuemin="0"
+           aria-valuemax="100"></div>
+    </div>
+  {% endif %}
+</div>
