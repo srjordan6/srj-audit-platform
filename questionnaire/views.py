@@ -131,13 +131,19 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
 
 @require_http_methods(["GET"])
 def next_question(request):
-    """Return the current respondent's next question or lifecycle banner."""
+    """Return the current respondent's next question or lifecycle banner.
+
+    Persists respondent_id to session when resolved from query param so
+    subsequent POSTs (which only check session) don't 404. This is what
+    makes ?respondent_id=<uuid> resume URLs work end-to-end.
+    """
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
+    if request.session.get("respondent_id") != rid:
+        request.session["respondent_id"] = rid
     with connection.cursor() as cursor:
         return _dispatch_by_state(request, cursor, rid)
-
 
 @require_http_methods(["POST"])
 @csrf_protect
