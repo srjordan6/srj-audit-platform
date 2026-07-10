@@ -1,24 +1,26 @@
-"""Report generation orchestrator (Sprint E option B).
+"""Report generation orchestrator.
 
 Ties together:
-- responses fetch (for content rendering)
+- reports.report_render (scoring contexts -> real tier1 snapshot HTML)
 - reports.generator.generate_locked_report (WeasyPrint + pypdf pipeline)
 - reports table INSERT (persistence metadata)
-- engagements.lifecycle.build_first_generation_update (Draft→Editable) or
+- engagements.lifecycle.build_first_generation_update (Draft->Editable) or
   regeneration (Editable stays Editable, generation_count++)
 
-Content HTML is a minimal placeholder for MVP — real Tier 1 report templates
-per Part A §5 land in Sprint F. Sufficient for smoke testing the state
-transition + PDF pipeline end-to-end.
+Sprint R: content_html now comes from the scoring-driven template renderer.
+The old placeholder is retained only as a logged fallback if rendering fails.
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 from engagements import lifecycle
 from reports import generator
+
+logger = logging.getLogger(__name__)
 
 
 def _get_engagement(cursor, engagement_id: str) -> tuple[str, str, int]:
@@ -46,14 +48,25 @@ def _count_responses(cursor, engagement_id: str) -> int:
 
 
 def _render_placeholder_content(engagement_id: str, response_count: int) -> str:
-    """Minimal report content — real templates arrive in Sprint F."""
+    """Fallback content if the real renderer fails."""
     return (
         f"<h1>AI Audit Snapshot</h1>"
         f"<p>Engagement ID: {engagement_id}</p>"
         f"<p>Responses recorded: {response_count}</p>"
-        f"<p>This is a placeholder Tier 1 snapshot. Full framework findings "
-        f"and prioritized actions land in Sprint F.</p>"
+        f"<p>Report rendering encountered an error; this is a fallback "
+        f"document. Contact support@aiauditforcompanies.com.</p>"
     )
+
+
+def _render_content(cursor, engagement_id: str) -> str:
+    """Real snapshot content via scoring engine; placeholder on failure."""
+    try:
+        from reports.report_render import render_tier1_snapshot_html
+        return render_tier1_snapshot_html(engagement_id)
+    except Exception:
+        logger.exception("tier1 snapshot render failed; using placeholder")
+        response_count = _count_responses(cursor, engagement_id)
+        return _render_placeholder_content(engagement_id, response_count)
 
 
 def _insert_report(
@@ -158,8 +171,7 @@ def generate_and_lock(
             f"cannot generate report in state {state} — snapshot is terminal"
         )
 
-    response_count = _count_responses(cursor, engagement_id)
-    content_html = _render_placeholder_content(engagement_id, response_count)
+    content_html = _render_content(cursor, engagement_id)
 
     pdf_bytes, pdf_hash = generator.generate_locked_report(
         content_html=content_html,

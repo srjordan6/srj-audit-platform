@@ -1,0 +1,126 @@
+<style>
+  h1, h2, h3 { font-family: sans-serif; color: #201868; }
+  .rpt-cover { text-align: center; padding-top: 3cm; }
+  .rpt-cover h1 { font-size: 26pt; margin-bottom: 4pt; }
+  .rpt-cover .rpt-rule { width: 30%; margin: 10pt auto; border-bottom: 3pt solid #F07800; }
+  .rpt-cover .rpt-company { font-size: 15pt; color: #1A1A2E; margin: 4pt 0; }
+  .rpt-cover .rpt-meta { font-size: 9.5pt; color: #6B7280; margin-top: 14pt; line-height: 1.6; }
+  .rpt-summary { margin-top: 26pt; }
+  .rpt-summary td { font-size: 10.5pt; padding: 5pt 8pt; }
+  .rpt-section { page-break-before: always; }
+  .rpt-fw-head { border-bottom: 2.5pt solid #F07800; padding-bottom: 5pt; margin-bottom: 10pt; }
+  .rpt-fw-head h2 { font-size: 16pt; margin: 0; }
+  .rpt-fw-head .rpt-sub { font-size: 9.5pt; color: #6B7280; }
+  .rpt-score-line { margin: 10pt 0 4pt 0; font-size: 11pt; color: #1A1A2E; }
+  .rpt-score-num { font-size: 22pt; font-weight: bold; color: #201868; }
+  .rpt-bar-track { background: #E8E6F0; height: 9pt; width: 100%; }
+  .rpt-bar-fill { background: #F07800; height: 9pt; }
+  .rpt-badges { font-size: 8.5pt; color: #6B7280; margin: 4pt 0 12pt 0; }
+  table.rpt-items { width: 100%; border-collapse: collapse; margin: 8pt 0 14pt 0; }
+  table.rpt-items th { background: #201868; color: #fff; font-size: 8.5pt;
+    text-align: left; padding: 4pt 6pt; font-family: sans-serif; }
+  table.rpt-items td { font-size: 9pt; padding: 4pt 6pt; border-bottom: 0.5pt solid #D8D6E4; }
+  table.rpt-items td.num { text-align: right; }
+  .rpt-gap { border: 0.75pt solid #D8D6E4; border-left: 3pt solid #F07800;
+    padding: 7pt 9pt; margin-bottom: 8pt; page-break-inside: avoid; }
+  .rpt-gap h3 { font-size: 10.5pt; margin: 0 0 3pt 0; }
+  .rpt-gap p { font-size: 8.8pt; margin: 2pt 0; line-height: 1.45; }
+  .rpt-gap .rpt-label { color: #201868; font-weight: bold; }
+  .rpt-gap .rpt-via { color: #6B7280; font-size: 8pt; margin-top: 3pt; }
+  .rpt-error { border: 1pt solid #C56100; background: #FEF3E4; padding: 8pt;
+    font-size: 9pt; color: #1A1A2E; }
+  .rpt-legal { page-break-before: always; font-size: 7.8pt; color: #6B7280; line-height: 1.5; }
+  .rpt-legal h2 { font-size: 11pt; }
+</style>
+
+<div class="rpt-cover">
+  <h1>AI Audit Snapshot</h1>
+  <div class="rpt-rule"></div>
+  {% if company %}
+    <div class="rpt-company">{{ company.name }}</div>
+    <div class="rpt-meta">
+      {{ company.industry }} &middot; {{ company.size_bracket }} employees<br>
+      Generated {{ generated_at|slice:":10" }} &middot; Tier 1 &middot; Single-respondent snapshot
+    </div>
+  {% endif %}
+
+  <table class="rpt-summary" align="center">
+    {% for fw in frameworks %}
+      {% if not fw.error %}
+      <tr>
+        <td style="text-align:right; color:#201868; font-family:sans-serif;">{{ fw.framework.display_name }}</td>
+        <td style="font-weight:bold; font-size:13pt; color:#F07800;">{{ fw.overall.score_0_100 }}</td>
+        <td style="color:#6B7280;">{% if fw.overall.bracket %}{{ fw.overall.bracket }}{% elif fw.overall.maturity_label %}{{ fw.overall.maturity_label }}{% endif %}</td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+  </table>
+</div>
+
+{% for fw in frameworks %}
+<div class="rpt-section">
+  <div class="rpt-fw-head">
+    <h2>{{ fw.framework.display_name }}</h2>
+    <span class="rpt-sub">{{ fw.framework.subtitle }}</span>
+  </div>
+
+  {% if fw.error %}
+    <div class="rpt-error">
+      This framework could not be scored for this engagement.<br>
+      Detail: {{ fw.error }}
+    </div>
+  {% else %}
+    <div class="rpt-score-line">
+      Overall score: <span class="rpt-score-num">{{ fw.overall.score_0_100 }}</span> / 100
+      {% if fw.overall.bracket %} &mdash; {{ fw.overall.bracket }}{% endif %}
+      {% if fw.overall.maturity_label %} &mdash; {{ fw.overall.maturity_label }}{% endif %}
+    </div>
+    <div class="rpt-bar-track"><div class="rpt-bar-fill" style="width: {{ fw.overall.score_0_100 }}%;"></div></div>
+    <div class="rpt-badges">
+      Confidence: {{ fw.overall.confidence_level }} &middot;
+      "Don't know" ratio: {{ fw.overall.dk_ratio }}
+    </div>
+
+    <table class="rpt-items">
+      <tr><th>Area</th><th style="text-align:right;">Score</th><th>Rating</th><th>Confidence</th><th style="text-align:right;">Answered</th></tr>
+      {% for item in fw.items %}
+      <tr>
+        <td>{{ item.display_name }}</td>
+        <td class="num">{{ item.score_0_100 }}</td>
+        <td>{% if item.bracket %}{{ item.bracket }}{% elif item.maturity_label %}{{ item.maturity_label }}{% endif %}</td>
+        <td>{{ item.confidence_level }}</td>
+        <td class="num">{{ item.answered }}/{{ item.expected }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    {% if fw.cross_cutting_signals %}
+      <table class="rpt-items">
+        <tr><th>Cross-cutting signal</th><th style="text-align:right;">Score</th><th>Confidence</th></tr>
+        {% for c in fw.cross_cutting_signals %}
+        <tr><td>{{ c.display_name }}</td><td class="num">{{ c.score_0_100 }}</td><td>{{ c.confidence_level }}</td></tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    <h3 style="font-size:11.5pt; margin-top:12pt;">Priority gaps</h3>
+    {% for gap in fw.priority_gaps %}
+    <div class="rpt-gap">
+      <h3>{{ gap.statement }}</h3>
+      <p><span class="rpt-label">Impact:</span> {{ gap.impact }}</p>
+      <p><span class="rpt-label">Recommended action:</span> {{ gap.action }}</p>
+      <p class="rpt-via">Addressed via {{ gap.addresses_via }} &middot; area score {{ gap.score_0_100 }}</p>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endfor %}
+
+<div class="rpt-legal">
+  <h2>Methodology</h2>
+  <p>{{ methodology }}</p>
+  <h2>Trademarks</h2>
+  <p>{{ trademark_notice }}</p>
+  <h2>Disclaimer</h2>
+  <p>{{ disclaimer }}</p>
+</div>
