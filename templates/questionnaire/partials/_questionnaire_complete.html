@@ -1,14 +1,31 @@
 {% comment %}
 Rendered inside #question-shell when the respondent has finished every
-visible question. PR 7 will replace the placeholder CTA with the paywall
-and Stripe checkout hand-off.
+visible question. Presents the paywall CTA that hands off to Stripe
+Checkout via POST /billing/checkout/.
+
+The form posts a plain browser request (no HTMX attributes) so the browser
+follows the 302 redirect to Stripe. CSRF token is provided by the parent
+page render.
 {% endcomment %}
 <div class="text-center py-5">
-    <h2 class="mb-3">Questionnaire complete.</h2>
+    <h2 class="mb-3" style="color: var(--srj-navy);">Assessment complete.</h2>
     <p class="lead text-muted mb-4">
-        Thank you for completing the assessment. Your snapshot is being prepared.
+        Thanks for completing your AI Audit Snapshot. Your report is
+        ready to purchase and download.
     </p>
-    <p class="small text-muted">
-        You will be redirected to your report shortly.
+
+    <form method="post" action="/billing/checkout/" class="d-inline-block">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-lg px-5 py-3"
+                style="background-color: var(--srj-orange); border-color: var(--srj-orange); font-size: 1.1rem;">
+            Purchase Snapshot Report &mdash; $399
+        </button>
+    </form>
+
+    <p class="small text-muted mt-4 mb-0">
+        Secure payment via Stripe. You will be redirected to complete checkout.
+    </p>
+    <p class="small text-muted mt-2 mb-0">
+        Your responses are saved. You can return via the link in your email.
     </p>
 </div>
