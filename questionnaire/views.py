@@ -99,9 +99,13 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
     if state == lifecycle.EXPIRED:
         return render(request, EXPIRED_TEMPLATE, {})
 
-    ctx = services.get_next_question_context(cursor, respondent_id)
+ctx = services.get_next_question_context(cursor, respondent_id)
     if ctx is None:
-        return render(request, COMPLETE_TEMPLATE, {})
+        is_htmx = request.headers.get("HX-Request") == "true"
+        template = COMPLETE_TEMPLATE
+        if not is_htmx and request.method == "GET":
+            template = "questionnaire/complete_shell.html"
+        return render(request, template, {})
 
     countdown_text = None
     if state == lifecycle.EDITABLE:
