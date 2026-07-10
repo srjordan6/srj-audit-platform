@@ -15,6 +15,7 @@ rq==1.16.2
 # PDF generation
 WeasyPrint==62.3
 pydyf==0.10.0
+pypdf==5.1.0
 
 # S3-compatible storage (Backblaze B2)
 boto3==1.35.0
