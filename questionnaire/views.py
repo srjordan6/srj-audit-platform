@@ -1,10 +1,10 @@
 """HTTP layer for questionnaire flow.
 
 Sprint D PR 5: lifecycle-aware rendering. State-based dispatch:
-- Locked  → _locked.html
-- Expired → _expired.html
-- Editable → include countdown_text in context
-- Draft   → standard question rendering
+- Locked  -> _locked.html
+- Expired -> _expired.html
+- Editable -> include countdown_text in context
+- Draft   -> standard question rendering
 """
 
 from __future__ import annotations
@@ -37,11 +37,7 @@ def _resolve_respondent_id(request) -> str | None:
 
 
 def _normalize_progress(progress):
-    """Coerce progress into {current, total, percent} with safe ints.
-
-    services.get_next_question_context returns progress as a tuple
-    (current, total). We also accept a dict shape for future-proofing.
-    """
+    """Coerce progress into {current, total, percent} with safe ints."""
     if not progress:
         return {}
     if isinstance(progress, tuple):
@@ -59,6 +55,37 @@ def _normalize_progress(progress):
         return {}
     percent = int(round((current / total) * 100)) if total else 0
     return {"current": current, "total": total, "percent": percent}
+
+
+def _parse_matrix_grid_from_post(post):
+    """Grid pattern: row_name_<i> + cell_<row>_<col>=<option>."""
+    rows = {}
+    for key in post.keys():
+        if key.startswith("row_name_"):
+            idx = key[len("row_name_"):]
+            rows.setdefault(idx, {})["name"] = (post.get(key) or "").strip()
+        elif key.startswith("cell_"):
+            parts = key.split("_")
+            if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
+                _, row_idx, col_idx = parts
+                rows.setdefault(row_idx, {}).setdefault("cells", {})[col_idx] = post.get(key)
+    if not rows:
+        return None
+    return {"matrix_type": "grid", "rows": rows}
+
+
+def _parse_matrix_choice_from_post(post):
+    """Choice pattern: row_<i>=<selected column label>."""
+    rows = {}
+    for key in post.keys():
+        if key.startswith("row_") and not key.startswith("row_name_"):
+            idx = key[len("row_"):]
+            if idx.isdigit():
+                rows[idx] = post.get(key)
+    if not rows:
+        return None
+    return {"matrix_type": "choice", "rows": rows}
+
 
 def _dispatch_by_state(request, cursor, respondent_id: str):
     """Render Locked/Expired/complete/next-question based on lifecycle state."""
@@ -140,7 +167,15 @@ def submit_response(request):
         elif answer:
             answer_value = {"selected": answer}
         else:
-            return HttpResponseBadRequest("answer required")
+            # Matrix questions post row_name_* / cell_R_C_* or row_<i>
+            matrix = (
+                _parse_matrix_grid_from_post(request.POST)
+                or _parse_matrix_choice_from_post(request.POST)
+            )
+            if matrix:
+                answer_value = matrix
+            else:
+                return HttpResponseBadRequest("answer required")
 
     is_dont_know = request.POST.get("is_dont_know") == "true"
     with connection.cursor() as cursor:
