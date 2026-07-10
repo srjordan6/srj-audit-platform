@@ -25,6 +25,7 @@ from questionnaire.decorators import require_writable_state
 
 
 COMPLETE_TEMPLATE = "questionnaire/partials/_questionnaire_complete.html"
+COMPLETE_SHELL_TEMPLATE = "questionnaire/complete_shell.html"
 LOCKED_TEMPLATE = "questionnaire/partials/_locked.html"
 EXPIRED_TEMPLATE = "questionnaire/partials/_expired.html"
 
@@ -99,12 +100,12 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
     if state == lifecycle.EXPIRED:
         return render(request, EXPIRED_TEMPLATE, {})
 
-ctx = services.get_next_question_context(cursor, respondent_id)
+    ctx = services.get_next_question_context(cursor, respondent_id)
     if ctx is None:
         is_htmx = request.headers.get("HX-Request") == "true"
         template = COMPLETE_TEMPLATE
         if not is_htmx and request.method == "GET":
-            template = "questionnaire/complete_shell.html"
+            template = COMPLETE_SHELL_TEMPLATE
         return render(request, template, {})
 
     countdown_text = None
@@ -135,12 +136,7 @@ ctx = services.get_next_question_context(cursor, respondent_id)
 
 @require_http_methods(["GET"])
 def next_question(request):
-    """Return the current respondent's next question or lifecycle banner.
-
-    Persists respondent_id to session when resolved from query param so
-    subsequent POSTs (which only check session) don't 404. This is what
-    makes ?respondent_id=<uuid> resume URLs work end-to-end.
-    """
+    """Return the current respondent's next question or lifecycle banner."""
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
@@ -148,6 +144,7 @@ def next_question(request):
         request.session["respondent_id"] = rid
     with connection.cursor() as cursor:
         return _dispatch_by_state(request, cursor, rid)
+
 
 @require_http_methods(["POST"])
 @csrf_protect
@@ -177,7 +174,6 @@ def submit_response(request):
         elif answer:
             answer_value = {"selected": answer}
         else:
-            # Matrix questions post row_name_* / cell_R_C_* or row_<i>
             matrix = (
                 _parse_matrix_grid_from_post(request.POST)
                 or _parse_matrix_choice_from_post(request.POST)
