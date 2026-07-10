@@ -60,16 +60,16 @@ POLICY_FIELDS = [
 ]
 
 CONDITION_NARRATIVES = [
-    ("Condition 01 — Workflows ready",
+    ("Condition 01 - Workflows ready",
      "What workflows is AI supporting, and are they ready?",
      ["T1-G-005", "T1-G-007", "T1-G-008"]),
-    ("Condition 02 — Data reliable",
+    ("Condition 02 - Data reliable",
      "What data is AI relying on, and is it reliable?",
      ["T1-E-004", "T1-E-006", "T1-E-007", "T1-E-008"]),
-    ("Condition 03 — Output owned",
+    ("Condition 03 - Output owned",
      "Who owns the output and what review standard does it meet?",
      ["T1-D-005", "T1-D-010", "T1-D-011"]),
-    ("Condition 04 — Measurable result",
+    ("Condition 04 - Measurable result",
      "What is AI producing in measurable business terms?",
      ["T1-G-002", "T1-C-015", "T1-D-016", "T1-D-008"]),
 ]
@@ -174,7 +174,7 @@ def _qa_block(qindex, responses, qids):
         resp = responses.get(qid)
         answer = _format_answer(resp)
         if resp and resp["dont_know"]:
-            answer = f"{answer} — respondent answered Don't know"
+            answer = f"{answer} - respondent answered Don't know"
         out.append({
             "qid": qid,
             "question": q["question_text"],
@@ -202,7 +202,7 @@ def _fuzzy_module_score(items, *keywords):
 
 
 # ---------------------------------------------------------------------------
-# Opinion rule (Phase 1 placeholder — operator-tunable)
+# Opinion rule (Phase 1 placeholder - operator-tunable)
 # ---------------------------------------------------------------------------
 
 OPINION_SCORE_FLOOR = 60.0
@@ -222,13 +222,13 @@ def _build_opinion(frameworks):
         name = f["framework"]["display_name"]
         if (o.get("score_0_100") or 0) < OPINION_SCORE_FLOOR:
             drivers.append(
-                f"{name} scored {o['score_0_100']} — below the "
+                f"{name} scored {o['score_0_100']} - below the "
                 f"{OPINION_SCORE_FLOOR:.0f} threshold."
             )
         if (o.get("dk_ratio") or 0) > OPINION_DK_CEILING:
             drivers.append(
                 f"{name} \"don't know\" ratio {o['dk_ratio']} exceeds "
-                f"{OPINION_DK_CEILING} — material uncertainty."
+                f"{OPINION_DK_CEILING} - material uncertainty."
             )
         if str(o.get("confidence_level", "")).lower() == "low":
             drivers.append(f"{name} confidence level is low.")
@@ -296,13 +296,17 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
     v2_items = v2["items"] if v2 else []
     conditions = [
         {"n": 1, "name": "Workflow Readiness Review",
-         "item": _fuzzy_module_score(v2_items, "workflow")},
+         "item": _fuzzy_module_score(v2_items, "workflow"),
+         "metric_note": None},
         {"n": 2, "name": "Data Reliability Checklist",
-         "item": _fuzzy_module_score(v2_items, "data")},
+         "item": _fuzzy_module_score(v2_items, "data"),
+         "metric_note": None},
         {"n": 3, "name": "AI Adoption Pattern Map",
-         "item": _fuzzy_module_score(v2_items, "adoption", "pattern")},
+         "item": _fuzzy_module_score(v2_items, "adoption", "pattern"),
+         "metric_note": None},
         {"n": 4, "name": "AI Governance Matrix",
-         "item": _fuzzy_module_score(v2_items, "governance")},
+         "item": _fuzzy_module_score(v2_items, "governance"),
+         "metric_note": None},
         {"n": 5, "name": "Net Efficiency Yield Ratio",
          "item": None,
          "metric_note": "NEYR = Net Completed Output Value / Total Labor "
@@ -339,3 +343,57 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
 
     # --- Section 4 ---
     section4 = [
+        _artifact(qindex, responses, title, intro, qids)
+        for title, intro, qids in SECTION_4_ARTIFACTS
+    ]
+    eff_scorecard = {
+        "overall": (eff["overall"] if eff else None),
+        "items": (eff["items"] if eff else []),
+        "gaps": (eff["priority_gaps"] if eff else []),
+    }
+    ninety_day = []
+    for f in (eff, v3, v2):
+        if f:
+            for gap in f["priority_gaps"]:
+                ninety_day.append(gap)
+    ninety_day = ninety_day[:3]
+
+    # --- Section 5 ---
+    opinion = _build_opinion(frameworks)
+
+    # --- Appendix A ---
+    appendix = []
+    for q in QUESTIONS:
+        resp = responses.get(q["id"])
+        appendix.append({
+            "qid": q["id"],
+            "section": q.get("section", ""),
+            "question": q["question_text"],
+            "answer": _format_answer(resp),
+        })
+
+    context = {
+        "company": (first["company"] if first else None),
+        "engagement": (first["engagement"] if first else None),
+        "generated_at": (first["generated_at"] if first else ""),
+        "frameworks": frameworks,
+        "section1": section1,
+        "gap_analysis": gap_analysis,
+        "perf_vs_op": perf_vs_op,
+        "policy_fields": policy_fields,
+        "conditions": conditions,
+        "neyr_olf_signals": neyr_olf_signals,
+        "condition_narratives": condition_narratives,
+        "v2_overall": (v2["overall"] if v2 else None),
+        "section3": section3,
+        "maturity": maturity,
+        "section4": section4,
+        "eff_scorecard": eff_scorecard,
+        "ninety_day": ninety_day,
+        "opinion": opinion,
+        "appendix": appendix,
+        "methodology": (first["methodology"] if first else ""),
+        "trademark_notice": (first["trademark_notice"] if first else ""),
+        "disclaimer": (first["disclaimer"] if first else ""),
+    }
+    return render_to_string("reports/tier1_snapshot.html", context)
