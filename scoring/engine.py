@@ -73,6 +73,24 @@ from questionnaire.question_bank import QUESTIONS
 from scoring.frameworks import efficiency, v1_audit, v2_readiness, v3_governance
 
 
+# Keys the framework aggregators may access on any question. Question
+# dicts in question_bank omit keys that don't apply to them; merging
+# these defaults guarantees the attribute exists on the namespace.
+_AGGREGATOR_DEFAULTS: dict = {
+    "subsection": None,
+    "matrix_rows": None,
+    "matrix_columns": None,
+    "skip_logic": None,
+    "scoring_overrides": None,
+    "extended_metadata": None,
+    "notes": None,
+    "role_visibility": None,
+    "required": False,
+    "scoring_weight": None,
+    "framework_mappings": None,
+}
+
+
 def _wrap_for_aggregator(q: dict) -> SimpleNamespace:
     """Adapt a dict-shaped question row to the attribute-access shape the
     framework aggregators expect (e.g. `question.framework_mappings`,
@@ -80,11 +98,11 @@ def _wrap_for_aggregator(q: dict) -> SimpleNamespace:
 
     The four framework modules were written against a Question dataclass
     that was never materialized; production `QUESTIONS` is a list of
-    plain dicts. SimpleNamespace gives attribute access with no
-    behavior change.
+    plain dicts. SimpleNamespace gives attribute access; merged defaults
+    guarantee every aggregator-accessed attribute exists even when the
+    source dict omits the key.
     """
-    return SimpleNamespace(**q)
-
+    return SimpleNamespace(**{**_AGGREGATOR_DEFAULTS, **q})
 
 # Cached once at module import. The aggregators are pure (no mutation),
 # so a single shared sequence per process is correct.
