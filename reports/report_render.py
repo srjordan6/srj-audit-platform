@@ -1,351 +1,341 @@
-<style>
-  h1, h2, h3, h4 { font-family: sans-serif; color: #201868; }
-  .rpt-cover { text-align: center; padding-top: 3cm; }
-  .rpt-cover h1 { font-size: 26pt; margin-bottom: 4pt; }
-  .rpt-rule { width: 30%; margin: 10pt auto; border-bottom: 3pt solid #F07800; }
-  .rpt-company { font-size: 15pt; color: #1A1A2E; margin: 4pt 0; }
-  .rpt-meta { font-size: 9.5pt; color: #6B7280; margin-top: 14pt; line-height: 1.6; }
-  .rpt-toc { margin-top: 28pt; font-size: 10.5pt; text-align: left;
-    width: 70%; margin-left: auto; margin-right: auto; }
-  .rpt-section { page-break-before: always; }
-  .rpt-sec-head { border-bottom: 2.5pt solid #F07800; padding-bottom: 5pt; margin-bottom: 12pt; }
-  .rpt-sec-head h2 { font-size: 17pt; margin: 0; }
-  .rpt-artifact { margin-bottom: 16pt; page-break-inside: avoid; }
-  .rpt-artifact h3 { font-size: 12.5pt; margin: 0 0 2pt 0; }
-  .rpt-artifact .rpt-intro { font-size: 9pt; color: #6B7280; margin: 0 0 6pt 0; }
-  table.rpt-qa { width: 100%; border-collapse: collapse; margin-bottom: 8pt; }
-  table.rpt-qa th { background: #201868; color: #fff; font-size: 8pt;
-    text-align: left; padding: 3pt 6pt; font-family: sans-serif; }
-  table.rpt-qa td { font-size: 8.5pt; padding: 3pt 6pt;
-    border-bottom: 0.5pt solid #D8D6E4; vertical-align: top; }
-  table.rpt-qa td.rpt-q { width: 55%; }
-  .rpt-score-line { margin: 8pt 0 4pt 0; font-size: 11pt; }
-  .rpt-score-num { font-size: 20pt; font-weight: bold; color: #201868; }
-  .rpt-bar-track { background: #E8E6F0; height: 8pt; width: 100%; }
-  .rpt-bar-fill { background: #F07800; height: 8pt; }
-  .rpt-gap { border: 0.75pt solid #D8D6E4; border-left: 3pt solid #F07800;
-    padding: 7pt 9pt; margin-bottom: 8pt; page-break-inside: avoid; }
-  .rpt-gap h4 { font-size: 10pt; margin: 0 0 3pt 0; }
-  .rpt-gap p { font-size: 8.5pt; margin: 2pt 0; line-height: 1.45; }
-  .rpt-label { color: #201868; font-weight: bold; }
-  .rpt-note { background: #FEF3E4; border: 0.75pt solid #F07800;
-    padding: 6pt 8pt; font-size: 8.5pt; margin: 6pt 0; }
-  .rpt-cols { width: 100%; border-collapse: collapse; }
-  .rpt-cols td { width: 50%; vertical-align: top; padding: 4pt; }
-  .rpt-policy { border: 1.5pt solid #201868; padding: 14pt; margin-top: 8pt; }
-  .rpt-policy-row { font-size: 9.5pt; padding: 5pt 0;
-    border-bottom: 0.5pt dotted #6B7280; }
-  .rpt-sign { margin-top: 22pt; font-size: 9.5pt; }
-  .rpt-opinion { border: 2pt solid #201868; padding: 16pt; margin-top: 10pt; }
-  .rpt-opinion h3 { margin-top: 0; }
-  .rpt-appendix td { font-size: 7.5pt; }
-  .rpt-legal { page-break-before: always; font-size: 7.8pt; color: #6B7280; line-height: 1.5; }
-  .rpt-legal h2 { font-size: 11pt; }
-  .rpt-cond-score { font-size: 12pt; font-weight: bold; color: #F07800; }
-</style>
+"""Render the Tier 1 audit report per Report Structure Specification v1.3.
 
-{# ============ COVER ============ #}
-<div class="rpt-cover">
-  <h1>AI Audit Snapshot</h1>
-  <div class="rpt-rule"></div>
-  {% if company %}
-    <div class="rpt-company">{{ company.name }}</div>
-    <div class="rpt-meta">
-      {{ company.industry }} &middot; {{ company.size_bracket }} employees<br>
-      Generated {{ generated_at|slice:":10" }} &middot; Tier 1 &middot; Single-respondent snapshot
-    </div>
-  {% endif %}
-  <div class="rpt-toc">
-    <strong>Contents</strong><br>
-    1. Audit Findings<br>
-    2. AI Readiness Scorecard<br>
-    3. AI Risk &amp; Governance Review&trade;<br>
-    4. AI Efficiency &amp; Process Optimization<br>
-    5. Summary of Findings<br>
-    Appendix A. Questions and Responses
-  </div>
-</div>
+Five sections + Appendix A:
+  1 Audit Findings, 2 AI Readiness Scorecard, 3 AI Risk & Governance
+  Review(tm), 4 AI Efficiency & Process Optimization, 5 Summary of
+  Findings (opinion), Appendix A (all questions + responses).
 
-{# ============ SECTION 1: AUDIT FINDINGS ============ #}
-<div class="rpt-section">
-  <div class="rpt-sec-head"><h2>1. Audit Findings</h2></div>
+Data sources: scoring contexts (reports.context.build_snapshot_context),
+raw responses (SQL), question bank metadata. Public entry point stays
+`render_tier1_snapshot_html` so reports.services is unchanged.
+"""
 
-  {% for a in section1 %}
-  <div class="rpt-artifact">
-    <h3>1{{ forloop.counter|stringformat:"s" }}. {{ a.title }}</h3>
-    <p class="rpt-intro">{{ a.intro }}</p>
-    <table class="rpt-qa">
-      <tr><th>Assessed item</th><th>Finding</th></tr>
-      {% for row in a.qa %}
-      <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-      {% endfor %}
-    </table>
-    {% if a.note %}<div class="rpt-note">{{ a.note }}</div>{% endif %}
-  </div>
-  {% endfor %}
+from __future__ import annotations
 
-  <div class="rpt-artifact">
-    <h3>Governance Gap Analysis</h3>
-    <p class="rpt-intro">{{ gap_analysis.intro }}</p>
-    {% for gap in gap_analysis.gaps %}
-    <div class="rpt-gap">
-      <h4>{{ gap.statement }}</h4>
-      <p><span class="rpt-label">Impact:</span> {{ gap.impact }}</p>
-      <p><span class="rpt-label">Recommended action:</span> {{ gap.action }}</p>
-      <p><span class="rpt-label">Addressed via:</span> {{ gap.addresses_via }} &middot; area score {{ gap.score_0_100 }}</p>
-    </div>
-    {% endfor %}
-    {% if gap_analysis.note %}<div class="rpt-note">{{ gap_analysis.note }}</div>{% endif %}
-  </div>
+import logging
 
-  <div class="rpt-artifact">
-    <h3>Performative vs Operational Diagnostic</h3>
-    <p class="rpt-intro">Where AI is producing operational results and where it is producing slide-deck strategy, scored side by side.</p>
-    <table class="rpt-cols">
-      <tr>
-        <td>
-          <h4>Operational evidence{% if perf_vs_op.operational_score %} — {{ perf_vs_op.operational_score }}/100{% endif %}</h4>
-          <table class="rpt-qa">
-            {% for row in perf_vs_op.operational_qa %}
-            <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-            {% endfor %}
-          </table>
-        </td>
-        <td>
-          <h4>Strategic posture{% if perf_vs_op.performative_score %} — {{ perf_vs_op.performative_score }}/100{% endif %}</h4>
-          <table class="rpt-qa">
-            {% for row in perf_vs_op.performative_qa %}
-            <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-            {% endfor %}
-          </table>
-        </td>
-      </tr>
-    </table>
-  </div>
+from django.db import connection
+from django.template.loader import render_to_string
 
-  <div class="rpt-artifact">
-    <h3>Standing AI Adoption Policy&trade;</h3>
-    <p class="rpt-intro">Named owner, defined budget, documented controls, recurring review, and exit criteria — on one signed page. Current state assessed below; blanks are the work.</p>
-    <div class="rpt-policy">
-      {% for f in policy_fields %}
-      <div class="rpt-policy-row"><span class="rpt-label">{{ f.label }}:</span> {{ f.value }}</div>
-      {% endfor %}
-      <div class="rpt-sign">
-        Accountable owner signature: ______________________________ &nbsp;&nbsp; Date: ______________
-      </div>
-    </div>
-  </div>
-</div>
+from questionnaire.question_bank import QUESTIONS
+from reports.context import build_snapshot_context
 
-{# ============ SECTION 2: AI READINESS SCORECARD ============ #}
-<div class="rpt-section">
-  <div class="rpt-sec-head"><h2>2. AI Readiness Scorecard</h2></div>
+logger = logging.getLogger(__name__)
 
-  {% if v2_overall %}
-  <div class="rpt-score-line">
-    Composite readiness: <span class="rpt-score-num">{{ v2_overall.score_0_100 }}</span> / 100
-    {% if v2_overall.maturity_label %} &mdash; {{ v2_overall.maturity_label }}{% endif %}
-  </div>
-  <div class="rpt-bar-track"><div class="rpt-bar-fill" style="width: {{ v2_overall.score_0_100 }}%;"></div></div>
-  {% endif %}
 
-  <h3 style="margin-top: 14pt;">The six conditions</h3>
-  <table class="rpt-qa">
-    <tr><th>#</th><th>Condition</th><th>Score</th><th>Rating</th></tr>
-    {% for c in conditions %}
-    <tr>
-      <td>{{ c.n }}</td>
-      <td class="rpt-q">{{ c.name }}{% if c.metric_note %}<br><span style="color:#6B7280;">{{ c.metric_note }}</span>{% endif %}</td>
-      <td><span class="rpt-cond-score">{% if c.item %}{{ c.item.score_0_100 }}{% else %}&mdash;{% endif %}</span></td>
-      <td>{% if c.item %}{% if c.item.maturity_label %}{{ c.item.maturity_label }}{% elif c.item.bracket %}{{ c.item.bracket }}{% endif %}{% else %}Directional (Tier 2 measures){% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
+# ---------------------------------------------------------------------------
+# Artifact -> question-id curation (Spec v1.3 Phase 1)
+# ---------------------------------------------------------------------------
 
-  <h4>Directional signals for NEYR and Operational Leakage Factor&trade;</h4>
-  <table class="rpt-qa">
-    {% for row in neyr_olf_signals %}
-    <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-    {% endfor %}
-  </table>
+SECTION_1_ARTIFACTS = [
+    ("AI Tool Inventory",
+     "What the company knows about the AI tools in active use.",
+     ["T1-B-001", "T1-B-002", "T1-B-003", "T1-B-004", "T1-B-005",
+      "T1-B-007", "T1-B-009", "T1-B-010", "T1-B-011", "T1-B-021",
+      "T1-B-022", "T1-B-023", "T1-B-024"]),
+    ("Fully Loaded Cost Map",
+     "Subscription spend plus the hidden costs of review, rework, and "
+     "vendor lock-in.",
+     ["T1-C-002", "T1-C-003", "T1-C-004", "T1-C-006", "T1-C-007",
+      "T1-C-010", "T1-C-011", "T1-C-012", "T1-C-013", "T1-C-014",
+      "T1-C-015", "T1-C-016"]),
+    ("Shadow AI Surface Report",
+     "AI in use outside sanctioned channels: personal accounts, "
+     "department-level adoption, vendor-embedded features, and "
+     "unrecognized charges.",
+     ["T1-B-011", "T1-B-013", "T1-B-014", "T1-B-015", "T1-B-016",
+      "T1-B-019", "T1-C-005"]),
+]
 
-  {% for cn in condition_narratives %}
-  <div class="rpt-artifact">
-    <h3>{{ cn.title }}</h3>
-    <p class="rpt-intro">{{ cn.question }}</p>
-    <table class="rpt-qa">
-      {% for row in cn.qa %}
-      <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% endfor %}
-</div>
+SECTION_1E_OPERATIONAL_QIDS = ["T1-G-002", "T1-G-005", "T1-D-016", "T1-C-015"]
+SECTION_1E_PERFORMATIVE_QIDS = ["T1-A-009", "T1-F-001", "T1-F-006", "T1-D-007"]
 
-{# ============ SECTION 3: AI RISK & GOVERNANCE REVIEW ============ #}
-<div class="rpt-section">
-  <div class="rpt-sec-head"><h2>3. AI Risk &amp; Governance Review&trade;</h2></div>
+POLICY_FIELDS = [
+    ("Named owner", "T1-B-004"),
+    ("Published AI usage policy", "T1-F-001"),
+    ("Defined budget (AI as distinct budget line)", "T1-C-006"),
+    ("Documented controls (approval before adoption)", "T1-B-024"),
+    ("Recurring review cadence", "T1-F-021"),
+    ("Exit criteria (tools retired on missed targets)", "T1-B-023"),
+]
 
-  {% for a in section3 %}
-  <div class="rpt-artifact">
-    <h3>{{ a.title }}</h3>
-    <p class="rpt-intro">{{ a.intro }}</p>
-    <table class="rpt-qa">
-      <tr><th>Assessed item</th><th>Finding</th></tr>
-      {% for row in a.qa %}
-      <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% endfor %}
+CONDITION_NARRATIVES = [
+    ("Condition 01 — Workflows ready",
+     "What workflows is AI supporting, and are they ready?",
+     ["T1-G-005", "T1-G-007", "T1-G-008"]),
+    ("Condition 02 — Data reliable",
+     "What data is AI relying on, and is it reliable?",
+     ["T1-E-004", "T1-E-006", "T1-E-007", "T1-E-008"]),
+    ("Condition 03 — Output owned",
+     "Who owns the output and what review standard does it meet?",
+     ["T1-D-005", "T1-D-010", "T1-D-011"]),
+    ("Condition 04 — Measurable result",
+     "What is AI producing in measurable business terms?",
+     ["T1-G-002", "T1-C-015", "T1-D-016", "T1-D-008"]),
+]
 
-  <div class="rpt-artifact">
-    <h3>AI Governance Maturity Scale</h3>
-    {% if maturity.overall %}
-    <div class="rpt-score-line">
-      Composite: <span class="rpt-score-num">{{ maturity.overall.score_0_100 }}</span> / 100
-      {% if maturity.overall.maturity_label %} &mdash; {{ maturity.overall.maturity_label }}{% endif %}
-    </div>
-    <div class="rpt-bar-track"><div class="rpt-bar-fill" style="width: {{ maturity.overall.score_0_100 }}%;"></div></div>
-    <table class="rpt-qa" style="margin-top: 8pt;">
-      <tr><th>Step</th><th>Score</th><th>Maturity</th><th>Confidence</th></tr>
-      {% for s in maturity.items %}
-      <tr><td class="rpt-q">{{ s.display_name }}</td><td>{{ s.score_0_100 }}</td><td>{{ s.maturity_label }}</td><td>{{ s.confidence_level }}</td></tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <div class="rpt-note">Governance scoring unavailable for this engagement.</div>
-    {% endif %}
-  </div>
-</div>
+SECTION_3_ARTIFACTS = [
+    ("AI Data Exposure Model",
+     "Where sensitive information meets external AI systems.",
+     ["T1-E-001", "T1-E-002", "T1-E-004", "T1-E-006", "T1-E-007",
+      "T1-E-008"]),
+    ("Decision Influence Matrix",
+     "Where AI influences or makes consequential decisions.",
+     ["T1-E-009", "T1-F-031", "T1-E-025", "T1-D-019"]),
+    ("AI Vendor Risk Inventory",
+     "Vendor terms, incidents, compliance evidence, and switching "
+     "exposure.",
+     ["T1-E-003", "T1-E-017", "T1-E-018", "T1-E-019", "T1-E-020",
+      "T1-E-021", "T1-E-029", "T1-E-031", "T1-E-032", "T1-C-012",
+      "T1-C-013", "T1-C-014"]),
+    ("AI Governance Framework Crosswalk",
+     "Obligations and voluntary standards mapped against assessed "
+     "posture.",
+     ["T1-A-006", "T1-A-011", "T1-A-012", "T1-F-013", "T1-F-014",
+      "T1-F-015", "T1-F-016", "T1-E-024"]),
+    ("Per-Use-Case Governance Dossier",
+     "Whether governance exists at the level of individual AI use "
+     "cases.",
+     ["T1-F-019", "T1-F-020", "T1-F-022"]),
+]
 
-{# ============ SECTION 4: AI EFFICIENCY & PROCESS OPTIMIZATION ============ #}
-<div class="rpt-section">
-  <div class="rpt-sec-head"><h2>4. AI Efficiency &amp; Process Optimization</h2></div>
+SECTION_4_ARTIFACTS = [
+    ("Workflow Reality Map",
+     "How AI actually behaves inside day-to-day work.",
+     ["T1-G-005", "T1-G-006", "T1-G-007", "T1-G-008"]),
+    ("The AI Efficiency Tax(tm)",
+     "Time and money consumed correcting, verifying, and reformatting "
+     "AI output.",
+     ["T1-C-007", "T1-C-010", "T1-C-011", "T1-D-009"]),
+]
 
-  {% for a in section4 %}
-  <div class="rpt-artifact">
-    <h3>{{ a.title }}</h3>
-    <p class="rpt-intro">{{ a.intro }}</p>
-    <table class="rpt-qa">
-      <tr><th>Assessed item</th><th>Finding</th></tr>
-      {% for row in a.qa %}
-      <tr><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% endfor %}
 
-  <div class="rpt-artifact">
-    <h3>The AI Efficiency Scorecard&trade;</h3>
-    {% if eff_scorecard.overall %}
-    <div class="rpt-score-line">
-      Composite: <span class="rpt-score-num">{{ eff_scorecard.overall.score_0_100 }}</span> / 100
-      {% if eff_scorecard.overall.bracket %} &mdash; {{ eff_scorecard.overall.bracket }}{% endif %}
-    </div>
-    <div class="rpt-bar-track"><div class="rpt-bar-fill" style="width: {{ eff_scorecard.overall.score_0_100 }}%;"></div></div>
-    <table class="rpt-qa" style="margin-top: 8pt;">
-      <tr><th>Component</th><th>Score</th><th>Rating</th><th>Confidence</th></tr>
-      {% for c in eff_scorecard.items %}
-      <tr><td class="rpt-q">{{ c.display_name }}</td><td>{{ c.score_0_100 }}</td><td>{{ c.bracket }}</td><td>{{ c.confidence_level }}</td></tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <div class="rpt-note">Efficiency scoring unavailable for this engagement.</div>
-    {% endif %}
-  </div>
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-  <div class="rpt-artifact">
-    <h3>The AI ROI Formula&trade;</h3>
-    <div class="rpt-note">
-      ROI = (Measured Business Value Delivered &minus; Fully Loaded Cost) &divide; Fully Loaded Cost.
-      Tier 1 collects spend brackets and hidden-cost estimates (Section 1, Fully Loaded Cost Map);
-      full measured-value ROI is produced in Tier 2 with documentation evidence.
-    </div>
-  </div>
+def _question_index() -> dict:
+    return {q["id"]: q for q in QUESTIONS}
 
-  <div class="rpt-artifact">
-    <h3>Executive AI Efficiency Brief</h3>
-    {% if eff_scorecard.overall %}
-    <p style="font-size: 9.5pt;">
-      The company's AI efficiency posture scores {{ eff_scorecard.overall.score_0_100 }}/100
-      ({{ eff_scorecard.overall.bracket }}).
-      {% if eff_scorecard.gaps %}The highest-priority efficiency gap: {{ eff_scorecard.gaps.0.statement }}
-      {{ eff_scorecard.gaps.0.impact }}{% endif %}
-    </p>
-    {% endif %}
-  </div>
 
-  <div class="rpt-artifact">
-    <h3>90-Day AI Process Optimization Plan</h3>
-    {% for gap in ninety_day %}
-    <div class="rpt-gap">
-      <h4>Day {% if forloop.counter == 1 %}1&ndash;30{% elif forloop.counter == 2 %}31&ndash;60{% else %}61&ndash;90{% endif %}: {{ gap.statement }}</h4>
-      <p><span class="rpt-label">Action:</span> {{ gap.action }}</p>
-      <p><span class="rpt-label">Addressed via:</span> {{ gap.addresses_via }}</p>
-    </div>
-    {% endfor %}
-  </div>
-</div>
+def _load_responses(cursor, engagement_id: str) -> dict:
+    cursor.execute(
+        """
+        SELECT r.question_id, r.answer_value, r.is_dont_know
+        FROM responses r
+        JOIN respondents rs ON r.respondent_id = rs.id
+        WHERE rs.engagement_id = %s
+        """,
+        [engagement_id],
+    )
+    return {row[0]: {"value": row[1], "dont_know": bool(row[2])}
+            for row in cursor.fetchall()}
 
-{# ============ SECTION 5: SUMMARY OF FINDINGS ============ #}
-<div class="rpt-section">
-  <div class="rpt-sec-head"><h2>5. Summary of Findings</h2></div>
 
-  <table class="rpt-qa">
-    <tr><th>Framework</th><th>Score</th><th>Rating</th><th>Confidence</th></tr>
-    {% for f in frameworks %}
-    {% if not f.error %}
-    <tr>
-      <td class="rpt-q">{{ f.framework.display_name }}</td>
-      <td>{{ f.overall.score_0_100 }}</td>
-      <td>{% if f.overall.bracket %}{{ f.overall.bracket }}{% elif f.overall.maturity_label %}{{ f.overall.maturity_label }}{% endif %}</td>
-      <td>{{ f.overall.confidence_level }}</td>
-    </tr>
-    {% endif %}
-    {% endfor %}
-  </table>
+def _format_answer(resp) -> str:
+    if resp is None:
+        return "Not answered"
+    value = resp["value"]
+    if isinstance(value, dict):
+        if value.get("_placeholder"):
+            return "Not captured (response pending re-answer)"
+        if "selected" in value:
+            sel = value["selected"]
+            if isinstance(sel, list):
+                return "; ".join(str(s) for s in sel)
+            return str(sel)
+        if "ranked" in value:
+            ranked = value.get("ranked") or []
+            if not ranked:
+                return "Not captured (response pending re-answer)"
+            return " > ".join(str(r) for r in ranked)
+        if "rows" in value:
+            parts = []
+            for key, row in sorted(value["rows"].items()):
+                if isinstance(row, dict):
+                    name = row.get("name") or f"Row {key}"
+                    cells = row.get("cells") or {}
+                    yes = sum(1 for v in cells.values()
+                              if str(v).lower() in ("selected", "yes"))
+                    parts.append(f"{name}: {yes}/{len(cells)} attributes")
+                else:
+                    parts.append(f"Row {key}: {row}")
+            return "; ".join(parts) if parts else "Matrix response recorded"
+    suffix = " (answered: Don't know)" if resp["dont_know"] else ""
+    return f"{value}{suffix}" if not isinstance(value, dict) else "Recorded"
 
-  <div class="rpt-opinion">
-    {% if opinion.kind == "unqualified" %}
-    <h3>Unqualified Opinion</h3>
-    <p style="font-size: 9.5pt;">
-      Based on the respondent's answers and the scoring methodology documented herein,
-      the findings present no material weakness across the assessed frameworks.
-      The company's AI posture, as self-reported, supports an unqualified opinion at the
-      Tier 1 snapshot level.
-    </p>
-    {% else %}
-    <h3>Qualified Opinion</h3>
-    <p style="font-size: 9.5pt;">
-      Based on the respondent's answers and the scoring methodology documented herein,
-      the following matters prevent an unqualified opinion:
-    </p>
-    <ul style="font-size: 9pt;">
-      {% for d in opinion.drivers %}<li>{{ d }}</li>{% endfor %}
-    </ul>
-    {% endif %}
-    <p style="font-size: 8pt; color: #6B7280;">
-      Opinion issued per the Tier 1 single-respondent snapshot methodology. A full
-      multi-respondent Tier 2 or Tier 3 engagement provides board-grade assurance.
-    </p>
-  </div>
-</div>
 
-{# ============ APPENDIX A ============ #}
-<div class="rpt-section">
-  <div class="rpt-sec-head"><h2>Appendix A. Questions and Responses</h2></div>
-  <table class="rpt-qa rpt-appendix">
-    <tr><th>ID</th><th>Question</th><th>Response</th></tr>
-    {% for row in appendix %}
-    <tr><td>{{ row.qid }}</td><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
-    {% endfor %}
-  </table>
-</div>
+def _qa_block(qindex, responses, qids):
+    out = []
+    for qid in qids:
+        q = qindex.get(qid)
+        if q is None:
+            continue
+        resp = responses.get(qid)
+        answer = _format_answer(resp)
+        if resp and resp["dont_know"]:
+            answer = f"{answer} — respondent answered Don't know"
+        out.append({
+            "qid": qid,
+            "question": q["question_text"],
+            "answer": answer,
+            "answered": resp is not None,
+        })
+    return out
 
-{# ============ LEGAL ============ #}
-<div class="rpt-legal">
-  <h2>Methodology</h2><p>{{ methodology }}</p>
-  <h2>Trademarks</h2><p>{{ trademark_notice }}</p>
-  <h2>Disclaimer</h2><p>{{ disclaimer }}</p>
-</div>
+
+def _artifact(qindex, responses, title, intro, qids, note=None):
+    return {
+        "title": title,
+        "intro": intro,
+        "qa": _qa_block(qindex, responses, qids),
+        "note": note,
+    }
+
+
+def _fuzzy_module_score(items, *keywords):
+    for item in items:
+        name = item.get("name", "").lower()
+        if any(k in name for k in keywords):
+            return item
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Opinion rule (Phase 1 placeholder — operator-tunable)
+# ---------------------------------------------------------------------------
+
+OPINION_SCORE_FLOOR = 60.0
+OPINION_DK_CEILING = 0.25
+
+
+def _build_opinion(frameworks):
+    drivers = []
+    scored = [f for f in frameworks if not f.get("error")]
+    if not scored:
+        return {
+            "kind": "qualified",
+            "drivers": ["No framework could be scored for this engagement."],
+        }
+    for f in scored:
+        o = f["overall"]
+        name = f["framework"]["display_name"]
+        if (o.get("score_0_100") or 0) < OPINION_SCORE_FLOOR:
+            drivers.append(
+                f"{name} scored {o['score_0_100']} — below the "
+                f"{OPINION_SCORE_FLOOR:.0f} threshold."
+            )
+        if (o.get("dk_ratio") or 0) > OPINION_DK_CEILING:
+            drivers.append(
+                f"{name} \"don't know\" ratio {o['dk_ratio']} exceeds "
+                f"{OPINION_DK_CEILING} — material uncertainty."
+            )
+        if str(o.get("confidence_level", "")).lower() == "low":
+            drivers.append(f"{name} confidence level is low.")
+    kind = "unqualified" if not drivers else "qualified"
+    return {"kind": kind, "drivers": drivers}
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+def render_tier1_snapshot_html(engagement_id: str) -> str:
+    qindex = _question_index()
+
+    with connection.cursor() as cursor:
+        responses = _load_responses(cursor, engagement_id)
+
+    frameworks = []
+    for key in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
+        try:
+            ctx = build_snapshot_context(engagement_id, key)
+            ctx["error"] = None
+            frameworks.append(ctx)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("scoring failed for framework %s", key)
+            frameworks.append({"error": str(exc), "framework": {"key": key}})
+
+    by_key = {f["framework"]["key"]: f for f in frameworks
+              if not f.get("error")}
+    v2 = by_key.get("v2_readiness")
+    v3 = by_key.get("v3_governance")
+    eff = by_key.get("efficiency")
+    first = next(iter(by_key.values()), None)
+
+    # --- Section 1 ---
+    section1 = [
+        _artifact(qindex, responses, title, intro, qids)
+        for title, intro, qids in SECTION_1_ARTIFACTS
+    ]
+    gap_analysis = {
+        "title": "Governance Gap Analysis",
+        "intro": "Highest-priority governance gaps identified by the "
+                 "AI Risk & Governance Review(tm) scoring.",
+        "gaps": (v3["priority_gaps"] if v3 else []),
+        "note": None if v3 else "Governance scoring unavailable for this "
+                                "engagement.",
+    }
+    perf_vs_op = {
+        "operational_score": (eff["overall"]["score_0_100"] if eff else None),
+        "performative_score": (v3["overall"]["score_0_100"] if v3 else None),
+        "operational_qa": _qa_block(qindex, responses,
+                                    SECTION_1E_OPERATIONAL_QIDS),
+        "performative_qa": _qa_block(qindex, responses,
+                                     SECTION_1E_PERFORMATIVE_QIDS),
+    }
+    policy_fields = []
+    for label, qid in POLICY_FIELDS:
+        resp = responses.get(qid)
+        policy_fields.append({
+            "label": label,
+            "value": _format_answer(resp),
+        })
+
+    # --- Section 2 ---
+    v2_items = v2["items"] if v2 else []
+    conditions = [
+        {"n": 1, "name": "Workflow Readiness Review",
+         "item": _fuzzy_module_score(v2_items, "workflow")},
+        {"n": 2, "name": "Data Reliability Checklist",
+         "item": _fuzzy_module_score(v2_items, "data")},
+        {"n": 3, "name": "AI Adoption Pattern Map",
+         "item": _fuzzy_module_score(v2_items, "adoption", "pattern")},
+        {"n": 4, "name": "AI Governance Matrix",
+         "item": _fuzzy_module_score(v2_items, "governance")},
+        {"n": 5, "name": "Net Efficiency Yield Ratio",
+         "item": None,
+         "metric_note": "NEYR = Net Completed Output Value / Total Labor "
+                        "Hours Across Generation. Tier 1 does not collect "
+                        "output value and labor hours directly - "
+                        "directional signals below; measured in Tier 2."},
+        {"n": 6, "name": "Operational Leakage Factor(tm)",
+         "item": None,
+         "metric_note": "OLF(tm) = Total Weekly Untracked Manual "
+                        "Correction, Verification, Reformatting, and "
+                        "Bypass Hours / Total Weekly AI-Supported Workflow "
+                        "Volume. Tier 1 directional estimate from the "
+                        "weekly review-and-fix time reported below; "
+                        "measured in Tier 2."},
+    ]
+    neyr_olf_signals = _qa_block(qindex, responses,
+                                 ["T1-C-010", "T1-C-011", "T1-G-009"])
+    condition_narratives = [
+        {"title": t, "question": qtext,
+         "qa": _qa_block(qindex, responses, qids)}
+        for t, qtext, qids in CONDITION_NARRATIVES
+    ]
+
+    # --- Section 3 ---
+    section3 = [
+        _artifact(qindex, responses, title, intro, qids)
+        for title, intro, qids in SECTION_3_ARTIFACTS
+    ]
+    maturity = {
+        "overall": (v3["overall"] if v3 else None),
+        "items": (v3["items"] if v3 else []),
+        "cross_cutting": (v3.get("cross_cutting_signals", []) if v3 else []),
+    }
+
+    # --- Section 4 ---
+    section4 = [
