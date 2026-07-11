@@ -42,12 +42,6 @@
   .rpt-legal { page-break-before: always; font-size: 7.8pt; color: #6B7280; line-height: 1.5; }
   .rpt-legal h2 { font-size: 11pt; }
   .rpt-cond-score { font-size: 12pt; font-weight: bold; color: #F07800; }
-  .rpt-ai { border: 1pt solid #201868; border-left: 3pt solid #201868;
-    background: #F4F3FA; padding: 8pt 10pt; margin: 0 0 14pt 0; }
-  .rpt-ai h3 { font-size: 11pt; margin: 0 0 4pt 0; }
-  .rpt-ai p { font-size: 9pt; line-height: 1.5; margin: 2pt 0; }
-  .rpt-ai ul { font-size: 8.5pt; margin: 2pt 0 4pt 14pt; padding: 0; line-height: 1.45; }
-  .rpt-ai-sub { font-size: 8.5pt; font-weight: bold; color: #201868; margin-top: 5pt; }
 </style>
 
 <div class="rpt-cover">
@@ -73,21 +67,6 @@
 
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>1. Audit Findings</h2></div>
-
-  {% if ai.section1 %}
-  <div class="rpt-ai">
-    <h3>Auditor's Analysis</h3>
-    <p>{{ ai.section1.narrative|linebreaksbr }}</p>
-    {% if ai.section1.key_findings %}
-    <div class="rpt-ai-sub">Key findings</div>
-    <ul>{% for k in ai.section1.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>
-    {% endif %}
-    {% if ai.section1.recommendations %}
-    <div class="rpt-ai-sub">Recommended actions</div>
-    <ul>{% for r in ai.section1.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>
-    {% endif %}
-  </div>
-  {% endif %}
 
   {% for a in section1 %}
   <div class="rpt-artifact">
@@ -159,21 +138,6 @@
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>2. AI Readiness Scorecard</h2></div>
 
-  {% if ai.section2 %}
-  <div class="rpt-ai">
-    <h3>Auditor's Analysis</h3>
-    <p>{{ ai.section2.narrative|linebreaksbr }}</p>
-    {% if ai.section2.key_findings %}
-    <div class="rpt-ai-sub">Key findings</div>
-    <ul>{% for k in ai.section2.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>
-    {% endif %}
-    {% if ai.section2.recommendations %}
-    <div class="rpt-ai-sub">Recommended actions</div>
-    <ul>{% for r in ai.section2.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>
-    {% endif %}
-  </div>
-  {% endif %}
-
   {% if v2_overall %}
   <div class="rpt-score-line">
     Composite readiness: <span class="rpt-score-num">{{ v2_overall.score_0_100 }}</span> / 100
@@ -218,21 +182,6 @@
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>3. AI Risk &amp; Governance Review&trade;</h2></div>
 
-  {% if ai.section3 %}
-  <div class="rpt-ai">
-    <h3>Auditor's Analysis</h3>
-    <p>{{ ai.section3.narrative|linebreaksbr }}</p>
-    {% if ai.section3.key_findings %}
-    <div class="rpt-ai-sub">Key findings</div>
-    <ul>{% for k in ai.section3.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>
-    {% endif %}
-    {% if ai.section3.recommendations %}
-    <div class="rpt-ai-sub">Recommended actions</div>
-    <ul>{% for r in ai.section3.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>
-    {% endif %}
-  </div>
-  {% endif %}
-
   {% for a in section3 %}
   <div class="rpt-artifact">
     <h3>{{ a.title }}</h3>
@@ -268,21 +217,6 @@
 
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>4. AI Efficiency &amp; Process Optimization</h2></div>
-
-  {% if ai.section4 %}
-  <div class="rpt-ai">
-    <h3>Auditor's Analysis</h3>
-    <p>{{ ai.section4.narrative|linebreaksbr }}</p>
-    {% if ai.section4.key_findings %}
-    <div class="rpt-ai-sub">Key findings</div>
-    <ul>{% for k in ai.section4.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>
-    {% endif %}
-    {% if ai.section4.recommendations %}
-    <div class="rpt-ai-sub">Recommended actions</div>
-    <ul>{% for r in ai.section4.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>
-    {% endif %}
-  </div>
-  {% endif %}
 
   {% for a in section4 %}
   <div class="rpt-artifact">
@@ -351,17 +285,6 @@
 
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>5. Summary of Findings</h2></div>
-
-  {% if ai.section5 %}
-  <div class="rpt-ai">
-    <h3>Executive Summary</h3>
-    <p>{{ ai.section5.narrative|linebreaksbr }}</p>
-    {% if ai.section5.key_findings %}
-    <div class="rpt-ai-sub">Key findings</div>
-    <ul>{% for k in ai.section5.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>
-    {% endif %}
-  </div>
-  {% endif %}
 
   <table class="rpt-qa">
     <tr><th>Framework</th><th>Score</th><th>Rating</th><th>Confidence</th></tr>

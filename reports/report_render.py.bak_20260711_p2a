@@ -396,13 +396,4 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         "trademark_notice": (first["trademark_notice"] if first else ""),
         "disclaimer": (first["disclaimer"] if first else ""),
     }
-
-    # --- Phase 2a: AI narrative analysis (never fatal) ---
-    try:
-        from reports.ai_analysis import analyze_report
-        context["ai"] = analyze_report(engagement_id, context)
-    except Exception:  # noqa: BLE001
-        logger.exception("AI analysis failed; rendering without narratives")
-        context["ai"] = {}
-
     return render_to_string("reports/tier1_snapshot.html", context)

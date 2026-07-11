@@ -1,0 +1,14 @@
+{% comment %}
+Rendered inside #question-shell when the respondent has finished every
+visible question. PR 7 will replace the placeholder CTA with the paywall
+and Stripe checkout hand-off.
+{% endcomment %}
+<div class="text-center py-5">
+    <h2 class="mb-3">Questionnaire complete.</h2>
+    <p class="lead text-muted mb-4">
+        Thank you for completing the assessment. Your snapshot is being prepared.
+    </p>
+    <p class="small text-muted">
+        You will be redirected to your report shortly.
+    </p>
+</div>
