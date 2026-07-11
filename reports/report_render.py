@@ -415,5 +415,6 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         opinion["kind"] = "qualified"
     opinion["exceptions"] = exceptions
     opinion["scope_limitations"] = basis.get("scope_limitations") or []
+    opinion["statement"] = basis.get("opinion_statement") or ""
 
     return render_to_string("reports/tier1_snapshot.html", context)
