@@ -1,4 +1,4 @@
-﻿"""Base settings for SRJ AI Audit Platform.
+"""Base settings for SRJ AI Audit Platform.
 
 Imported by development.py and production.py. Defaults to development-friendly
 values; production.py hardens the security-sensitive ones.
@@ -87,10 +87,19 @@ RQ_QUEUES = {
 AUTH_USER_MODEL = 'accounts.User'
 
 # Static files
+# STATICFILES_DIRS tells collectstatic WHERE to look for source assets.
+# Without this, `python manage.py collectstatic` won't pick up files under
+# ./static/ (e.g. static/img/srj-logo.jpg) and {% static %} references will
+# 404 in production. Only include the folder if it exists so dev environments
+# without the folder don't crash Django startup with an ImproperlyConfigured.
 _static_src = BASE_DIR / 'static'
 STATICFILES_DIRS = [_static_src] if _static_src.exists() else []
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# CompressedManifestStaticFilesStorage would 500 on any {% static %} tag whose
+# file wasn't collected (strict hash lookup). Use the non-manifest compressed
+# storage while we're stabilizing the asset pipeline; switch back to Manifest
+# once collectstatic is reliably green in CI.
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # File storage (Backblaze B2 via S3 API). In dev, falls back to local FS
@@ -126,6 +135,13 @@ TIER_1_REPORT_PRICE_CENTS = env.int('TIER_1_REPORT_PRICE_CENTS', default=39900)
 STRIPE_IDENTITY_REQUIRED_THRESHOLD_EMPLOYEES = env.int(
     'STRIPE_IDENTITY_REQUIRED_THRESHOLD_EMPLOYEES', default=501
 )
+
+# AI narrative analysis (Claude API) - Phase 2a
+# Empty ANTHROPIC_API_KEY silently disables the layer; reports still
+# generate with template-only content.
+ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
+AI_ANALYSIS_MODEL = env('AI_ANALYSIS_MODEL', default='claude-sonnet-4-5')
+AI_ANALYSIS_ENABLED = env.bool('AI_ANALYSIS_ENABLED', default=True)
 
 # Platform configuration
 PLATFORM_BASE_URL = env('PLATFORM_BASE_URL', default='http://localhost:8000')
@@ -163,7 +179,7 @@ TEMPLATES = [
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-     'OPTIONS': {'min_length': 12}},
+     'OPTIONS': {'min_length': 12}},  # Per Part A §2.8 security baseline
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
