@@ -1,25 +1,24 @@
-t · PY
 """Qualified-opinion checklist (Phase 2b).
- 
+
 100 specific conditions the auditor watches for when identifying, validating,
 and formulating a qualified opinion, grouped into five research domains:
 governance/data access, executive oversight/financial controls, organizational
 readiness/operational maturity, leadership accountability/human-in-the-loop,
 and risk management/continuous auditing.
- 
+
 Source: operator-supplied checklist, 2026-07-11. Edit text freely; the AI
 opinion-basis evaluation reads this list at call time - no other code changes
 needed.
- 
+
 Each entry: (point_number, domain, condition_text).
 """
- 
+
 D1 = "AI Governance & Data Access Controls"
 D2 = "Executive Oversight & Financial Controls"
 D3 = "Organizational Readiness & Operational Maturity"
 D4 = "Leadership Accountability & Human-in-the-Loop"
 D5 = "AI Risk Management & Continuous Auditing"
- 
+
 CHECKLIST = [
     (1, D1, "Absence of a formalized data access protocol across external systems."),
     (2, D1, "Lack of explicit categorizations defining what data is strictly prohibited inside external generative environments."),
@@ -122,8 +121,8 @@ CHECKLIST = [
     (99, D5, "Absence of clear contractual remedies or exit strategies if a vital vendor suddenly changes their data privacy policy."),
     (100, D5, "Reconciling systemic model flaws via superficial prompt adjustments rather than addressing core governance architecture failures."),
 ]
- 
- 
+
+
 def checklist_text() -> str:
     """Render the checklist as compact numbered text for the AI prompt."""
     lines = []
