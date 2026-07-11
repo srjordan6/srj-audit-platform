@@ -396,6 +396,34 @@
       {% for d in opinion.drivers %}<li>{{ d }}</li>{% endfor %}
     </ul>
     {% endif %}
+
+    {% if opinion.exceptions %}
+    <h4 style="margin-bottom: 3pt;">Basis for Opinion &mdash; Checklist Exceptions</h4>
+    <p style="font-size: 8pt; color: #6B7280; margin-top: 0;">
+      Conditions identified against the audit's 100-point qualified-opinion
+      checklist, with the respondent evidence supporting each.
+    </p>
+    <table class="rpt-qa">
+      <tr><th>#</th><th>Domain</th><th>Condition identified</th><th>Evidence</th><th>Materiality</th></tr>
+      {% for e in opinion.exceptions %}
+      <tr class="checklist-exception">
+        <td>{{ e.point }}</td>
+        <td style="font-size: 7.5pt;">{{ e.domain }}</td>
+        <td class="rpt-q" style="width: 35%;">{{ e.finding }}</td>
+        <td style="font-size: 7.5pt;">{{ e.evidence }}</td>
+        <td>{% if e.materiality == "material" %}<strong>Material</strong>{% else %}Notable{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if opinion.scope_limitations %}
+    <h4 style="margin-bottom: 3pt;">Scope Limitations</h4>
+    <ul style="font-size: 8.5pt;">
+      {% for s in opinion.scope_limitations %}<li>{{ s }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
     <p style="font-size: 8pt; color: #6B7280;">
       Opinion issued per the Tier 1 single-respondent snapshot methodology. A full
       multi-respondent Tier 2 or Tier 3 engagement provides board-grade assurance.

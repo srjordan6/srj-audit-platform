@@ -405,4 +405,15 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         logger.exception("AI analysis failed; rendering without narratives")
         context["ai"] = {}
 
+    # --- Phase 2b: fold checklist exceptions into the opinion ---
+    # Material exceptions from the 100-point qualified-opinion checklist
+    # qualify the opinion even when framework scores alone would not.
+    basis = (context["ai"] or {}).get("opinion_basis") or {}
+    exceptions = basis.get("exceptions") or []
+    material = [e for e in exceptions if e.get("materiality") == "material"]
+    if material and opinion["kind"] == "unqualified":
+        opinion["kind"] = "qualified"
+    opinion["exceptions"] = exceptions
+    opinion["scope_limitations"] = basis.get("scope_limitations") or []
+
     return render_to_string("reports/tier1_snapshot.html", context)
