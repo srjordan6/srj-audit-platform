@@ -388,6 +388,11 @@
     </p>
     {% else %}
     <h3>Qualified Opinion</h3>
+    {% if opinion.statement %}
+    <p style="font-size: 10pt; font-style: italic; line-height: 1.55;">
+      {{ opinion.statement }}
+    </p>
+    {% endif %}
     <p style="font-size: 9.5pt;">
       Based on the respondent's answers and the scoring methodology documented herein,
       the following matters prevent an unqualified opinion:
