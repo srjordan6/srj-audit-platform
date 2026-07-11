@@ -188,6 +188,18 @@ def submit_response(request):
         services.save_response(
             cursor, rid, question_id, answer_value, is_dont_know
         )
+        # Phase 2c: if that was the final question, stamp completion and
+        # kick off report generation + email delivery in the background.
+        # Never fatal - the respondent always gets the completion page.
+        if services.get_next_question_context(cursor, rid) is None:
+            try:
+                from reports.auto_delivery import on_respondent_complete
+                on_respondent_complete(cursor, rid)
+            except Exception:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).exception(
+                    "auto delivery trigger failed for %s", rid
+                )
         return _dispatch_by_state(request, cursor, rid)
 
 
