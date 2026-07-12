@@ -200,6 +200,9 @@ def submit_response(request):
                 logging.getLogger(__name__).exception(
                     "auto delivery trigger failed for %s", rid
                 )
+        # Phase 2d: edits from the review page return to the review list.
+        if request.GET.get("next") == "review" or request.POST.get("next") == "review":
+            return redirect("questionnaire:review")
         return _dispatch_by_state(request, cursor, rid)
 
 

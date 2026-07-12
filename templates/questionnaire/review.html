@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review your responses</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0;
+         background: #F4F3FA; color: #1A1A2E; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { color: #201868; font-size: 24px; margin: 16px 0 4px; }
+  .sub { color: #6B7280; font-size: 14px; margin-bottom: 18px; }
+  .banner { background: #FEF3E4; border: 1px solid #F07800; border-radius: 6px;
+            padding: 10px 14px; font-size: 14px; margin-bottom: 18px; }
+  .banner.locked { background: #EEE; border-color: #6B7280; }
+  table { width: 100%; border-collapse: collapse; background: #fff;
+          border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(32,24,104,.12); }
+  th { background: #201868; color: #fff; text-align: left; font-size: 12px;
+       padding: 8px 10px; }
+  td { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid #E8E6F0;
+       vertical-align: top; }
+  tr:hover td { background: #F8F7FC; }
+  .qid { color: #6B7280; font-size: 11px; white-space: nowrap; }
+  .edit-btn { display: inline-block; background: #F07800; color: #fff;
+              text-decoration: none; font-size: 12px; font-weight: 600;
+              padding: 4px 12px; border-radius: 4px; }
+  .edit-btn:hover { background: #d96c00; }
+  .section-row td { background: #E8E6F0; color: #201868; font-weight: 700;
+                    font-size: 12px; letter-spacing: .03em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Review your responses</h1>
+  <p class="sub">{{ answered_count }} answered question{{ answered_count|pluralize }}.</p>
+
+  {% if editable %}
+    <div class="banner">
+      You can update any answer below{% if countdown_text %} &mdash; {{ countdown_text }}{% endif %}.
+      Changed answers are reflected the next time your report is generated.
+    </div>
+  {% else %}
+    <div class="banner locked">
+      This snapshot is {{ state }} &mdash; responses are read-only.
+    </div>
+  {% endif %}
+
+  <table>
+    <tr><th style="width:12%">ID</th><th style="width:48%">Question</th>
+        <th style="width:30%">Your answer</th>{% if editable %}<th style="width:10%"></th>{% endif %}</tr>
+    {% regroup rows by section as section_list %}
+    {% for sec in section_list %}
+      <tr class="section-row"><td colspan="{% if editable %}4{% else %}3{% endif %}">{{ sec.grouper|default:"General" }}</td></tr>
+      {% for r in sec.list %}
+      <tr>
+        <td class="qid">{{ r.qid }}</td>
+        <td>{{ r.question }}</td>
+        <td>{{ r.answer }}</td>
+        {% if editable %}<td><a class="edit-btn" href="/q/edit/{{ r.qid }}/">Edit</a></td>{% endif %}
+      </tr>
+      {% endfor %}
+    {% endfor %}
+  </table>
+</div>
+</body>
+</html>
