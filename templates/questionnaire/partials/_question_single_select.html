@@ -30,6 +30,7 @@ inside `options` per production data — no separate UI affordance is
 needed. The scoring engine identifies don't-know responses by string
 match per scoring/response_scoring.py.
 {% endcomment %}
+{% load glossary %}
 <form class="srj-question srj-question--single-select"
       hx-post="{{ submit_url }}"
       hx-target="{{ swap_target|default:'#question-shell' }}"
@@ -60,7 +61,7 @@ match per scoring/response_scoring.py.
                  {% if question.required %}required{% endif %}
                  {% if prior_answer and prior_answer.selected == option %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">
-            {{ option }}
+            {{ option|glossary_annotate|safe }}
           </label>
         </div>
         {% endwith %}

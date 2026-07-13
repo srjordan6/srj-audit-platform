@@ -57,6 +57,7 @@ Matrix layouts don't fit on narrow viewports. The wrapper is
 horizontally scrollable (overflow-x:auto via Bootstrap's .table-responsive)
 so the grid remains usable on mobile without cropping cells.
 {% endcomment %}
+{% load glossary %}
 {% with cell_options=question.extended_metadata.matrix_cell_options %}
 <form class="srj-question srj-question--matrix srj-question--matrix-grid"
       hx-post="{{ submit_url }}"
@@ -88,7 +89,7 @@ so the grid remains usable on mobile without cropping cells.
             <th scope="col" class="srj-question__matrix-row-header">Item</th>
             {% for column in question.matrix_columns %}
               <th scope="col" class="srj-question__matrix-col-header">
-                {{ column }}
+                {{ column|glossary_annotate|safe }}
               </th>
             {% endfor %}
           </tr>
@@ -128,7 +129,7 @@ so the grid remains usable on mobile without cropping cells.
                                value="{{ opt }}"
                                {% if question.required %}required{% endif %}>
                         <label class="form-check-label small" for="{{ input_id }}">
-                          {{ opt }}
+                          {{ opt|glossary_annotate|safe }}
                         </label>
                       </div>
                       {% endwith %}

@@ -25,6 +25,7 @@ data (e.g. T1-B-002). Mutual exclusivity with other options (selecting
 client-side UX nicety to ship later, not a v1 concern. The scoring
 engine treats {"selected": ["None of these"]} correctly regardless.
 {% endcomment %}
+{% load glossary %}
 <form class="srj-question srj-question--multi-select"
       hx-post="{{ submit_url }}"
       hx-target="{{ swap_target|default:'#question-shell' }}"
@@ -57,7 +58,7 @@ engine treats {"selected": ["None of these"]} correctly regardless.
                  value="{{ option }}"
                  {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">
-            {{ option }}
+            {{ option|glossary_annotate|safe }}
           </label>
         </div>
         {% endwith %}

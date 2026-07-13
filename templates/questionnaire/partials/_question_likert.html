@@ -27,6 +27,7 @@ option_weight system. Storing the numeric value separately would
 require teaching response_scoring.py to handle two storage shapes —
 not worth it.
 {% endcomment %}
+{% load glossary %}
 <form class="srj-question srj-question--likert"
       hx-post="{{ submit_url }}"
       hx-target="{{ swap_target|default:'#question-shell' }}"
@@ -57,7 +58,7 @@ not worth it.
                  {% if question.required %}required{% endif %}
                  {% if prior_answer and prior_answer.selected == option %}checked{% endif %}>
           <label class="form-check-label d-block" for="{{ input_id }}">
-            {{ option }}
+            {{ option|glossary_annotate|safe }}
           </label>
         </div>
         {% endwith %}

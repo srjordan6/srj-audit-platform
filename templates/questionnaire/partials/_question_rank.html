@@ -50,6 +50,7 @@ option distribution based on prior_answer, hidden input presence, and
 data attrs SortableJS needs. JS behavior is manually verified in the
 Sprint C browser walkthrough.
 {% endcomment %}
+{% load glossary %}
 {% with options_length=question.options|length %}
 {% with rank_max=question.extended_metadata.rank_max|default:options_length %}
 <form class="srj-question srj-question--rank"
@@ -104,7 +105,7 @@ Sprint C browser walkthrough.
                   data-option="{{ option }}"
                   draggable="true">
                 <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
-                <span class="srj-question__rank-label-text">{{ option }}</span>
+                <span class="srj-question__rank-label-text">{{ option|glossary_annotate|safe }}</span>
               </li>
             {% endif %}
           {% endfor %}
@@ -127,7 +128,7 @@ Sprint C browser walkthrough.
                     draggable="true">
                   <span class="srj-question__rank-position badge bg-secondary me-2">{{ forloop.counter }}</span>
                   <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
-                  <span class="srj-question__rank-label-text">{{ option }}</span>
+                  <span class="srj-question__rank-label-text">{{ option|glossary_annotate|safe }}</span>
                 </li>
               {% endif %}
             {% endfor %}

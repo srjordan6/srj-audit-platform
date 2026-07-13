@@ -41,6 +41,7 @@ counters) rather than a custom filter — the trade-off is that the
 respondent must not have shifted rows between saves. Production data
 has fixed row labels, so this is safe.
 {% endcomment %}
+{% load glossary %}
 <form class="srj-question srj-question--matrix srj-question--matrix-choice"
       hx-post="{{ submit_url }}"
       hx-target="{{ swap_target|default:'#question-shell' }}"
@@ -71,7 +72,7 @@ has fixed row labels, so this is safe.
             <th scope="col" class="srj-question__matrix-row-header"></th>
             {% for column in question.matrix_columns %}
               <th scope="col" class="srj-question__matrix-col-header text-center">
-                {{ column }}
+                {{ column|glossary_annotate|safe }}
               </th>
             {% endfor %}
           </tr>
@@ -81,7 +82,7 @@ has fixed row labels, so this is safe.
             {% with row_index=forloop.counter0 %}
             <tr data-row-index="{{ row_index }}" data-row-label="{{ row }}">
               <th scope="row" class="srj-question__matrix-row-label">
-                {{ row }}
+                {{ row|glossary_annotate|safe }}
               </th>
               {% for column in question.matrix_columns %}
                 {% with col_index=forloop.counter0 %}
