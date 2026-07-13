@@ -173,9 +173,11 @@
     {% block content %}{% endblock %}
   </main>
 
-  {# Footer — legal links appear on every page (marketing + Django) so a
-     respondent can reach Terms / Privacy / Disclaimer at any point in
-     the questionnaire without losing progress (links open in a new tab). #}
+  {% comment %}
+  Footer — legal links appear on every page (marketing + Django) so a
+  respondent can reach Terms / Privacy / Disclaimer at any point in
+  the questionnaire without losing progress (links open in a new tab).
+  {% endcomment %}
   <footer class="srj-footer">
     <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
       <div>
