@@ -173,14 +173,21 @@
     {% block content %}{% endblock %}
   </main>
 
-  {# Footer #}
+  {# Footer — legal links appear on every page (marketing + Django) so a
+     respondent can reach Terms / Privacy / Disclaimer at any point in
+     the questionnaire without losing progress (links open in a new tab). #}
   <footer class="srj-footer">
-    <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center">
+    <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
       <div>
         &copy; SRJ Consulting &amp; Services LLC
       </div>
+      <div class="srj-footer-legal d-flex flex-wrap gap-3 justify-content-center">
+        <a href="https://aiauditforcompanies.com/terms.html" target="_blank" rel="noopener">Terms of Service</a>
+        <a href="https://aiauditforcompanies.com/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+        <a href="https://aiauditforcompanies.com/disclaimer.html" target="_blank" rel="noopener">Disclaimer</a>
+      </div>
       <div>
-        <a href="https://srjconsultingservices.com">srjconsultingservices.com</a>
+        <a href="https://srjconsultingservices.com" target="_blank" rel="noopener">srjconsultingservices.com</a>
       </div>
     </div>
   </footer>
