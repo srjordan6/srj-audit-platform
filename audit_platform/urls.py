@@ -15,6 +15,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import include, path
 
+from questionnaire import views as q_views
+
 
 def healthz(request):
     """Liveness probe for Render. Returns 200 with body 'ok'."""
@@ -28,6 +30,9 @@ def root(request):
 
 urlpatterns = [
     path('', root, name='root'),
+    # Public branded start URL — aiauditforcompanies.com/startaiaudit → questionnaire.views.start.
+    # Alias of /q/start/; both routes render the same view. Marketing CTAs link here.
+    path('startaiaudit/', q_views.start, name='start_alias'),
     path('admin/', admin.site.urls),
     path('healthz/', healthz, name='healthz'),
     path('django-rq/', include('django_rq.urls')),
