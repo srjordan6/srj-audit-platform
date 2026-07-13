@@ -4945,7 +4945,7 @@ TIER_1_QUESTIONS = [
         "tier": 'tier_1',
         "section": 'H',
         "sequence_number": 6,
-        "question_text": "Anything we should know that the questionnaire didn't ask? (optional, max 300 characters)",
+        "question_text": "Anything we should know that the questionnaire didn't ask? (optional, max 1000 characters)",
         "question_type": 'TEXT',
         "options": None,
         "matrix_rows": None,
@@ -4965,7 +4965,7 @@ TIER_1_QUESTIONS = [
         "is_active": True,
         "scoring_overrides": None,
         "extended_metadata": {
-            'max_length': 300
+            'max_length': 1000
         },
     },
 ]

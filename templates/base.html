@@ -202,25 +202,121 @@
       }
     });
 
-    // Rank partial SortableJS wiring
+    // ------------------------------------------------------------------
+    // RANK partial helpers.
+    //
+    // srjAttachSortable(): wires SortableJS to the source + target lists
+    //   inside every RANK question partial on the page. Both lists share
+    //   a group name so items can be dragged between them. onEnd callbacks
+    //   renumber the target-list badges and enforce the top-N cap
+    //   (data-max on the target list). Idempotent via data-sortable-attached.
+    //
+    // srjRankPrepareSubmit(form): called from the RANK form's onsubmit.
+    //   Reads the DOM order of items currently in the target list, joins
+    //   their data-option values with "||", writes to the hidden "answer"
+    //   input, and validates 1..max items. Returns false + alert to block
+    //   submit on invalid state; otherwise returns true.
+    // ------------------------------------------------------------------
+
+    function srjRenumberRankTarget(targetEl) {
+      // Refresh the numbered badges (1, 2, 3, ...) after any drag ends.
+      var items = targetEl.querySelectorAll('.srj-question__rank-item');
+      items.forEach(function (item, idx) {
+        var badge = item.querySelector('.srj-question__rank-position');
+        if (badge) {
+          badge.textContent = String(idx + 1);
+        } else {
+          // Item was dragged in from the source list — inject a badge.
+          var newBadge = document.createElement('span');
+          newBadge.className = 'srj-question__rank-position badge bg-secondary me-2';
+          newBadge.textContent = String(idx + 1);
+          item.insertBefore(newBadge, item.firstChild);
+        }
+      });
+    }
+
+    function srjStripRankBadges(sourceEl) {
+      // When an item is dragged BACK to the source list, remove any
+      // position badge it accumulated while on the target list.
+      var items = sourceEl.querySelectorAll('.srj-question__rank-item');
+      items.forEach(function (item) {
+        var badge = item.querySelector('.srj-question__rank-position');
+        if (badge) badge.remove();
+      });
+    }
+
     function srjAttachSortable() {
+      // Group name is per-question so multiple questions on one page
+      // (defense against future multi-question layouts) don't cross-drag.
       document.querySelectorAll('[data-role="rank-source"]:not([data-sortable-attached])')
         .forEach(function (el) {
+          var groupName = 'srj-rank-' + (el.id || '').replace(/^rank-available-/, '');
           new Sortable(el, {
-            group: 'srj-rank-' + el.id.split('-').pop(),
+            group: { name: groupName, pull: true, put: true },
             animation: 150,
+            onEnd: function () {
+              srjStripRankBadges(el);
+              var targetId = el.id.replace(/^rank-available-/, 'rank-selected-');
+              var targetEl = document.getElementById(targetId);
+              if (targetEl) srjRenumberRankTarget(targetEl);
+            },
           });
           el.setAttribute('data-sortable-attached', 'true');
         });
+
       document.querySelectorAll('[data-role="rank-target"]:not([data-sortable-attached])')
         .forEach(function (el) {
+          var groupName = 'srj-rank-' + (el.id || '').replace(/^rank-selected-/, '');
+          var max = parseInt(el.getAttribute('data-max') || '0', 10);
           new Sortable(el, {
-            group: 'srj-rank-' + el.id.split('-').pop(),
+            group: { name: groupName, pull: true, put: true },
             animation: 150,
+            onAdd: function (evt) {
+              // Enforce the top-N cap: if we already had max items and one
+              // more just arrived, send the excess back to the source.
+              if (max > 0 && el.children.length > max) {
+                var overflow = evt.item;
+                var sourceId = el.id.replace(/^rank-selected-/, 'rank-available-');
+                var sourceEl = document.getElementById(sourceId);
+                if (sourceEl) sourceEl.appendChild(overflow);
+                var badge = overflow.querySelector('.srj-question__rank-position');
+                if (badge) badge.remove();
+              }
+              srjRenumberRankTarget(el);
+            },
+            onUpdate: function () { srjRenumberRankTarget(el); },
+            onRemove: function () { srjRenumberRankTarget(el); },
           });
           el.setAttribute('data-sortable-attached', 'true');
         });
     }
+
+    function srjRankPrepareSubmit(form) {
+      var target = form.querySelector('[data-role="rank-target"]');
+      var hidden = form.querySelector('[data-role="rank-hidden-input"]');
+      if (!target || !hidden) {
+        // Not a rank form or malformed — let it submit unchanged.
+        return true;
+      }
+      var items = target.querySelectorAll('.srj-question__rank-item');
+      var max = parseInt(target.getAttribute('data-max') || String(items.length), 10);
+      if (items.length === 0) {
+        alert('Please drag at least one option into your ranking before continuing.');
+        return false;
+      }
+      if (max > 0 && items.length > max) {
+        alert('Please rank at most ' + max + ' options.');
+        return false;
+      }
+      var values = [];
+      items.forEach(function (item) {
+        var opt = item.getAttribute('data-option');
+        if (opt) values.push(opt);
+      });
+      hidden.value = values.join('||');
+      return true;
+    }
+
     document.addEventListener('DOMContentLoaded', srjAttachSortable);
     document.body.addEventListener('htmx:afterSwap', srjAttachSortable);
   </script>
