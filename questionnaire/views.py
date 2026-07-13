@@ -22,6 +22,7 @@ from engagements import lifecycle
 from questionnaire import services, session as session_module
 from questionnaire.attestation import CURRENT_TIER_1_ATTESTATION
 from questionnaire.decorators import require_writable_state
+from questionnaire.resume_email import send_resume_email_async
 
 
 COMPLETE_TEMPLATE = "questionnaire/partials/_questionnaire_complete.html"
@@ -240,6 +241,23 @@ def start(request):
             )
 
     request.session["respondent_id"] = rid
+
+    # Fire-and-forget resume-link email. The user gets a 30-day-valid
+    # personal link so they can pick up from any device, any time. Non-
+    # fatal: any failure is logged to events.resume_link_sent; the
+    # browser session cookie still lets this tab continue.
+    try:
+        send_resume_email_async(
+            respondent_id=rid,
+            email=values["email"],
+            name=values["name"],
+            company=values["company_name"],
+        )
+    except Exception:  # noqa: BLE001
+        # Belt and suspenders - the async wrapper already catches, but
+        # do not let anything here block the redirect.
+        pass
+
     return redirect("questionnaire:attest")
 
 
