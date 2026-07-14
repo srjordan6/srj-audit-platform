@@ -8,18 +8,26 @@
         scores immediately.
     </p>
 
+    {% if access_code_error %}
+        <div class="alert alert-danger" role="alert">
+            {{ access_code_error }}
+        </div>
+    {% endif %}
+
     <form method="post" action="{% url 'questionnaire:start' %}">
         {% csrf_token %}
 
         <div class="mb-3">
             <label for="email" class="form-label">Your email</label>
             <input type="email" id="email" name="email" class="form-control"
+                   value="{{ prefill_values.email|default:'' }}"
                    required autocomplete="email">
         </div>
 
         <div class="mb-3">
             <label for="name" class="form-label">Your name</label>
             <input type="text" id="name" name="name" class="form-control"
+                   value="{{ prefill_values.name|default:'' }}"
                    required autocomplete="name">
         </div>
 
@@ -27,28 +35,30 @@
             <label for="role" class="form-label">Your role</label>
             <select id="role" name="role" class="form-select" required>
                 <option value="">Select…</option>
-                <option value="BOARD">Board Member</option>
-                <option value="CEO">CEO or Owner</option>
-                <option value="CFO">CFO</option>
-                <option value="CIO">CIO</option>
-                <option value="CISO">CISO</option>
-                <option value="COO">COO</option>
-                <option value="VP">VP</option>
-                <option value="DIR">Director</option>
-                <option value="MGR">Line Manager</option>
-                <option value="IC">Individual Contributor</option>
+                <option value="BOARD" {% if prefill_values.role == 'BOARD' %}selected{% endif %}>Board Member</option>
+                <option value="CEO"   {% if prefill_values.role == 'CEO'   %}selected{% endif %}>CEO or Owner</option>
+                <option value="CFO"   {% if prefill_values.role == 'CFO'   %}selected{% endif %}>CFO</option>
+                <option value="CIO"   {% if prefill_values.role == 'CIO'   %}selected{% endif %}>CIO</option>
+                <option value="CISO"  {% if prefill_values.role == 'CISO'  %}selected{% endif %}>CISO</option>
+                <option value="COO"   {% if prefill_values.role == 'COO'   %}selected{% endif %}>COO</option>
+                <option value="VP"    {% if prefill_values.role == 'VP'    %}selected{% endif %}>VP</option>
+                <option value="DIR"   {% if prefill_values.role == 'DIR'   %}selected{% endif %}>Director</option>
+                <option value="MGR"   {% if prefill_values.role == 'MGR'   %}selected{% endif %}>Line Manager</option>
+                <option value="IC"    {% if prefill_values.role == 'IC'    %}selected{% endif %}>Individual Contributor</option>
             </select>
         </div>
 
         <div class="mb-3">
             <label for="company_name" class="form-label">Company name</label>
             <input type="text" id="company_name" name="company_name"
+                   value="{{ prefill_values.company_name|default:'' }}"
                    class="form-control" required>
         </div>
 
         <div class="mb-3">
             <label for="company_industry" class="form-label">Industry</label>
             <input type="text" id="company_industry" name="company_industry"
+                   value="{{ prefill_values.company_industry|default:'' }}"
                    class="form-control" required>
         </div>
 
@@ -57,13 +67,30 @@
             <select id="company_size_bracket" name="company_size_bracket"
                     class="form-select" required>
                 <option value="">Select…</option>
-                <option value="1-25">1-25 employees</option>
-                <option value="26-100">26-100</option>
-                <option value="101-500">101-500</option>
-                <option value="501-2000">501-2,000</option>
-                <option value="2001-5000">2,001-5,000</option>
-                <option value="5000+">5,000+</option>
+                <option value="1-25"      {% if prefill_values.company_size_bracket == '1-25'      %}selected{% endif %}>1-25 employees</option>
+                <option value="26-100"    {% if prefill_values.company_size_bracket == '26-100'    %}selected{% endif %}>26-100</option>
+                <option value="101-500"   {% if prefill_values.company_size_bracket == '101-500'   %}selected{% endif %}>101-500</option>
+                <option value="501-2000"  {% if prefill_values.company_size_bracket == '501-2000'  %}selected{% endif %}>501-2,000</option>
+                <option value="2001-5000" {% if prefill_values.company_size_bracket == '2001-5000' %}selected{% endif %}>2,001-5,000</option>
+                <option value="5000+"     {% if prefill_values.company_size_bracket == '5000+'     %}selected{% endif %}>5,000+</option>
             </select>
+        </div>
+
+        {% comment %}
+        Optional access code. Auto-populated from ?code=<CODE> in the URL
+        so marketing links can pre-fill the promo. Empty = normal flow.
+        {% endcomment %}
+        <div class="mb-4">
+            <label for="access_code" class="form-label">
+                Access code <span class="text-muted small">(optional)</span>
+            </label>
+            <input type="text" id="access_code" name="access_code"
+                   value="{{ prefill_code|default:'' }}"
+                   class="form-control" autocomplete="off"
+                   placeholder="Have a code? Enter it here.">
+            <div class="form-text">
+                If you were invited to test the audit, enter your code to skip payment.
+            </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-lg">

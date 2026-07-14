@@ -38,6 +38,7 @@ class Engagement(models.Model):
         ('paid', 'Paid'),
         ('refunded', 'Refunded'),
         ('failed', 'Failed'),
+        ('comped', 'Comped (promo/tester code)'),
     ]
 
     IDENTITY_STATUS_CHOICES = [

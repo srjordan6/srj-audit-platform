@@ -108,8 +108,18 @@ def create_engagement_and_respondent(
     company_name: str,
     company_industry: str,
     company_size_bracket: str,
+    access_code_row=None,
 ) -> str:
-    """Create/find company + user, then create engagement + respondent."""
+    """Create/find company + user, then create engagement + respondent.
+
+    If access_code_row is passed (as returned by
+    questionnaire.access_codes.validate_code), the engagement is comped
+    (payment_status='comped', price_cents=0) and a redemption row is
+    written atomically. The caller MUST have already validated the code;
+    if the redeem_code UPDATE loses the race (code exhausted between
+    validation and this call), we raise ValueError so the outer view
+    rolls back the transaction and re-renders the form with an error.
+    """
     cursor.execute(
         "SELECT id FROM companies WHERE name = %s LIMIT 1",
         (company_name,),
@@ -138,12 +148,21 @@ def create_engagement_and_respondent(
         row = cursor.fetchone()
     user_id = row[0]
 
-    cursor.execute(
-        "INSERT INTO engagements "
-        "(company_id, buyer_user_id, tier, status, payment_status, price_cents) "
-        "VALUES (%s, %s, 'tier_1', 'in_progress', 'free', 0) RETURNING id",
-        (company_id, user_id),
-    )
+    if access_code_row is not None:
+        # Comped engagement — no Stripe path, payment_status = 'comped'.
+        cursor.execute(
+            "INSERT INTO engagements "
+            "(company_id, buyer_user_id, tier, status, payment_status, price_cents) "
+            "VALUES (%s, %s, 'tier_1', 'in_progress', 'comped', 0) RETURNING id",
+            (company_id, user_id),
+        )
+    else:
+        cursor.execute(
+            "INSERT INTO engagements "
+            "(company_id, buyer_user_id, tier, status, payment_status, price_cents) "
+            "VALUES (%s, %s, 'tier_1', 'in_progress', 'free', 0) RETURNING id",
+            (company_id, user_id),
+        )
     engagement_id = cursor.fetchone()[0]
 
     cursor.execute(
@@ -153,6 +172,21 @@ def create_engagement_and_respondent(
         (engagement_id, user_id, email, name, role, company_id),
     )
     respondent_id = cursor.fetchone()[0]
+
+    if access_code_row is not None:
+        # Atomic claim + redemption record. If the UPDATE loses the race
+        # (someone else drained the last use between validate and here),
+        # raise so the whole transaction rolls back and the user sees an
+        # error rather than a silent partial state.
+        from questionnaire.access_codes import redeem_code
+        ok = redeem_code(
+            cursor,
+            access_code_id=access_code_row.id,
+            engagement_id=str(engagement_id),
+            respondent_email=email,
+        )
+        if not ok:
+            raise ValueError("access_code_exhausted")
 
     return str(respondent_id)
 

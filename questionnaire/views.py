@@ -211,7 +211,14 @@ def submit_response(request):
 @csrf_protect
 def start(request):
     if request.method == "GET":
-        return render(request, "questionnaire/start.html", {})
+        # Pre-fill the access-code input from ?code=<CODE> so LinkedIn/
+        # marketing URLs can include the promo in the query string.
+        prefill_code = request.GET.get("code", "").strip()
+        return render(
+            request,
+            "questionnaire/start.html",
+            {"prefill_code": prefill_code},
+        )
 
     required = [
         "email",
@@ -228,17 +235,64 @@ def start(request):
             f"Missing fields: {', '.join(missing)}"
         )
 
-    with transaction.atomic():
+    # Optional access code - promotional/tester full-comp code.
+    submitted_code = request.POST.get("access_code", "").strip()
+    access_code_row = None
+    if submitted_code:
+        from questionnaire.access_codes import validate_code
         with connection.cursor() as cursor:
-            rid = services.create_engagement_and_respondent(
-                cursor,
-                email=values["email"],
-                name=values["name"],
-                role=values["role"],
-                company_name=values["company_name"],
-                company_industry=values["company_industry"],
-                company_size_bracket=values["company_size_bracket"],
+            access_code_row = validate_code(cursor, submitted_code)
+        if access_code_row is None:
+            # Re-render the form with the user's inputs preserved and an
+            # error surface on the code field. Do NOT proceed to create
+            # an engagement.
+            return render(
+                request,
+                "questionnaire/start.html",
+                {
+                    "prefill_code": submitted_code,
+                    "prefill_values": values,
+                    "access_code_error": (
+                        "That code is not recognized, has already been "
+                        "fully redeemed, or has expired. Double-check "
+                        "the code or continue without one."
+                    ),
+                },
+                status=400,
             )
+
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                rid = services.create_engagement_and_respondent(
+                    cursor,
+                    email=values["email"],
+                    name=values["name"],
+                    role=values["role"],
+                    company_name=values["company_name"],
+                    company_industry=values["company_industry"],
+                    company_size_bracket=values["company_size_bracket"],
+                    access_code_row=access_code_row,
+                )
+    except ValueError as exc:
+        # Currently the only ValueError services raises is the
+        # access_code_exhausted race. Re-render the form with a friendly
+        # error rather than blow up.
+        if str(exc) == "access_code_exhausted":
+            return render(
+                request,
+                "questionnaire/start.html",
+                {
+                    "prefill_values": values,
+                    "access_code_error": (
+                        "That code was just fully redeemed by another "
+                        "user before you finished submitting. Try a "
+                        "different code or continue without one."
+                    ),
+                },
+                status=409,
+            )
+        raise
 
     request.session["respondent_id"] = rid
 
