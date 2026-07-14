@@ -38,6 +38,24 @@
         </div>
       </div>
 
+      {% comment %}
+      "Previous question" button — persistent across HTMX swaps because it
+      lives OUTSIDE #question-shell. Uses hx-vals with js: to read the
+      currently-rendered question's id from its data-question-id attribute
+      each time, so it always targets the correct "previous". Returns 404
+      silently on the first question (the button just does nothing).
+      {% endcomment %}
+      <div class="text-center mt-3">
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm"
+                hx-get="{% url 'questionnaire:previous_question' %}"
+                hx-target="#question-shell"
+                hx-swap="innerHTML"
+                hx-vals='js:{"current_question_id": (document.querySelector("[data-question-id]") ? document.querySelector("[data-question-id]").getAttribute("data-question-id") : "")}'>
+          ← Previous question
+        </button>
+      </div>
+
       <div class="text-center mt-4">
         <small class="text-muted">
           Answers are saved automatically. You can close this window and return via the link in your email.

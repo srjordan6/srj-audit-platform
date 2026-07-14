@@ -96,6 +96,55 @@ def get_next_question_context(
     }
 
 
+def get_previous_visible_question_context(
+    cursor,
+    respondent_id: str,
+    current_question_id: Optional[str] = None,
+) -> Optional[dict]:
+    """Return the visible question immediately before current_question_id.
+
+    If current_question_id is None (or not found among visible questions),
+    returns the LAST-ANSWERED visible question — a safe fallback so the
+    "Previous" button always does something sensible.
+
+    Returned dict is shaped like get_next_question_context but also
+    carries a 'prior_answer' key so the partial pre-fills the input(s).
+    Returns None when there is no earlier answered question (e.g., the
+    respondent is already on the first question).
+    """
+    role = get_respondent_role(cursor, respondent_id)
+    if role is None:
+        return None
+    answered = load_answered_by_id(cursor, respondent_id)
+    visible = flow.questions_visible_to_role(role, answered)
+
+    prev_q = None
+    if current_question_id:
+        for i, q in enumerate(visible):
+            if q.id == current_question_id:
+                if i > 0:
+                    prev_q = visible[i - 1]
+                break
+
+    if prev_q is None:
+        # Fallback: last answered visible question.
+        for q in visible:
+            if q.id in answered:
+                prev_q = q
+
+    if prev_q is None:
+        return None
+
+    _decorate_question(prev_q, answered)
+    return {
+        "question": prev_q,
+        "partial": flow.partial_template_for_type(prev_q.question_type),
+        "prior_answer": answered.get(prev_q.id),
+        "progress": flow.progress_for_role(role, answered),
+        "role": role,
+    }
+
+
 def _decorate_question(q, answered):
     """Inject dynamic context onto a question SimpleNamespace before render.
 
@@ -112,9 +161,10 @@ def _decorate_question(q, answered):
         return
 
     if q.id == "T1-B-017":
-        inventory = answered.get("T1-A-000")
-        if inventory and isinstance(inventory.get("answer_value"), dict):
-            av = inventory["answer_value"]
+        # load_answered_by_id returns {question_id: answer_value}. The
+        # T1-A-000 answer_value is {"selected": [...], "other": "..."}.
+        av = answered.get("T1-A-000")
+        if av and isinstance(av, dict):
             selected = list(av.get("selected") or [])
             other = (av.get("other") or "").strip()
             if other:

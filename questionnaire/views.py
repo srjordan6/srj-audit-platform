@@ -136,6 +136,47 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
 
 
 @require_http_methods(["GET"])
+def previous_question(request):
+    """Render the visible question immediately BEFORE current_question_id.
+
+    Used by the in-progress "Previous" button. Falls back to the last
+    answered question if the given current_question_id can't be located.
+    Returns 404 if the respondent has no earlier answered question.
+    """
+    rid = _resolve_respondent_id(request)
+    if not rid:
+        return HttpResponseNotFound("respondent_id required")
+    current_qid = (
+        request.GET.get("current_question_id")
+        or request.headers.get("X-Current-Question-Id")
+        or ""
+    ).strip() or None
+    with connection.cursor() as cursor:
+        ctx = services.get_previous_visible_question_context(
+            cursor, rid, current_qid
+        )
+    if ctx is None:
+        return HttpResponseNotFound("no previous question")
+
+    progress = _normalize_progress(ctx.get("progress"))
+    template = ctx["partial"]
+    is_htmx = request.headers.get("HX-Request") == "true"
+    if not is_htmx and request.method == "GET":
+        template = "questionnaire/question_shell.html"
+    return render(
+        request,
+        template,
+        {
+            "question": ctx["question"],
+            "prior_answer": ctx.get("prior_answer"),
+            "progress": progress,
+            "submit_url": "/q/submit/",
+            "initial_question_template": ctx["partial"],
+        },
+    )
+
+
+@require_http_methods(["GET"])
 def next_question(request):
     """Return the current respondent's next question or lifecycle banner."""
     rid = _resolve_respondent_id(request)
