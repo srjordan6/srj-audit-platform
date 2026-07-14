@@ -39,8 +39,43 @@ from decimal import Decimal
 
 TIER_1_QUESTIONS = [
 
-    # ===== Section A — Context & Identity (15 questions) =====
+    # ===== Section A — Context & Identity (15 questions + tool inventory) =====
 
+    # T1-A-000 — TOOL INVENTORY. Renders first (sequence_number 0).
+    # Captures which AI tools the company uses; downstream questions
+    # (starting with T1-B-017 "top 3 tools by spend") pre-fill from this
+    # answer. Options field carries the flat list for legacy scoring;
+    # the categorized rendering is driven by questionnaire.tool_catalog
+    # via services._decorate_question at render time.
+    {
+        "id": 'T1-A-000',
+        "tier": 'tier_1',
+        "section": 'A',
+        "sequence_number": 0,
+        "question_text": "Which AI tools does your company currently use? Check every tool anyone at the company uses.",
+        "question_type": 'TOOL_INVENTORY',
+        "options": [],  # Filled from tool_catalog at render time.
+        "matrix_rows": None,
+        "matrix_columns": None,
+        "skip_logic": None,
+        "role_visibility": ['all'],
+        "required": False,
+        "scoring_weight": Decimal('1.00'),
+        "framework_mappings": [
+            {
+                'weight': 0,
+                'framework': 'context',
+                'sub_component': 'tool_inventory_seed'
+            }
+        ],
+        "notes": "Seeds the audit tool inventory; downstream questions filter to this set.",
+        "is_active": True,
+        "scoring_overrides": None,
+        "extended_metadata": {
+            'renders_categorized': True,
+            'allows_other_free_text': True,
+        },
+    },
     {
         "id": 'T1-A-001',
         "tier": 'tier_1',

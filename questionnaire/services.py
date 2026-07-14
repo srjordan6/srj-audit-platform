@@ -87,12 +87,45 @@ def get_next_question_context(
     q = flow.next_unanswered_question(role, answered)
     if q is None:
         return None
+    _decorate_question(q, answered)
     return {
         "question": q,
         "partial": flow.partial_template_for_type(q.question_type),
         "progress": flow.progress_for_role(role, answered),
         "role": role,
     }
+
+
+def _decorate_question(q, answered):
+    """Inject dynamic context onto a question SimpleNamespace before render.
+
+    - TOOL_INVENTORY: attach the canonical tool_catalog.CATEGORIES so the
+      partial can render the categorized checklist.
+    - T1-B-017 (MATRIX 'top 3 tools by spend'): prefill matrix_rows from
+      the respondent's T1-A-000 tool inventory answer if available, so
+      the respondent sees their tools as row placeholders instead of
+      generic 'Tool 1 / Tool 2 / Tool 3'.
+    """
+    if q.question_type == "TOOL_INVENTORY":
+        from questionnaire.tool_catalog import CATEGORIES
+        q.tool_categories = CATEGORIES
+        return
+
+    if q.id == "T1-B-017":
+        inventory = answered.get("T1-A-000")
+        if inventory and isinstance(inventory.get("answer_value"), dict):
+            av = inventory["answer_value"]
+            selected = list(av.get("selected") or [])
+            other = (av.get("other") or "").strip()
+            if other:
+                selected += [t.strip() for t in other.split(",") if t.strip()]
+            if selected:
+                # Prefill up to the number of rows the question already
+                # declares. Preserve declared count so we don't shrink.
+                current_rows = list(q.matrix_rows or [])
+                for i, tool in enumerate(selected[: len(current_rows)]):
+                    current_rows[i] = tool
+                q.matrix_rows = current_rows
 
 
 # ---------------------------------------------------------------------------

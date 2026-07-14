@@ -162,6 +162,7 @@ def submit_response(request):
         return HttpResponseBadRequest("question_id required")
 
     answer_value_json = request.POST.get("answer_value_json")
+    other_tools = request.POST.get("other_tools", "").strip()
     if answer_value_json:
         try:
             answer_value = json.loads(answer_value_json)
@@ -170,7 +171,13 @@ def submit_response(request):
     else:
         answer = request.POST.get("answer")
         answers = request.POST.getlist("answer")
-        if len(answers) > 1:
+        # TOOL_INVENTORY posts include a companion "other_tools" textarea.
+        # If it's present we always emit the dict-with-selected shape so
+        # the "other" value never gets dropped when zero checkboxes are
+        # ticked (respondent may have ONLY custom tools).
+        if other_tools:
+            answer_value = {"selected": answers or [], "other": other_tools}
+        elif len(answers) > 1:
             answer_value = {"selected": answers}
         elif answer:
             answer_value = {"selected": answer}
@@ -182,7 +189,15 @@ def submit_response(request):
             if matrix:
                 answer_value = matrix
             else:
-                return HttpResponseBadRequest("answer required")
+                # An empty TOOL_INVENTORY submission (no tools checked,
+                # no other-tools text) is still a valid answer — treat
+                # zero-check submits from that question as an empty
+                # selection rather than a 400.
+                if request.POST.get("data-question-type") == "TOOL_INVENTORY" or \
+                   request.POST.get("question_id", "").endswith("A-000"):
+                    answer_value = {"selected": [], "other": ""}
+                else:
+                    return HttpResponseBadRequest("answer required")
 
     is_dont_know = request.POST.get("is_dont_know") == "true"
     with connection.cursor() as cursor:

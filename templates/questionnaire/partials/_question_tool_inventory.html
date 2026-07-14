@@ -1,0 +1,105 @@
+{% comment %}
+Tool inventory question partial (question_type == "TOOL_INVENTORY").
+
+Used once, on T1-A-000 (the very first question), to capture which AI
+tools the respondent's company uses. Renders a categorized checkbox
+grid + a free-form "other tools" textarea for anything not in the
+canonical list.
+
+Answer shape captured on POST (see questionnaire.views.submit_response):
+    {
+        "selected": ["ChatGPT", "Claude", ...],   // checkbox values
+        "other":    "InternalGPT, Acme AI Bot"    // free-form textarea
+    }
+
+Context contract
+----------------
+question        Question dict. Uses question.extended_metadata.tool_categories
+                (a list of [category_name, [tool_name, ...]] pairs) if
+                present; falls back to the canonical CATEGORIES import
+                below if the DB row lacks the metadata.
+prior_answer    Optional dict for save-and-resume:
+                    {"selected": [...], "other": "..."}
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+{% endcomment %}
+{% load glossary %}
+<form class="srj-question srj-question--tool-inventory"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="TOOL_INVENTORY">
+  {% csrf_token %}
+  <input type="hidden" name="question_id" value="{{ question.id }}">
+
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+    </legend>
+
+    <p class="text-muted small mb-3">
+      Check every AI tool your company uses today — even the ones only
+      one person uses, and even the ones adopted without formal approval.
+      This list scopes the rest of the audit. If your tool isn't listed,
+      add it in the "Other tools" box at the bottom.
+    </p>
+
+    {% for category_name, tools in question.tool_categories %}
+      <details class="mb-3" {% if forloop.first %}open{% endif %}>
+        <summary class="fw-semibold" style="cursor:pointer;">
+          {{ category_name }}
+          <span class="text-muted small">({{ tools|length }})</span>
+        </summary>
+        <div class="row g-2 mt-2 ms-3">
+          {% for tool in tools %}
+            {% with input_id="tool-"|add:question.id|add:"-"|add:forloop.parentloop.counter|stringformat:"s"|add:"-"|add:forloop.counter|stringformat:"s" %}
+            <div class="col-md-6 col-lg-4">
+              <div class="form-check">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="answer"
+                       id="{{ input_id }}"
+                       value="{{ tool }}"
+                       {% if prior_answer and tool in prior_answer.selected %}checked{% endif %}>
+                <label class="form-check-label" for="{{ input_id }}">
+                  {{ tool|glossary_annotate|safe }}
+                </label>
+              </div>
+            </div>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </details>
+    {% endfor %}
+
+    <div class="mt-4">
+      <label for="other_tools-{{ question.id }}" class="form-label fw-semibold">
+        Other AI tools not listed above
+        <span class="text-muted small">(comma-separated, optional)</span>
+      </label>
+      <textarea class="form-control"
+                id="other_tools-{{ question.id }}"
+                name="other_tools"
+                rows="2"
+                maxlength="1000"
+                placeholder="e.g., Internal GPT, Acme AI Assistant, CompanyBot">{% if prior_answer %}{{ prior_answer.other|default:'' }}{% endif %}</textarea>
+      <div class="form-text">
+        Any AI tools your company uses that weren't in the categories above.
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      No tools? Leave everything unchecked and continue.
+    </span>
+  </div>
+</form>
+
+{% include "questionnaire/partials/_progress_oob.html" %}
