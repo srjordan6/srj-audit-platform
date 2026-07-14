@@ -36,7 +36,9 @@ swap_target     HTMX hx-target CSS selector.
 
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
-      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__id text-muted small d-block">
+        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Q{{ question.sequence_number }}
+      </span>
       <span class="srj-question__text">{{ question.question_text }}</span>
     </legend>
 

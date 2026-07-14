@@ -109,6 +109,10 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
             template = COMPLETE_SHELL_TEMPLATE
         return render(request, template, {})
 
+    # Track cursor position so the Previous / Forward buttons know where
+    # the user just was without depending on client-side JS.
+    request.session["current_question_id"] = ctx["question"].id
+
     countdown_text = None
     if state == lifecycle.EDITABLE:
         countdown_text = lifecycle.format_countdown(
@@ -135,29 +139,13 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
     )
 
 
-@require_http_methods(["GET"])
-def previous_question(request):
-    """Render the visible question immediately BEFORE current_question_id.
+def _render_ctx(request, ctx):
+    """Shared render helper for Previous / Forward views.
 
-    Used by the in-progress "Previous" button. Falls back to the last
-    answered question if the given current_question_id can't be located.
-    Returns 404 if the respondent has no earlier answered question.
+    Also updates session["current_question_id"] so subsequent Previous /
+    Forward / Save clicks know where the user just was.
     """
-    rid = _resolve_respondent_id(request)
-    if not rid:
-        return HttpResponseNotFound("respondent_id required")
-    current_qid = (
-        request.GET.get("current_question_id")
-        or request.headers.get("X-Current-Question-Id")
-        or ""
-    ).strip() or None
-    with connection.cursor() as cursor:
-        ctx = services.get_previous_visible_question_context(
-            cursor, rid, current_qid
-        )
-    if ctx is None:
-        return HttpResponseNotFound("no previous question")
-
+    request.session["current_question_id"] = ctx["question"].id
     progress = _normalize_progress(ctx.get("progress"))
     template = ctx["partial"]
     is_htmx = request.headers.get("HX-Request") == "true"
@@ -174,6 +162,52 @@ def previous_question(request):
             "initial_question_template": ctx["partial"],
         },
     )
+
+
+def _current_qid_from_session_or_query(request):
+    return (
+        request.session.get("current_question_id")
+        or request.GET.get("current_question_id")
+        or request.headers.get("X-Current-Question-Id")
+        or ""
+    ).strip() or None
+
+
+@require_http_methods(["GET"])
+def forward_question(request):
+    """Render the visible question immediately AFTER the user's current
+    position (tracked in session). Prefills prior_answer if the target
+    question was already answered. Distinct from /q/next/ which is the
+    auto-advance flow controller."""
+    rid = _resolve_respondent_id(request)
+    if not rid:
+        return HttpResponseNotFound("respondent_id required")
+    current_qid = _current_qid_from_session_or_query(request)
+    with connection.cursor() as cursor:
+        ctx = services.get_next_visible_question_context_by_position(
+            cursor, rid, current_qid
+        )
+    if ctx is None:
+        return HttpResponseNotFound("no next question")
+    return _render_ctx(request, ctx)
+
+
+@require_http_methods(["GET"])
+def previous_question(request):
+    """Render the visible question immediately BEFORE the user's current
+    position (tracked in session). Prefills prior_answer. Returns 404
+    if the respondent is already on the first question."""
+    rid = _resolve_respondent_id(request)
+    if not rid:
+        return HttpResponseNotFound("respondent_id required")
+    current_qid = _current_qid_from_session_or_query(request)
+    with connection.cursor() as cursor:
+        ctx = services.get_previous_visible_question_context(
+            cursor, rid, current_qid
+        )
+    if ctx is None:
+        return HttpResponseNotFound("no previous question")
+    return _render_ctx(request, ctx)
 
 
 @require_http_methods(["GET"])

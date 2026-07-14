@@ -45,14 +45,20 @@
       each time, so it always targets the correct "previous". Returns 404
       silently on the first question (the button just does nothing).
       {% endcomment %}
-      <div class="text-center mt-3">
+      <div class="text-center mt-3 d-flex justify-content-center gap-2">
         <button type="button"
                 class="btn btn-outline-secondary btn-sm"
                 hx-get="{% url 'questionnaire:previous_question' %}"
                 hx-target="#question-shell"
-                hx-swap="innerHTML"
-                hx-vals='js:{"current_question_id": (document.querySelector("[data-question-id]") ? document.querySelector("[data-question-id]").getAttribute("data-question-id") : "")}'>
+                hx-swap="innerHTML">
           ← Previous question
+        </button>
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm"
+                hx-get="{% url 'questionnaire:forward_question' %}"
+                hx-target="#question-shell"
+                hx-swap="innerHTML">
+          Next question →
         </button>
       </div>
 

@@ -39,7 +39,9 @@ not worth it.
   <input type="hidden" name="question_id" value="{{ question.id }}">
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
-      <span class="srj-question__id text-muted small d-block">{{ question.id }}</span>
+      <span class="srj-question__id text-muted small d-block">
+        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Q{{ question.sequence_number }}
+      </span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}
         <span class="srj-question__required text-danger" aria-hidden="true">*</span>

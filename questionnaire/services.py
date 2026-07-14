@@ -96,6 +96,52 @@ def get_next_question_context(
     }
 
 
+def get_next_visible_question_context_by_position(
+    cursor,
+    respondent_id: str,
+    current_question_id: Optional[str] = None,
+) -> Optional[dict]:
+    """Return the visible question immediately AFTER current_question_id.
+
+    Mirror of get_previous_visible_question_context but +1 instead of -1.
+    If current_question_id is None or not found, falls back to the first
+    unanswered visible question. Returns None if the respondent is
+    already at the end of the flow.
+    """
+    role = get_respondent_role(cursor, respondent_id)
+    if role is None:
+        return None
+    answered = load_answered_by_id(cursor, respondent_id)
+    visible = flow.questions_visible_to_role(role, answered)
+
+    next_q = None
+    if current_question_id:
+        for i, q in enumerate(visible):
+            if q.id == current_question_id:
+                if i + 1 < len(visible):
+                    next_q = visible[i + 1]
+                break
+
+    if next_q is None:
+        # Fallback: first unanswered visible question.
+        for q in visible:
+            if q.id not in answered:
+                next_q = q
+                break
+
+    if next_q is None:
+        return None
+
+    _decorate_question(next_q, answered)
+    return {
+        "question": next_q,
+        "partial": flow.partial_template_for_type(next_q.question_type),
+        "prior_answer": answered.get(next_q.id),
+        "progress": flow.progress_for_role(role, answered),
+        "role": role,
+    }
+
+
 def get_previous_visible_question_context(
     cursor,
     respondent_id: str,

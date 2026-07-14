@@ -27,3 +27,21 @@ register = template.Library()
 def glossary_annotate(value) -> str:
     """Return HTML with glossary terms wrapped in info-icon spans."""
     return annotate(value if value is not None else "")
+
+
+_SECTION_NAMES = {
+    "A": "Context & Identity",
+    "B": "AI Tool Inventory & Discovery",
+    "C": "Cost Mapping",
+    "D": "Performance Measurement",
+    "E": "Risk Exposure",
+    "F": "Governance Gaps",
+    "G": "Outcomes, Workflow & Confidence",
+    "H": "Follow-up",
+}
+
+
+@register.filter(name="section_name")
+def section_name(letter: str) -> str:
+    """Map a section letter (A-H) to its human-readable topic name."""
+    return _SECTION_NAMES.get((letter or "").upper(), str(letter or ""))
