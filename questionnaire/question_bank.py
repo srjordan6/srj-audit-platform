@@ -655,8 +655,8 @@ TIER_1_QUESTIONS = [
             {'weight': 0, 'dimension': 'naics_sector', 'framework': 'context'},
             {'step': 'framework_crosswalk_readiness', 'weight': 0.5, 'framework': 'v3_governance'}
         ],
-        "notes": '2026-07-14: converted from free-form industry to NAICS 2-digit sector dropdown per operator request. Enables correct scoping of sector-specific evidence packages.',
-        "is_active": True,
+        "notes": '2026-07-14: converted to NAICS sector dropdown. 2026-07-14 (later): DEACTIVATED — industry now captured on the signup form as a NAICS dropdown; this in-questionnaire duplicate is no longer needed.',
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": {
             'other_text_field': True,
@@ -666,6 +666,8 @@ TIER_1_QUESTIONS = [
     {
         # T1-A-016 — Sub-segment refinement inside the T1-A-015 NAICS sector.
         # Added 2026-07-14 alongside the T1-A-015 conversion.
+        # DEACTIVATED 2026-07-14 — industry captured at signup; subsegment
+        # deemed not needed per operator direction.
         "id": 'T1-A-016',
         "tier": 'tier_1',
         "section": 'A',
@@ -707,8 +709,8 @@ TIER_1_QUESTIONS = [
         "framework_mappings": [
             {'weight': 0, 'framework': 'context', 'sub_component': 'regulated_subsegment'}
         ],
-        "notes": "Sub-segment refinement inside the T1-A-015 NAICS sector.",
-        "is_active": True,
+        "notes": "Sub-segment refinement inside the T1-A-015 NAICS sector. DEACTIVATED 2026-07-14 — not needed per operator direction.",
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": {
             'other_text_field': True,
