@@ -18,12 +18,29 @@ from questionnaire import flow
 
 
 def load_answered_by_id(cursor, respondent_id: str) -> dict[str, Any]:
+    """Return {question_id: parsed_answer_value_dict}.
+
+    Django's default psycopg configuration returns JSONB columns as raw
+    JSON strings rather than parsed dicts on this Django/psycopg version.
+    Parse them here so downstream code (prior_answer prefill in
+    Previous/Forward, _decorate_question T1-B-017 prefill, etc.) can
+    treat the value as a dict uniformly.
+    """
     cursor.execute(
         "SELECT question_id, answer_value FROM responses "
         "WHERE respondent_id = %s",
         (respondent_id,),
     )
-    return {row[0]: row[1] for row in cursor.fetchall()}
+    result: dict[str, Any] = {}
+    for qid, raw in cursor.fetchall():
+        if isinstance(raw, str):
+            try:
+                result[qid] = json.loads(raw)
+            except (ValueError, TypeError):
+                result[qid] = raw
+        else:
+            result[qid] = raw
+    return result
 
 
 def get_respondent_role(cursor, respondent_id: str) -> Optional[str]:
