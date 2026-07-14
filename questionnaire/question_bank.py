@@ -39,18 +39,18 @@ from decimal import Decimal
 
 TIER_1_QUESTIONS = [
 
-    # ===== Section A — Context & Identity (15 questions + tool inventory) =====
+    # ===== Section A — Context & Identity =====
+    # (Tool inventory moved to Section B 2026-07-14 — see T1-A-000
+    #  below with section='B', sequence_number=0. Legacy ID retained
+    #  to preserve existing response history.)
 
-    # T1-A-000 — TOOL INVENTORY. Renders first (sequence_number 0).
-    # Captures which AI tools the company uses; downstream questions
-    # (starting with T1-B-017 "top 3 tools by spend") pre-fill from this
-    # answer. Options field carries the flat list for legacy scoring;
-    # the categorized rendering is driven by questionnaire.tool_catalog
-    # via services._decorate_question at render time.
     {
         "id": 'T1-A-000',
         "tier": 'tier_1',
-        "section": 'A',
+        # Moved 2026-07-14: section changed A -> B so this renders as
+        # the FIRST question of "AI Tool Inventory & Discovery" instead
+        # of the very first question overall.
+        "section": 'B',
         "sequence_number": 0,
         "question_text": "Which AI tools does your company currently use? Check every tool anyone at the company uses.",
         "question_type": 'TOOL_INVENTORY',
@@ -68,7 +68,7 @@ TIER_1_QUESTIONS = [
                 'sub_component': 'tool_inventory_seed'
             }
         ],
-        "notes": "Seeds the audit tool inventory; downstream questions filter to this set.",
+        "notes": "Tool inventory. Seeds every downstream tool-related question. Moved from Section A to Section B (AI Tool Inventory & Discovery) on 2026-07-14.",
         "is_active": True,
         "scoring_overrides": None,
         "extended_metadata": {
