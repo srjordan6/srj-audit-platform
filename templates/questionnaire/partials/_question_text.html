@@ -44,7 +44,7 @@ pattern as the other question partials.
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
       <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Q{{ question.sequence_number }}
+        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Question {{ question.display_number|default:question.sequence_number }}{% if question.total_visible %} of {{ question.total_visible }}{% endif %}
       </span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}

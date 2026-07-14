@@ -84,10 +84,15 @@ def get_next_question_context(
     if role is None:
         return None
     answered = load_answered_by_id(cursor, respondent_id)
-    q = flow.next_unanswered_question(role, answered)
+    visible = flow.questions_visible_to_role(role, answered)
+    q = None
+    for candidate in visible:
+        if candidate.id not in answered:
+            q = candidate
+            break
     if q is None:
         return None
-    _decorate_question(q, answered)
+    _decorate_question(q, answered, visible=visible)
     return {
         "question": q,
         "partial": flow.partial_template_for_type(q.question_type),
@@ -132,7 +137,7 @@ def get_next_visible_question_context_by_position(
     if next_q is None:
         return None
 
-    _decorate_question(next_q, answered)
+    _decorate_question(next_q, answered, visible=visible)
     return {
         "question": next_q,
         "partial": flow.partial_template_for_type(next_q.question_type),
@@ -181,7 +186,7 @@ def get_previous_visible_question_context(
     if prev_q is None:
         return None
 
-    _decorate_question(prev_q, answered)
+    _decorate_question(prev_q, answered, visible=visible)
     return {
         "question": prev_q,
         "partial": flow.partial_template_for_type(prev_q.question_type),
@@ -191,9 +196,12 @@ def get_previous_visible_question_context(
     }
 
 
-def _decorate_question(q, answered):
+def _decorate_question(q, answered, visible=None):
     """Inject dynamic context onto a question SimpleNamespace before render.
 
+    - display_number: 1-based position in the visible list, so the header
+      shows contiguous numbering (Q1..QN) even when is_active=False
+      questions are skipped in the middle of a section.
     - TOOL_INVENTORY: attach the canonical tool_catalog.CATEGORIES so the
       partial can render the categorized checklist.
     - T1-B-017 (MATRIX 'top 3 tools by spend'): prefill matrix_rows from
@@ -201,6 +209,15 @@ def _decorate_question(q, answered):
       the respondent sees their tools as row placeholders instead of
       generic 'Tool 1 / Tool 2 / Tool 3'.
     """
+    if visible is not None:
+        for idx, vq in enumerate(visible, start=1):
+            if vq.id == q.id:
+                q.display_number = idx
+                q.total_visible = len(visible)
+                break
+        else:
+            q.display_number = None
+            q.total_visible = len(visible)
     if q.question_type == "TOOL_INVENTORY":
         from questionnaire.tool_catalog import CATEGORIES
         q.tool_categories = CATEGORIES

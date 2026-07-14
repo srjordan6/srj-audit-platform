@@ -26,8 +26,14 @@ def _as_ns(question: Any) -> SimpleNamespace:
 
 
 def _all_wrapped() -> list[SimpleNamespace]:
-    """Return every question in bank order, wrapped for attribute access."""
-    return [_as_ns(q) for q in QUESTIONS]
+    """Return every ACTIVE question in bank order, wrapped for attribute access.
+
+    Questions with is_active=False are dropped here — the single choke
+    point for runtime visibility. Downstream (skip_logic, next_unanswered,
+    previous/forward navigation, scoring wiring by ID) all inherit this.
+    """
+    active = [q for q in QUESTIONS if q.get("is_active", True)]
+    return [_as_ns(q) for q in active]
 
 
 def questions_visible_to_role(
