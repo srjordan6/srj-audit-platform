@@ -205,6 +205,28 @@ def previous_question(request):
         ctx = services.get_previous_visible_question_context(
             cursor, rid, current_qid
         )
+        # DIAGNOSTIC: log to events so we can see exactly what happened.
+        # Non-fatal — swallow any exception.
+        try:
+            import json as _json
+            cursor.execute(
+                "INSERT INTO events (id, event_type, payload) "
+                "VALUES (gen_random_uuid(), 'previous_question_debug', %s::jsonb)",
+                [_json.dumps({
+                    "respondent_id": rid,
+                    "current_qid_in_session": current_qid,
+                    "hx_request": request.headers.get("HX-Request"),
+                    "ctx_found": ctx is not None,
+                    "returned_qid": ctx["question"].id if ctx else None,
+                    "returned_qtype": ctx["question"].question_type if ctx else None,
+                    "prior_answer_shape": (
+                        {"keys": list(ctx["prior_answer"].keys())} if ctx and isinstance(ctx.get("prior_answer"), dict) else str(type(ctx.get("prior_answer")) if ctx else None)
+                    ),
+                    "prior_answer": ctx.get("prior_answer") if ctx else None,
+                })],
+            )
+        except Exception:  # noqa: BLE001
+            pass
     if ctx is None:
         return HttpResponseNotFound("no previous question")
     return _render_ctx(request, ctx)
