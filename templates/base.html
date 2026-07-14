@@ -263,6 +263,10 @@
           new Sortable(el, {
             group: { name: groupName, pull: true, put: true },
             animation: 150,
+            onAdd: function (evt) {
+              // An item was dropped BACK to the source (available) list.
+              _srjDecorateAsAvailable(evt.item);
+            },
             onEnd: function () {
               srjStripRankBadges(el);
               var targetId = el.id.replace(/^rank-available-/, 'rank-selected-');
@@ -288,8 +292,9 @@
                 var sourceId = el.id.replace(/^rank-selected-/, 'rank-available-');
                 var sourceEl = document.getElementById(sourceId);
                 if (sourceEl) sourceEl.appendChild(overflow);
-                var badge = overflow.querySelector('.srj-question__rank-position');
-                if (badge) badge.remove();
+                _srjDecorateAsAvailable(overflow);
+              } else {
+                _srjDecorateAsSelected(evt.item);
               }
               srjRenumberRankTarget(el);
             },
@@ -328,6 +333,140 @@
 
     document.addEventListener('DOMContentLoaded', srjAttachSortable);
     document.body.addEventListener('htmx:afterSwap', srjAttachSortable);
+
+    // ------------------------------------------------------------------
+    // RANK click-fallback wiring — works regardless of drag reliability.
+    //
+    // Buttons on each list item (data-role="rank-add" / rank-remove /
+    // rank-up / rank-down) let the user compose the ranking with
+    // clicks. All handlers work on the sibling list found by walking
+    // from the button to its list-group and then to the paired list
+    // (source <-> target). Buttons themselves are re-decorated on
+    // add/remove so a moved item lands with the correct button set.
+    // ------------------------------------------------------------------
+
+    function _srjRankPairedList(clickedLi) {
+      var list = clickedLi && clickedLi.closest('[data-role="rank-source"], [data-role="rank-target"]');
+      if (!list) return null;
+      var pairedId;
+      if (list.getAttribute('data-role') === 'rank-source') {
+        pairedId = list.id.replace(/^rank-available-/, 'rank-selected-');
+      } else {
+        pairedId = list.id.replace(/^rank-selected-/, 'rank-available-');
+      }
+      return document.getElementById(pairedId);
+    }
+
+    function _srjDecorateAsSelected(li) {
+      // Strip any "+ Add" button from the item, add the ↑ / ↓ / × buttons,
+      // and (re)insert a position badge. Called when an item enters the
+      // right-hand ranking list via click OR drag.
+      var addBtn = li.querySelector('[data-role="rank-add"]');
+      if (addBtn) addBtn.remove();
+      if (!li.querySelector('[data-role="rank-up"]')) {
+        var up = document.createElement('button');
+        up.type = 'button';
+        up.className = 'btn btn-sm btn-outline-secondary srj-rank-up-btn';
+        up.setAttribute('data-role', 'rank-up');
+        up.setAttribute('aria-label', 'Move up');
+        up.textContent = '↑';
+        li.appendChild(up);
+      }
+      if (!li.querySelector('[data-role="rank-down"]')) {
+        var down = document.createElement('button');
+        down.type = 'button';
+        down.className = 'btn btn-sm btn-outline-secondary srj-rank-down-btn';
+        down.setAttribute('data-role', 'rank-down');
+        down.setAttribute('aria-label', 'Move down');
+        down.textContent = '↓';
+        li.appendChild(down);
+      }
+      if (!li.querySelector('[data-role="rank-remove"]')) {
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'btn btn-sm btn-outline-danger srj-rank-remove-btn';
+        rm.setAttribute('data-role', 'rank-remove');
+        rm.setAttribute('aria-label', 'Remove from ranking');
+        rm.textContent = '×';
+        li.appendChild(rm);
+      }
+    }
+
+    function _srjDecorateAsAvailable(li) {
+      // Reverse: strip ranking-specific badges/buttons, ensure the "+ Add"
+      // button is present.
+      ['rank-up', 'rank-down', 'rank-remove'].forEach(function (role) {
+        var btn = li.querySelector('[data-role="' + role + '"]');
+        if (btn) btn.remove();
+      });
+      var badge = li.querySelector('.srj-question__rank-position');
+      if (badge) badge.remove();
+      if (!li.querySelector('[data-role="rank-add"]')) {
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'btn btn-sm btn-outline-primary srj-rank-add-btn';
+        add.setAttribute('data-role', 'rank-add');
+        add.setAttribute('aria-label', 'Add to ranking');
+        add.textContent = '+ Add';
+        li.appendChild(add);
+      }
+    }
+
+    // Delegated click handler: one listener catches all rank buttons on
+    // every question, current and future (survives HTMX swaps).
+    document.body.addEventListener('click', function (evt) {
+      var btn = evt.target && evt.target.closest('[data-role]');
+      if (!btn) return;
+      var role = btn.getAttribute('data-role');
+      if (['rank-add','rank-remove','rank-up','rank-down'].indexOf(role) === -1) return;
+      evt.preventDefault();
+
+      var li = btn.closest('.srj-question__rank-item');
+      if (!li) return;
+      var paired = _srjRankPairedList(li);
+      if (!paired) return;
+
+      if (role === 'rank-add') {
+        var max = parseInt(paired.getAttribute('data-max') || '0', 10);
+        if (max > 0 && paired.children.length >= max) {
+          alert('You can only rank ' + max + ' items. Remove one first, or click ↑ / ↓ to reorder.');
+          return;
+        }
+        paired.appendChild(li);
+        _srjDecorateAsSelected(li);
+        srjRenumberRankTarget(paired);
+      } else if (role === 'rank-remove') {
+        var sourceList = paired;  // paired of a target item is the source
+        sourceList.appendChild(li);
+        _srjDecorateAsAvailable(li);
+        // Renumber the (now shorter) target list.
+        var targetId = sourceList.id.replace(/^rank-available-/, 'rank-selected-');
+        var targetEl = document.getElementById(targetId);
+        if (targetEl) srjRenumberRankTarget(targetEl);
+      } else if (role === 'rank-up') {
+        var prev = li.previousElementSibling;
+        if (prev) {
+          li.parentNode.insertBefore(li, prev);
+          srjRenumberRankTarget(li.parentNode);
+        }
+      } else if (role === 'rank-down') {
+        var next = li.nextElementSibling;
+        if (next) {
+          li.parentNode.insertBefore(next, li);
+          srjRenumberRankTarget(li.parentNode);
+        }
+      }
+    });
+
+    // After any HTMX swap OR page load, re-decorate every list item so
+    // drag-and-drop paths that drop an item into the wrong-decorated
+    // list still end up with the correct button set.
+    function srjDecorateAllRankLists() {
+      document.querySelectorAll('[data-role="rank-target"] .srj-question__rank-item').forEach(_srjDecorateAsSelected);
+      document.querySelectorAll('[data-role="rank-source"] .srj-question__rank-item').forEach(_srjDecorateAsAvailable);
+    }
+    document.addEventListener('DOMContentLoaded', srjDecorateAllRankLists);
+    document.body.addEventListener('htmx:afterSwap', srjDecorateAllRankLists);
   </script>
 </body>
 </html>

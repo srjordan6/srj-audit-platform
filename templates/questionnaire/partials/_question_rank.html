@@ -89,6 +89,11 @@ Sprint C browser walkthrough.
     that order; remaining options go into the left. Otherwise all
     options start in the left column.
     {% endcomment %}
+    <span class="srj-question__hint text-muted small d-block mb-2">
+      Click <strong>+ Add</strong> to add an option, then click ↑ / ↓ to
+      reorder or <strong>×</strong> to remove. Drag also works if you prefer.
+    </span>
+
     <div class="srj-question__rank-columns row g-3">
       <div class="col-md-6">
         <div class="srj-question__rank-label small text-muted mb-2">
@@ -101,11 +106,15 @@ Sprint C browser walkthrough.
             {% if prior_answer and option in prior_answer.ranked %}
               {# option is in prior ranking — will render in the right column, skip here #}
             {% else %}
-              <li class="list-group-item srj-question__rank-item"
+              <li class="list-group-item srj-question__rank-item d-flex align-items-center gap-2"
                   data-option="{{ option }}"
                   draggable="true">
-                <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
-                <span class="srj-question__rank-label-text">{{ option|glossary_annotate|safe }}</span>
+                <span class="srj-question__rank-handle text-muted" aria-hidden="true">⋮⋮</span>
+                <span class="srj-question__rank-label-text flex-grow-1">{{ option|glossary_annotate|safe }}</span>
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary srj-rank-add-btn"
+                        data-role="rank-add"
+                        aria-label="Add to ranking">+ Add</button>
               </li>
             {% endif %}
           {% endfor %}
@@ -123,12 +132,18 @@ Sprint C browser walkthrough.
           {% if prior_answer %}
             {% for option in prior_answer.ranked %}
               {% if option in question.options %}
-                <li class="list-group-item srj-question__rank-item"
+                <li class="list-group-item srj-question__rank-item d-flex align-items-center gap-2"
                     data-option="{{ option }}"
                     draggable="true">
-                  <span class="srj-question__rank-position badge bg-secondary me-2">{{ forloop.counter }}</span>
-                  <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
-                  <span class="srj-question__rank-label-text">{{ option|glossary_annotate|safe }}</span>
+                  <span class="srj-question__rank-position badge bg-secondary">{{ forloop.counter }}</span>
+                  <span class="srj-question__rank-handle text-muted" aria-hidden="true">⋮⋮</span>
+                  <span class="srj-question__rank-label-text flex-grow-1">{{ option|glossary_annotate|safe }}</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary srj-rank-up-btn"
+                          data-role="rank-up" aria-label="Move up">↑</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary srj-rank-down-btn"
+                          data-role="rank-down" aria-label="Move down">↓</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger srj-rank-remove-btn"
+                          data-role="rank-remove" aria-label="Remove from ranking">×</button>
                 </li>
               {% endif %}
             {% endfor %}
