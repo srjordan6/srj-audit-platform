@@ -28,9 +28,11 @@ completion, not just position.
              aria-valuemax="100"></div>
       </div>
     {% endif %}
-    {# Slider for random-access jumping within already-answered territory.
-       max = last-answered position (never further). Change event fires
-       an HTMX GET to /q/jump/?position=N which swaps in that question. #}
+    {% comment %}
+    Slider for random-access jumping within already-answered territory.
+    max = last-answered position (never further). Change event fires an
+    HTMX GET to /q/jump/?position=N which swaps in that question.
+    {% endcomment %}
     {% if question.last_answered_position and question.last_answered_position > 0 %}
       <form class="mt-2" hx-get="{% url 'questionnaire:jump_to_position' %}"
             hx-target="#question-shell" hx-swap="innerHTML"
