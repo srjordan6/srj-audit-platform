@@ -26,7 +26,23 @@ if env_file.exists():
 
 SECRET_KEY = env('SECRET_KEY', default='dev-only-insecure-key-replace-in-production')
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+# ALLOWED_HOSTS: union whatever's in the ALLOWED_HOSTS env var with the
+# well-known production hostnames (branded apex + www + Render internal)
+# so a misconfigured env var can't 400 the site with "Disallowed Host".
+# The Cloudflare Worker sets Host = <render-internal> upstream but with
+# USE_X_FORWARDED_HOST=True in production Django reads Host from
+# X-Forwarded-Host which is aiauditforcompanies.com — so both must be
+# listed.
+_ALLOWED_HOSTS_ALWAYS = [
+    'aiauditforcompanies.com',
+    'www.aiauditforcompanies.com',
+    'srj-audit-web-gor5.onrender.com',
+    'localhost',
+    '127.0.0.1',
+]
+ALLOWED_HOSTS = list(dict.fromkeys(
+    env.list('ALLOWED_HOSTS', default=[]) + _ALLOWED_HOSTS_ALWAYS
+))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
