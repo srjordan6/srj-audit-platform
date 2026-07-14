@@ -53,13 +53,14 @@ match per scoring/response_scoring.py.
       {% for option in question.options %}
         {% with input_id="opt-"|add:question.id|add:"-"|add:forloop.counter|stringformat:"s" %}
         <div class="form-check">
-          <input class="form-check-input"
+          <input class="form-check-input srj-answer-input"
                  type="radio"
                  name="answer"
                  id="{{ input_id }}"
                  value="{{ option }}"
                  {% if question.required %}required{% endif %}
-                 {% if prior_answer and prior_answer.selected == option %}checked{% endif %}>
+                 {% if prior_answer and prior_answer.selected == option %}checked{% endif %}
+                 data-is-other="{% if 'Other' in option %}1{% endif %}">
           <label class="form-check-label" for="{{ input_id }}">
             {{ option|glossary_annotate|safe }}
           </label>
@@ -67,6 +68,37 @@ match per scoring/response_scoring.py.
         {% endwith %}
       {% endfor %}
     </div>
+
+    {% if question.extended_metadata.other_text_field %}
+      <div class="srj-other-specify mt-2 ms-4" style="display:{% if prior_answer and 'Other' in prior_answer.selected|default:'' %}block{% else %}none{% endif %};">
+        <label for="other-{{ question.id }}" class="form-label small text-muted">
+          Please specify:
+        </label>
+        <input type="text"
+               class="form-control form-control-sm"
+               id="other-{{ question.id }}"
+               name="other_specify"
+               maxlength="255"
+               value="{{ prior_answer.other|default:'' }}"
+               placeholder="Tell us more">
+      </div>
+      <script>
+      (function () {
+        var form = document.currentScript.closest('form');
+        if (!form) return;
+        var box = form.querySelector('.srj-other-specify');
+        function refresh() {
+          var chosen = form.querySelector('input[name="answer"]:checked');
+          var isOther = chosen && chosen.dataset && chosen.dataset.isOther === '1';
+          if (box) box.style.display = isOther ? 'block' : 'none';
+        }
+        form.querySelectorAll('input[name="answer"]').forEach(function (el) {
+          el.addEventListener('change', refresh);
+        });
+        refresh();
+      })();
+      </script>
+    {% endif %}
   </fieldset>
   <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
     <button type="submit" class="btn btn-primary">

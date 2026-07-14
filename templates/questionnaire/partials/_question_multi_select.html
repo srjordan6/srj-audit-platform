@@ -56,7 +56,8 @@ engine treats {"selected": ["None of these"]} correctly regardless.
                  name="answer"
                  id="{{ input_id }}"
                  value="{{ option }}"
-                 {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
+                 {% if prior_answer and option in prior_answer.selected %}checked{% endif %}
+                 data-is-other="{% if 'Other' in option %}1{% endif %}">
           <label class="form-check-label" for="{{ input_id }}">
             {{ option|glossary_annotate|safe }}
           </label>
@@ -64,6 +65,37 @@ engine treats {"selected": ["None of these"]} correctly regardless.
         {% endwith %}
       {% endfor %}
     </div>
+
+    {% if question.extended_metadata.other_text_field %}
+      <div class="srj-other-specify mt-2 ms-4" style="display:{% if prior_answer and prior_answer.other %}block{% else %}none{% endif %};">
+        <label for="other-{{ question.id }}" class="form-label small text-muted">
+          Please specify what "Other" means for you:
+        </label>
+        <input type="text"
+               class="form-control form-control-sm"
+               id="other-{{ question.id }}"
+               name="other_specify"
+               maxlength="255"
+               value="{{ prior_answer.other|default:'' }}"
+               placeholder="Tell us more">
+      </div>
+      <script>
+      (function () {
+        var form = document.currentScript.closest('form');
+        if (!form) return;
+        var box = form.querySelector('.srj-other-specify');
+        function refresh() {
+          var anyOther = Array.from(form.querySelectorAll('input[name="answer"]:checked'))
+            .some(function (el) { return el.dataset && el.dataset.isOther === '1'; });
+          if (box) box.style.display = anyOther ? 'block' : 'none';
+        }
+        form.querySelectorAll('input[name="answer"]').forEach(function (el) {
+          el.addEventListener('change', refresh);
+        });
+        refresh();
+      })();
+      </script>
+    {% endif %}
   </fieldset>
   <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
     <button type="submit" class="btn btn-primary">

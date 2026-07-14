@@ -204,6 +204,7 @@ def submit_response(request):
 
     answer_value_json = request.POST.get("answer_value_json")
     other_tools = request.POST.get("other_tools", "").strip()
+    other_specify = request.POST.get("other_specify", "").strip()
     if answer_value_json:
         try:
             answer_value = json.loads(answer_value_json)
@@ -220,8 +221,12 @@ def submit_response(request):
             answer_value = {"selected": answers or [], "other": other_tools}
         elif len(answers) > 1:
             answer_value = {"selected": answers}
+            if other_specify:
+                answer_value["other"] = other_specify
         elif answer:
             answer_value = {"selected": answer}
+            if other_specify:
+                answer_value["other"] = other_specify
         else:
             matrix = (
                 _parse_matrix_grid_from_post(request.POST)

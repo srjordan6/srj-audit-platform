@@ -141,6 +141,9 @@ TIER_1_QUESTIONS = [
         "extended_metadata": None,
     },
     {
+        # DEACTIVATED 2026-07-14 — company size is already captured on
+        # the start form as `company_size_bracket`. Kept in the bank as
+        # historical context; is_active=False skips it during rendering.
         "id": 'T1-A-003',
         "tier": 'tier_1',
         "section": 'A',
@@ -148,32 +151,25 @@ TIER_1_QUESTIONS = [
         "question_text": 'Company size (employees, including part-time)',
         "question_type": 'SS',
         "options": [
-            '1-25',
-            '26-100',
-            '101-500',
-            '501-2,000',
-            '2,001-5,000',
-            '5,000+'
+            '1-25', '26-100', '101-500', '501-2,000', '2,001-5,000', '5,000+',
         ],
         "matrix_rows": None,
         "matrix_columns": None,
         "skip_logic": None,
         "role_visibility": ['all'],
-        "required": True,
+        "required": False,
         "scoring_weight": Decimal('1.00'),
         "framework_mappings": [
-            {
-                'weight': 0,
-                'dimension': 'company_size',
-                'framework': 'context'
-            }
+            {'weight': 0, 'dimension': 'company_size', 'framework': 'context'}
         ],
-        "notes": None,
-        "is_active": True,
+        "notes": "Redundant with start-form company_size_bracket; deactivated 2026-07-14.",
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": None,
     },
     {
+        # DEACTIVATED 2026-07-14 — replaced by T1-A-015 (NAICS sector
+        # dropdown) + T1-A-016 (subsegment). Kept in the bank for history.
         "id": 'T1-A-004',
         "tier": 'tier_1',
         "section": 'A',
@@ -181,36 +177,23 @@ TIER_1_QUESTIONS = [
         "question_text": 'Primary industry',
         "question_type": 'SS',
         "options": [
-            'Professional Services',
-            'Financial Services',
-            'Healthcare',
-            'Manufacturing',
-            'Retail/Ecommerce',
-            'Technology/Software',
-            'Construction',
-            'Education',
-            'Government/Public Sector',
-            'Nonprofit',
-            'Real Estate',
-            'Hospitality',
-            'Transportation/Logistics',
-            'Other'
+            'Professional Services', 'Financial Services', 'Healthcare',
+            'Manufacturing', 'Retail/Ecommerce', 'Technology/Software',
+            'Construction', 'Education', 'Government/Public Sector',
+            'Nonprofit', 'Real Estate', 'Hospitality',
+            'Transportation/Logistics', 'Other',
         ],
         "matrix_rows": None,
         "matrix_columns": None,
         "skip_logic": None,
         "role_visibility": ['all'],
-        "required": True,
+        "required": False,
         "scoring_weight": Decimal('1.00'),
         "framework_mappings": [
-            {
-                'weight': 0,
-                'dimension': 'industry',
-                'framework': 'context'
-            }
+            {'weight': 0, 'dimension': 'industry', 'framework': 'context'}
         ],
-        "notes": None,
-        "is_active": True,
+        "notes": "Replaced by T1-A-015 (NAICS sector) + T1-A-016 (subsegment); deactivated 2026-07-14.",
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": None,
     },
@@ -636,12 +619,63 @@ TIER_1_QUESTIONS = [
         "tier": 'tier_1',
         "section": 'A',
         "sequence_number": 15,
-        "question_text": 'Within your primary industry (selected in T1-A-004), which sub-segment best describes your company\'s regulated AI exposure? Select the option that most closely fits; choose "Not applicable" if your industry has no sub-segment to specify.',
+        "question_text": "Which NAICS sector best describes your company's primary line of business?",
+        "question_type": 'SS',
+        "options": [
+            '11 — Agriculture, Forestry, Fishing and Hunting',
+            '21 — Mining, Quarrying, and Oil and Gas Extraction',
+            '22 — Utilities',
+            '23 — Construction',
+            '31-33 — Manufacturing',
+            '42 — Wholesale Trade',
+            '44-45 — Retail Trade',
+            '48-49 — Transportation and Warehousing',
+            '51 — Information',
+            '52 — Finance and Insurance',
+            '53 — Real Estate and Rental and Leasing',
+            '54 — Professional, Scientific, and Technical Services',
+            '55 — Management of Companies and Enterprises',
+            '56 — Administrative, Support, Waste Management and Remediation',
+            '61 — Educational Services',
+            '62 — Health Care and Social Assistance',
+            '71 — Arts, Entertainment, and Recreation',
+            '72 — Accommodation and Food Services',
+            '81 — Other Services (except Public Administration)',
+            '92 — Public Administration',
+            'Other',
+            "Don't know",
+        ],
+        "matrix_rows": None,
+        "matrix_columns": None,
+        "skip_logic": None,
+        "role_visibility": ['all'],
+        "required": True,
+        "scoring_weight": Decimal('1.00'),
+        "framework_mappings": [
+            {'weight': 0, 'dimension': 'naics_sector', 'framework': 'context'},
+            {'step': 'framework_crosswalk_readiness', 'weight': 0.5, 'framework': 'v3_governance'}
+        ],
+        "notes": '2026-07-14: converted from free-form industry to NAICS 2-digit sector dropdown per operator request. Enables correct scoping of sector-specific evidence packages.',
+        "is_active": True,
+        "scoring_overrides": None,
+        "extended_metadata": {
+            'other_text_field': True,
+            'source': 'NAICS 2-digit sector, US Census Bureau',
+        },
+    },
+    {
+        # T1-A-016 — Sub-segment refinement inside the T1-A-015 NAICS sector.
+        # Added 2026-07-14 alongside the T1-A-015 conversion.
+        "id": 'T1-A-016',
+        "tier": 'tier_1',
+        "section": 'A',
+        "sequence_number": 16,
+        "question_text": "Which sub-segment best describes your company's regulated AI exposure? Choose the option closest to your business, or 'Not applicable' if none apply.",
         "question_type": 'SS',
         "options": [
             'Healthcare: Provider',
             'Healthcare: Payer',
-            'Healthcare: Pharma/Medical Device',
+            'Healthcare: Pharma / Medical Device',
             'Healthcare: Health IT vendor',
             'Healthcare: Other',
             'Financial: Bank or credit union',
@@ -660,31 +694,26 @@ TIER_1_QUESTIONS = [
             'Government: Local',
             'Government: Defense contractor',
             'Government: Other',
-            'Not applicable to my industry',
-            "Don't know"
+            'Other (specify)',
+            'Not applicable to my sector',
+            "Don't know",
         ],
         "matrix_rows": None,
         "matrix_columns": None,
         "skip_logic": None,
         "role_visibility": ['all'],
-        "required": True,
+        "required": False,
         "scoring_weight": Decimal('1.00'),
         "framework_mappings": [
-            {
-                'weight': 0,
-                'dimension': 'industry_sub_segment',
-                'framework': 'context'
-            },
-            {
-                'step': 'framework_crosswalk_readiness',
-                'weight': 0.5,
-                'framework': 'v3_governance'
-            }
+            {'weight': 0, 'framework': 'context', 'sub_component': 'regulated_subsegment'}
         ],
-        "notes": '2026-06-28: NEW per OD-14 gap audit. Enables correct scoping of sector-specific evidence packages (HIPAA covered entity vs business associate, GLBA financial institution vs not, FERPA LEA vs vendor, DFARS prime vs sub, SR 11-7 Fed-regulated vs not).',
+        "notes": "Sub-segment refinement inside the T1-A-015 NAICS sector.",
         "is_active": True,
         "scoring_overrides": None,
-        "extended_metadata": None,
+        "extended_metadata": {
+            'other_text_field': True,
+            'depends_on': 'T1-A-015',
+        },
     },
 
     # ===== Section B — AI Tool Inventory & Discovery (21 questions) =====
@@ -3322,7 +3351,7 @@ TIER_1_QUESTIONS = [
         "notes": '2026-06-28: NEW per OD-14 gap audit. Single highest-leverage vendor-evidence question — feeds HIPAA, GLBA, GDPR DPA, DFARS, DTSA, SBOM/AIBOM, ISO 27001 supplier.',
         "is_active": True,
         "scoring_overrides": None,
-        "extended_metadata": None,
+        "extended_metadata": {'other_text_field': True},
     },
     {
         "id": 'T1-E-030',
