@@ -42,9 +42,7 @@ match per scoring/response_scoring.py.
   <input type="hidden" name="question_id" value="{{ question.id }}">
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
-      <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }}
-      </span>
+      <span class="srj-question__id text-muted small d-block">Section {{ question.section }} &mdash; {{ question.section|section_name }}</span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}
         <span class="srj-question__required text-danger" aria-hidden="true">*</span>
@@ -55,14 +53,13 @@ match per scoring/response_scoring.py.
       {% for option in question.options %}
         {% with input_id="opt-"|add:question.id|add:"-"|add:forloop.counter|stringformat:"s" %}
         <div class="form-check">
-          <input class="form-check-input srj-answer-input"
+          <input class="form-check-input"
                  type="radio"
                  name="answer"
                  id="{{ input_id }}"
                  value="{{ option }}"
                  {% if question.required %}required{% endif %}
-                 {% if prior_answer and prior_answer.selected == option %}checked{% endif %}
-                 data-is-other="{% if 'Other' in option %}1{% endif %}">
+                 {% if prior_answer and prior_answer.selected == option %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">
             {{ option|glossary_annotate|safe }}
           </label>
@@ -70,6 +67,15 @@ match per scoring/response_scoring.py.
         {% endwith %}
       {% endfor %}
     </div>
+  </fieldset>
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      Press Enter to continue
+    </span>
+  </div>
+</form>
 
-    {% if question.extended_metadata.other_text_field %}
-   
+{% include "questionnaire/partials/_progress_oob.html" %}

@@ -37,9 +37,7 @@ engine treats {"selected": ["None of these"]} correctly regardless.
   <input type="hidden" name="question_id" value="{{ question.id }}">
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
-      <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }}
-      </span>
+      <span class="srj-question__id text-muted small d-block">Section {{ question.section }} &mdash; {{ question.section|section_name }}</span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}
         <span class="srj-question__required text-danger" aria-hidden="true">*</span>
@@ -58,8 +56,7 @@ engine treats {"selected": ["None of these"]} correctly regardless.
                  name="answer"
                  id="{{ input_id }}"
                  value="{{ option }}"
-                 {% if prior_answer and option in prior_answer.selected %}checked{% endif %}
-                 data-is-other="{% if 'Other' in option %}1{% endif %}">
+                 {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">
             {{ option|glossary_annotate|safe }}
           </label>
@@ -67,6 +64,15 @@ engine treats {"selected": ["None of these"]} correctly regardless.
         {% endwith %}
       {% endfor %}
     </div>
+  </fieldset>
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      Press Enter to continue
+    </span>
+  </div>
+</form>
 
-    {% if question.extended_metadata.other_text_field %}
-      <div cl
+{% include "questionnaire/partials/_progress_oob.html" %}

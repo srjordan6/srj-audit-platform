@@ -36,9 +36,7 @@ swap_target     HTMX hx-target CSS selector.
 
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
-      <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }}
-      </span>
+      <span class="srj-question__id text-muted small d-block">Section {{ question.section }} &mdash; {{ question.section|section_name }}</span>
       <span class="srj-question__text">{{ question.question_text }}</span>
     </legend>
 
@@ -96,4 +94,12 @@ swap_target     HTMX hx-target CSS selector.
 
   <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
     <button type="submit" class="btn btn-primary">
-      Save &
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      No tools? Leave everything unchecked and continue.
+    </span>
+  </div>
+</form>
+
+{% include "questionnaire/partials/_progress_oob.html" %}
