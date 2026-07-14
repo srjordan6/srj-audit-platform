@@ -67,7 +67,7 @@ Sprint C browser walkthrough.
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
       <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Question {{ question.display_number|default:question.sequence_number }}{% if question.total_visible %} of {{ question.total_visible }}{% endif %}
+        Section {{ question.section }} &mdash; {{ question.section|section_name }}
       </span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}
@@ -138,35 +138,4 @@ Sprint C browser walkthrough.
                     data-option="{{ option }}"
                     draggable="true">
                   <span class="srj-question__rank-position badge bg-secondary">{{ forloop.counter }}</span>
-                  <span class="srj-question__rank-handle text-muted" aria-hidden="true">⋮⋮</span>
-                  <span class="srj-question__rank-label-text flex-grow-1">{{ option|glossary_annotate|safe }}</span>
-                  <button type="button" class="btn btn-sm btn-outline-secondary srj-rank-up-btn"
-                          data-role="rank-up" aria-label="Move up">↑</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary srj-rank-down-btn"
-                          data-role="rank-down" aria-label="Move down">↓</button>
-                  <button type="button" class="btn btn-sm btn-outline-danger srj-rank-remove-btn"
-                          data-role="rank-remove" aria-label="Remove from ranking">×</button>
-                </li>
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-        </ol>
-      </div>
-    </div>
-
-    <input type="hidden" name="answer" value="" data-role="rank-hidden-input">
-  </fieldset>
-
-  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
-    <button type="submit" class="btn btn-primary">
-      Save &amp; continue
-    </button>
-    <span class="srj-question__hint text-muted small">
-      Drag from the left column to rank
-    </span>
-  </div>
-</form>
-{% endwith %}
-{% endwith %}
-
-{% include "questionnaire/partials/_progress_oob.html" %}
+                  <span class="srj-questio

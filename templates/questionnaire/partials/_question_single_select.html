@@ -43,7 +43,7 @@ match per scoring/response_scoring.py.
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
       <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Question {{ question.display_number|default:question.sequence_number }}{% if question.total_visible %} of {{ question.total_visible }}{% endif %}
+        Section {{ question.section }} &mdash; {{ question.section|section_name }}
       </span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}
@@ -72,44 +72,4 @@ match per scoring/response_scoring.py.
     </div>
 
     {% if question.extended_metadata.other_text_field %}
-      <div class="srj-other-specify mt-2 ms-4" style="display:{% if prior_answer and 'Other' in prior_answer.selected|default:'' %}block{% else %}none{% endif %};">
-        <label for="other-{{ question.id }}" class="form-label small text-muted">
-          Please specify:
-        </label>
-        <input type="text"
-               class="form-control form-control-sm"
-               id="other-{{ question.id }}"
-               name="other_specify"
-               maxlength="255"
-               value="{{ prior_answer.other|default:'' }}"
-               placeholder="Tell us more">
-      </div>
-      <script>
-      (function () {
-        var form = document.currentScript.closest('form');
-        if (!form) return;
-        var box = form.querySelector('.srj-other-specify');
-        function refresh() {
-          var chosen = form.querySelector('input[name="answer"]:checked');
-          var isOther = chosen && chosen.dataset && chosen.dataset.isOther === '1';
-          if (box) box.style.display = isOther ? 'block' : 'none';
-        }
-        form.querySelectorAll('input[name="answer"]').forEach(function (el) {
-          el.addEventListener('change', refresh);
-        });
-        refresh();
-      })();
-      </script>
-    {% endif %}
-  </fieldset>
-  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
-    <button type="submit" class="btn btn-primary">
-      Save &amp; continue
-    </button>
-    <span class="srj-question__hint text-muted small">
-      Press Enter to continue
-    </span>
-  </div>
-</form>
-
-{% include "questionnaire/partials/_progress_oob.html" %}
+   

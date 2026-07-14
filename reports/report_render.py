@@ -397,6 +397,26 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         "disclaimer": (first["disclaimer"] if first else ""),
     }
 
+    # --- Tool-inventory discrepancy signal ---
+    # Compare T1-A-000 tool count against T1-B-009 / T1-B-011 self-reports.
+    # Attached to context so AI analysis can quote it and the template
+    # renders a Basis-for-Opinion exception when material.
+    try:
+        from reports.tool_inventory_signals import compute_signals
+        from django.db import connection as _conn
+        with _conn.cursor() as _c:
+            # engagement_id -> respondent_id lookup
+            _c.execute(
+                "SELECT id FROM respondents WHERE engagement_id = %s LIMIT 1",
+                (engagement_id,),
+            )
+            _row = _c.fetchone()
+            if _row:
+                context["tool_inventory_signal"] = compute_signals(_c, _row[0])
+    except Exception:  # noqa: BLE001
+        logger.exception("tool_inventory_signal compute failed; continuing")
+        context["tool_inventory_signal"] = None
+
     # --- Phase 2a: AI narrative analysis (never fatal) ---
     try:
         from reports.ai_analysis import analyze_report

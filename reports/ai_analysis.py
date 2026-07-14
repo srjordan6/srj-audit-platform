@@ -160,6 +160,20 @@ def _section_payload(section_key, context):
             "size_bracket": company.get("size_bracket"),
         },
     }
+    # Tool inventory discrepancy signal is relevant to Section 1 (governance
+    # gaps / accountability), Section 3 (risk exposure), and the opinion
+    # basis. Attach whenever available so the model can quote it.
+    tis = context.get("tool_inventory_signal") or {}
+    if tis and tis.get("flags"):
+        base["tool_inventory_signal"] = {
+            "inventory_count": tis.get("inventory_count"),
+            "leadership_count": tis.get("leadership_count"),
+            "personal_count": tis.get("personal_count"),
+            "delta_vs_leadership": tis.get("delta_vs_leadership"),
+            "delta_vs_personal": tis.get("delta_vs_personal"),
+            "flags": tis.get("flags", []),
+            "narrative": tis.get("narrative"),
+        }
     if section_key == "section1":
         base.update({
             "artifacts": context.get("section1", []),
@@ -292,6 +306,27 @@ def _call_opinion_basis(client, model, context):
         "framework_scores": _framework_summaries(context),
         "all_questions_and_answers": context.get("appendix", []),
     }
+    # Elevate tool-inventory discrepancy so the model considers it as a
+    # candidate Basis exception. material_discrepancy in flags should
+    # produce an exception in domain D2 (Tool Inventory & Discovery).
+    tis = context.get("tool_inventory_signal") or {}
+    if tis and tis.get("flags"):
+        payload["tool_inventory_signal"] = {
+            "inventory_count": tis.get("inventory_count"),
+            "leadership_count": tis.get("leadership_count"),
+            "personal_count": tis.get("personal_count"),
+            "delta_vs_leadership": tis.get("delta_vs_leadership"),
+            "delta_vs_personal": tis.get("delta_vs_personal"),
+            "flags": tis.get("flags", []),
+            "narrative": tis.get("narrative"),
+            "guidance_for_model": (
+                "If flags contain 'material_discrepancy', 'leadership_underestimate', "
+                "or 'personal_use_exceeds_inventory', emit an exception in domain 'D2' "
+                "with finding 'Tool inventory head-count discrepancy' and evidence "
+                "quoting the specific delta from the narrative. Materiality = 'material' "
+                "if the absolute delta is >= 3 tools, else 'notable'."
+            ),
+        }
     prompt = (
         "QUALIFIED-OPINION CHECKLIST (100 points):\n"
         + checklist_text()

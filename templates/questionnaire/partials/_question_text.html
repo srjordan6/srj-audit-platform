@@ -44,7 +44,7 @@ pattern as the other question partials.
   <fieldset>
     <legend class="srj-question__heading h5 mb-3">
       <span class="srj-question__id text-muted small d-block">
-        Section {{ question.section }} &mdash; {{ question.section|section_name }} &middot; Question {{ question.display_number|default:question.sequence_number }}{% if question.total_visible %} of {{ question.total_visible }}{% endif %}
+        Section {{ question.section }} &mdash; {{ question.section|section_name }}
       </span>
       <span class="srj-question__text">{{ question.question_text }}</span>
       {% if question.required %}
@@ -72,13 +72,4 @@ pattern as the other question partials.
   </fieldset>
   <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
     <button type="submit" class="btn btn-primary">
-      {% if question.required %}Save &amp; continue{% else %}Save &amp; finish{% endif %}
-    </button>
-    <span class="srj-question__hint text-muted small">
-      Press Enter to insert a line break
-    </span>
-  </div>
-</form>
-{% endwith %}
-
-{% include "questionnaire/partials/_progress_oob.html" %}
+      {% if question.required %}Save &amp; continue{% els

@@ -29,6 +29,25 @@
                    aria-valuemax="100"></div>
             </div>
           {% endif %}
+          {% if question.last_answered_position and question.last_answered_position > 0 %}
+            <form class="mt-2" hx-get="{% url 'questionnaire:jump_to_position' %}"
+                  hx-target="#question-shell" hx-swap="innerHTML"
+                  hx-trigger="change from:input[name=position]">
+              <input type="range"
+                     class="form-range"
+                     name="position"
+                     min="1"
+                     max="{{ question.last_answered_position }}"
+                     value="{{ question.display_number|default:1 }}"
+                     step="1"
+                     aria-label="Jump to question">
+              <div class="d-flex justify-content-between small text-muted">
+                <span>1</span>
+                <span class="text-center">Drag to jump</span>
+                <span>{{ question.last_answered_position }}</span>
+              </div>
+            </form>
+          {% endif %}
         {% endif %}
       </div>
 

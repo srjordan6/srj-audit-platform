@@ -118,6 +118,18 @@ def get_next_question_context(
     }
 
 
+def _last_answered_index(visible, answered) -> int:
+    """1-based index of the furthest-answered visible question, or 0.
+
+    Returned as position not array-index so it matches display_number.
+    """
+    last = 0
+    for idx, q in enumerate(visible, start=1):
+        if q.id in answered:
+            last = idx
+    return last
+
+
 def get_next_visible_question_context_by_position(
     cursor,
     respondent_id: str,
@@ -125,34 +137,43 @@ def get_next_visible_question_context_by_position(
 ) -> Optional[dict]:
     """Return the visible question immediately AFTER current_question_id.
 
-    Mirror of get_previous_visible_question_context but +1 instead of -1.
-    If current_question_id is None or not found, falls back to the first
-    unanswered visible question. Returns None if the respondent is
-    already at the end of the flow.
+    Guard rail (per operator direction 2026-07-14): Next may not advance
+    past the last-answered position. Save & continue is the only path
+    that opens new territory.
+
+    Returns None if:
+      - the current question is unknown, OR
+      - the next position would move beyond the furthest-answered index.
     """
     role = get_respondent_role(cursor, respondent_id)
     if role is None:
         return None
     answered = load_answered_by_id(cursor, respondent_id)
     visible = flow.questions_visible_to_role(role, answered)
+    last_answered = _last_answered_index(visible, answered)
 
-    next_q = None
+    current_idx_1based = None
     if current_question_id:
-        for i, q in enumerate(visible):
+        for i, q in enumerate(visible, start=1):
             if q.id == current_question_id:
-                if i + 1 < len(visible):
-                    next_q = visible[i + 1]
+                current_idx_1based = i
                 break
 
-    if next_q is None:
-        # Fallback: first unanswered visible question.
+    if current_idx_1based is None:
+        # Fallback: first-unanswered (matches natural forward flow).
         for q in visible:
             if q.id not in answered:
                 next_q = q
                 break
-
-    if next_q is None:
-        return None
+        else:
+            return None
+    else:
+        next_pos = current_idx_1based + 1
+        if next_pos > last_answered:
+            return None  # blocked — no further-answered territory
+        if next_pos > len(visible):
+            return None
+        next_q = visible[next_pos - 1]
 
     _decorate_question(next_q, answered, visible=visible)
     return {
@@ -161,6 +182,50 @@ def get_next_visible_question_context_by_position(
         "prior_answer": answered.get(next_q.id),
         "progress": flow.progress_for_role(role, answered),
         "role": role,
+    }
+
+
+def get_question_context_by_position(
+    cursor,
+    respondent_id: str,
+    position: int,
+) -> Optional[dict]:
+    """Jump to the visible question at 1-based ``position``.
+
+    Enforces the same guard as Next: position may not exceed the
+    furthest-answered index (so the slider can only visit territory the
+    respondent has already seen). Returns None if position is out of
+    range.
+    """
+    role = get_respondent_role(cursor, respondent_id)
+    if role is None:
+        return None
+    answered = load_answered_by_id(cursor, respondent_id)
+    visible = flow.questions_visible_to_role(role, answered)
+    last_answered = _last_answered_index(visible, answered)
+
+    try:
+        pos = int(position)
+    except (TypeError, ValueError):
+        return None
+
+    if pos < 1 or pos > len(visible):
+        return None
+    # Allow jumping to any already-answered position, OR to the current
+    # first-unanswered (which equals last_answered + 1).
+    max_reachable = min(len(visible), max(last_answered, 1) + 1)
+    if pos > max_reachable:
+        pos = max_reachable
+
+    target = visible[pos - 1]
+    _decorate_question(target, answered, visible=visible)
+    return {
+        "question": target,
+        "partial": flow.partial_template_for_type(target.question_type),
+        "prior_answer": answered.get(target.id),
+        "progress": flow.progress_for_role(role, answered),
+        "role": role,
+        "last_answered_position": last_answered,
     }
 
 
@@ -235,6 +300,9 @@ def _decorate_question(q, answered, visible=None):
         else:
             q.display_number = None
             q.total_visible = len(visible)
+        # Furthest-answered position drives the slider's max attribute
+        # so users can only jump within already-visited territory.
+        q.last_answered_position = _last_answered_index(visible, answered)
     if q.question_type == "TOOL_INVENTORY":
         from questionnaire.tool_catalog import CATEGORIES
         q.tool_categories = CATEGORIES
