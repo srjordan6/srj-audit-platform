@@ -14,6 +14,23 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
+
+# Behind a Cloudflare Worker reverse proxy at aiauditforcompanies.com.
+# The Worker sets Host = <render-internal> so ALLOWED_HOSTS matches, and
+# forwards X-Forwarded-Host / X-Forwarded-Proto carrying the branded origin.
+USE_X_FORWARDED_HOST = True
+
+# CSRF checks the request Origin/Referer against this list on POST.
+# Browsers send Origin = https://aiauditforcompanies.com from the branded
+# domain; that must be trusted or Django 4+ returns 403.
+CSRF_TRUSTED_ORIGINS = env.list(  # noqa: F405
+    'CSRF_TRUSTED_ORIGINS',
+    default=[
+        'https://aiauditforcompanies.com',
+        'https://www.aiauditforcompanies.com',
+        'https://srj-audit-web-gor5.onrender.com',
+    ],
+)
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
