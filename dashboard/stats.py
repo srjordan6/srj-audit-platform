@@ -87,14 +87,61 @@ def _numeric_value(option: str) -> Optional[float]:
     return None
 
 
+def _role_gate(role_visibility) -> Optional[list[str]]:
+    """Return the restricted role list, or None if question is shown to all.
+
+    role_visibility of None, [], ['all'], or containing 'all' means everyone.
+    Anything else is a restrictive allow-list of role codes (IC, MGR, CIO, ...).
+    """
+    if not role_visibility:
+        return None
+    roles = [str(r).strip().upper() for r in role_visibility if r]
+    if not roles or "ALL" in roles:
+        return None
+    return roles
+
+
 def question_stats(
     question: dict,
     responses: Iterable[dict],
+    respondents_by_id: Optional[dict] = None,
+    total_respondents: int = 0,
 ) -> dict:
-    """Return stats for one question given the rows from responses table."""
+    """Return stats for one question given the rows from responses table.
+
+    Parameters
+    ----------
+    question : dict
+        Row from QUESTIONS bank. Uses id, question_text, question_type,
+        section, options, skip_logic, role_visibility.
+    responses : iterable of dicts
+        Each row must have question_id, answer_value, is_dont_know, and
+        respondent_id (so we can bucket by respondent).
+    respondents_by_id : dict, optional
+        respondent_id -> role_code (upper-cased). Used to compute the
+        eligible-pool count when a question is role-gated.
+    total_respondents : int
+        Total distinct respondents in the dataset (denominator when the
+        question is shown to everyone).
+    """
     qid = question["id"]
     qtype = question["question_type"]
     all_option_labels = list(question.get("options") or [])
+    respondents_by_id = respondents_by_id or {}
+
+    # --- role gating: how many respondents were eligible to see it? ---
+    allowed_roles = _role_gate(question.get("role_visibility"))
+    if allowed_roles is None:
+        eligible_count = total_respondents
+    else:
+        eligible_count = sum(
+            1 for role in respondents_by_id.values()
+            if str(role or "").strip().upper() in allowed_roles
+        )
+
+    # --- skip_logic present? (informational, not evaluated here) ---
+    sl = question.get("skip_logic")
+    has_skip_logic = bool(sl) and sl not in ({}, [], "", "null")
 
     counter: Counter = Counter()
     numerics: list[float] = []
@@ -142,4 +189,10 @@ def question_stats(
         "median": median,
         "stdev": stdev,
         "n_all_options_in_bank": len(all_option_labels),
+        # New badge fields:
+        "has_skip_logic": has_skip_logic,
+        "allowed_roles": allowed_roles or [],
+        "role_gated": allowed_roles is not None,
+        "eligible_count": eligible_count,
+        "total_respondents": total_respondents,
     }

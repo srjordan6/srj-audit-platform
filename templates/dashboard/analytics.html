@@ -14,11 +14,22 @@
     </span>
   </div>
 
-  <p class="text-muted small">
+  <p class="text-muted small mb-1">
     Every response captured since day one. For each question: frequency + %
     per option, mode (most-picked), and for questions with numeric-mappable
     options (Likert 1&ndash;5, revenue brackets, employee counts) also mean, median,
     and standard deviation.
+  </p>
+  <p class="text-muted small">
+    <span class="badge bg-warning-subtle text-dark border">role-gated</span>
+    only shown to respondents whose role matches (e.g., CFO/COO for spend questions).
+    &nbsp;
+    <span class="badge bg-info-subtle text-dark border">conditional</span>
+    only appears when an earlier answer triggers it (skip logic).
+    &nbsp;
+    <em>&ldquo;n=X of Y eligible&rdquo;</em> means X respondents in the eligible
+    pool of Y actually answered &mdash; if X&lt;Y they were shown the question but
+    skipped it; if Y=0 no one in the dataset qualified.
   </p>
 
   {% for block in sections %}
@@ -30,9 +41,21 @@
             <div>
               <strong>{{ q.question_id }}</strong>
               <span class="small text-muted">&middot; {{ q.question_type }}</span>
+              {% if q.role_gated %}
+                <span class="badge bg-warning-subtle text-dark border ms-1"
+                      title="Only shown to respondents whose role is one of: {{ q.allowed_roles|join:', ' }}">
+                  role-gated: {{ q.allowed_roles|join:", " }}
+                </span>
+              {% endif %}
+              {% if q.has_skip_logic %}
+                <span class="badge bg-info-subtle text-dark border ms-1"
+                      title="Only appears when an earlier answer triggers it">
+                  conditional
+                </span>
+              {% endif %}
             </div>
             <div class="small text-muted">
-              n={{ q.n_answered }} respondent{{ q.n_answered|pluralize }}
+              n={{ q.n_answered }} of {{ q.eligible_count }} eligible
               {% if q.n_dont_know %}&middot; {{ q.n_dont_know }} Don't&nbsp;know{% endif %}
             </div>
           </div>

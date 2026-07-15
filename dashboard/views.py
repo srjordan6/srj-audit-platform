@@ -212,26 +212,42 @@ def engagement_add_note(request, engagement_id):
 def analytics(request):
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT question_id, answer_value, is_dont_know FROM responses"
+            "SELECT question_id, respondent_id, answer_value, is_dont_know "
+            "FROM responses"
         )
         rows = cursor.fetchall()
         cursor.execute("SELECT COUNT(*) FROM engagements")
         total_engagements = cursor.fetchone()[0]
+        cursor.execute("SELECT id, role FROM respondents")
+        respondents_by_id = {
+            str(rid): (role or "") for rid, role in cursor.fetchall()
+        }
+
+    total_respondents = len(respondents_by_id)
 
     all_rows = []
-    for qid, av, dk in rows:
+    for qid, rid, av, dk in rows:
         if isinstance(av, str):
             try:
                 av = json.loads(av)
             except (ValueError, TypeError):
                 pass
-        all_rows.append({"question_id": qid, "answer_value": av, "is_dont_know": dk})
+        all_rows.append({
+            "question_id": qid,
+            "respondent_id": str(rid) if rid else None,
+            "answer_value": av,
+            "is_dont_know": dk,
+        })
 
     per_question = []
     for q in QUESTIONS:
         if not q.get("is_active", True):
             continue
-        per_question.append(question_stats(q, all_rows))
+        per_question.append(question_stats(
+            q, all_rows,
+            respondents_by_id=respondents_by_id,
+            total_respondents=total_respondents,
+        ))
 
     # Group by section for readability.
     by_section: dict[str, list[dict]] = defaultdict(list)
@@ -245,5 +261,6 @@ def analytics(request):
     return render(request, "dashboard/analytics.html", {
         "sections": section_blocks,
         "total_engagements": total_engagements,
+        "total_respondents": total_respondents,
         "total_responses": len(all_rows),
     })
