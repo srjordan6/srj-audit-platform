@@ -108,7 +108,7 @@ def _send_postmark(to_email: str, name: str, company: str,
                                       company=company or "your company"),
         "MessageStream": "outbound",
         "Attachments": [{
-            "Name": f"AI_Audit_Snapshot_{engagement_id[:8]}.pdf",
+            "Name": f"AI_Audit_Snapshot_{str(engagement_id)[:8]}.pdf",
             "Content": base64.b64encode(pdf_bytes).decode(),
             "ContentType": "application/pdf",
         }],
@@ -241,6 +241,9 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     if not row:
         return False
     engagement_id, email, name, company, state = row
+    # e.id comes back as a Python UUID; downstream (_send_postmark filename)
+    # slices with [:8] which fails on UUID. Cast to str at the boundary.
+    engagement_id = str(engagement_id)
     # Only regenerate for engagements that are already Editable (i.e. have
     # a report of record). Draft never got past first generation. Locked /
     # Expired are terminal.
@@ -253,33 +256,15 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
         "status": "queued_regeneration",
         "respondent_id": respondent_id,
     })
-    # DIAGNOSTIC 2026-07-15: run synchronously in the request thread so
-    # any exception surfaces with a proper traceback logged to events.
-    # Once regen is confirmed working we can flip back to daemon thread.
-    import traceback
-    try:
-        _log_event(cursor, {
-            "engagement_id": engagement_id, "to": email,
-            "status": "regen_sync_started", "respondent_id": respondent_id,
-        })
-        _worker(engagement_id, email, name, company)
-        _log_event(cursor, {
-            "engagement_id": engagement_id, "to": email,
-            "status": "regen_sync_returned", "respondent_id": respondent_id,
-        })
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("regenerate_after_edit: sync worker crashed for %s",
-                         engagement_id)
-        try:
-            _log_event(cursor, {
-                "engagement_id": engagement_id, "to": email,
-                "status": "regen_sync_failed",
-                "respondent_id": respondent_id,
-                "error": f"{type(exc).__name__}: {exc}",
-                "traceback": traceback.format_exc()[:4000],
-            })
-        except Exception:  # noqa: BLE001
-            logger.exception("could not log regen_sync_failed")
+    # Bug fixed 2026-07-15 — UUID subscript in _send_postmark filename.
+    # Flip back to daemon thread so edits feel snappy again.
+    thread = threading.Thread(
+        target=_worker,
+        args=(engagement_id, email, name, company),
+        daemon=True,
+        name=f"report-regen-{engagement_id[:8]}",
+    )
+    thread.start()
     return True
 
 
