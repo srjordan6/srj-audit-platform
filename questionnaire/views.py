@@ -214,18 +214,23 @@ def ai_recommend_laws_view(request):
         answered = services.load_answered_by_id(cursor, rid)
         # Assemble the profile we send to Claude. Include revenue if the
         # respondent has already answered T1-A-007; otherwise omit it.
+        # Prefer signup-captured company profile (industry / size /
+        # revenue / geographic). Fall back to T1-A-005 and T1-A-007 for
+        # any engagement created before those moved to signup.
+        legacy_geo = (
+            (answered.get("T1-A-005") or {}).get("selected")
+            if isinstance(answered.get("T1-A-005"), dict) else None
+        )
+        legacy_rev = (
+            (answered.get("T1-A-007") or {}).get("selected")
+            if isinstance(answered.get("T1-A-007"), dict) else None
+        )
         profile = {
             "industry": rctx.get("company_industry"),
             "size_bracket": rctx.get("company_size_bracket"),
             "role_of_respondent": rctx.get("respondent_role"),
-            "geographic_footprint": (
-                (answered.get("T1-A-005") or {}).get("selected")
-                if isinstance(answered.get("T1-A-005"), dict) else None
-            ),
-            "annual_revenue": (
-                (answered.get("T1-A-007") or {}).get("selected")
-                if isinstance(answered.get("T1-A-007"), dict) else None
-            ),
+            "geographic_footprint": rctx.get("geographic_footprint") or legacy_geo,
+            "annual_revenue": rctx.get("annual_revenue") or legacy_rev,
             "regulations_the_user_already_checked": (
                 (answered.get("T1-A-006") or {}).get("selected")
                 if isinstance(answered.get("T1-A-006"), dict) else None
@@ -417,6 +422,8 @@ def start(request):
         "company_name",
         "company_industry",
         "company_size_bracket",
+        "annual_revenue",
+        "geographic_footprint",
     ]
     values = {k: request.POST.get(k, "").strip() for k in required}
     missing = [k for k, v in values.items() if not v]
@@ -464,6 +471,8 @@ def start(request):
                     company_name=values["company_name"],
                     company_industry=values["company_industry"],
                     company_size_bracket=values["company_size_bracket"],
+                    annual_revenue=values["annual_revenue"],
+                    geographic_footprint=values["geographic_footprint"],
                     access_code_row=access_code_row,
                 )
     except ValueError as exc:

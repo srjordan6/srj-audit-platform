@@ -81,7 +81,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="company_size_bracket" class="form-label">Company size</label>
+            <label for="company_size_bracket" class="form-label">Number of employees</label>
             <select id="company_size_bracket" name="company_size_bracket"
                     class="form-select" required>
                 <option value="">Select…</option>
@@ -92,6 +92,38 @@
                 <option value="2001-5000" {% if prefill_values.company_size_bracket == '2001-5000' %}selected{% endif %}>2,001-5,000</option>
                 <option value="5000+"     {% if prefill_values.company_size_bracket == '5000+'     %}selected{% endif %}>5,000+</option>
             </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="annual_revenue" class="form-label">Approximate annual revenue</label>
+            <select id="annual_revenue" name="annual_revenue"
+                    class="form-select" required>
+                <option value="">Select…</option>
+                <option value="Under $5M"          {% if prefill_values.annual_revenue == 'Under $5M'          %}selected{% endif %}>Under $5M</option>
+                <option value="$5-25M"             {% if prefill_values.annual_revenue == '$5-25M'             %}selected{% endif %}>$5M-$25M</option>
+                <option value="$25-100M"           {% if prefill_values.annual_revenue == '$25-100M'           %}selected{% endif %}>$25M-$100M</option>
+                <option value="$100M-$1B"          {% if prefill_values.annual_revenue == '$100M-$1B'          %}selected{% endif %}>$100M-$1B</option>
+                <option value="Over $1B"           {% if prefill_values.annual_revenue == 'Over $1B'           %}selected{% endif %}>Over $1B</option>
+                <option value="Decline to answer"  {% if prefill_values.annual_revenue == 'Decline to answer'  %}selected{% endif %}>Decline to answer</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="geographic_footprint" class="form-label">Where does your company operate?</label>
+            <select id="geographic_footprint" name="geographic_footprint"
+                    class="form-select" required>
+                <option value="">Select…</option>
+                <option value="Single state, US"                             {% if prefill_values.geographic_footprint == 'Single state, US'                             %}selected{% endif %}>Single state, US</option>
+                <option value="Multi-state, US"                              {% if prefill_values.geographic_footprint == 'Multi-state, US'                              %}selected{% endif %}>Multi-state, US</option>
+                <option value="Multi-state, US including California"         {% if prefill_values.geographic_footprint == 'Multi-state, US including California'         %}selected{% endif %}>Multi-state, US — includes California</option>
+                <option value="Multi-state, US including New York"           {% if prefill_values.geographic_footprint == 'Multi-state, US including New York'           %}selected{% endif %}>Multi-state, US — includes New York</option>
+                <option value="Multi-state, US including California and NY"  {% if prefill_values.geographic_footprint == 'Multi-state, US including California and NY'  %}selected{% endif %}>Multi-state, US — includes California AND New York</option>
+                <option value="North America"                                {% if prefill_values.geographic_footprint == 'North America'                                %}selected{% endif %}>North America (US + Canada + Mexico)</option>
+                <option value="Global including EU"                          {% if prefill_values.geographic_footprint == 'Global including EU'                          %}selected{% endif %}>Global — includes European Union</option>
+                <option value="Global"                                       {% if prefill_values.geographic_footprint == 'Global'                                       %}selected{% endif %}>Global</option>
+                <option value="Other"                                        {% if prefill_values.geographic_footprint == 'Other'                                        %}selected{% endif %}>Other</option>
+            </select>
+            <div class="form-text">Used to recommend which laws and regulators apply.</div>
         </div>
 
         {% comment %}

@@ -286,7 +286,8 @@ def _load_respondent_context(cursor, respondent_id: str) -> dict:
     """
     try:
         cursor.execute(
-            "SELECT c.industry, c.size_bracket, r.role, r.email "
+            "SELECT c.industry, c.size_bracket, r.role, r.email, "
+            "       c.annual_revenue, c.geographic_footprint "
             "FROM respondents r JOIN companies c ON c.id = r.company_id "
             "WHERE r.id = %s LIMIT 1",
             (respondent_id,),
@@ -299,6 +300,8 @@ def _load_respondent_context(cursor, respondent_id: str) -> dict:
             "company_size_bracket": row[1],
             "respondent_role": row[2],
             "respondent_email": row[3],
+            "annual_revenue": row[4],
+            "geographic_footprint": row[5],
         }
     except Exception:  # noqa: BLE001
         return {}
@@ -339,10 +342,17 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
         from questionnaire.law_recommender import recommend_laws
         q.law_categories = CATEGORIES
         ctx = respondent_ctx or {}
+        # Prefer signup-captured profile fields. Fall back to legacy
+        # T1-A-005 / T1-A-007 answers for engagements that pre-date the
+        # signup-profile expansion.
+        geo = (
+            ctx.get("geographic_footprint")
+            or answered.get("T1-A-005")
+        )
         q.recommended_laws = recommend_laws(
             industry=ctx.get("company_industry"),
             size_bracket=ctx.get("company_size_bracket"),
-            geographic=answered.get("T1-A-005"),
+            geographic=geo,
         )
         q.recommended_set = set(q.recommended_laws)
         q.recommendation_inputs = {
@@ -386,6 +396,8 @@ def create_engagement_and_respondent(
     company_name: str,
     company_industry: str,
     company_size_bracket: str,
+    annual_revenue: str = "",
+    geographic_footprint: str = "",
     access_code_row=None,
 ) -> str:
     """Create/find company + user, then create engagement + respondent.
@@ -405,11 +417,26 @@ def create_engagement_and_respondent(
     row = cursor.fetchone()
     if row is None:
         cursor.execute(
-            "INSERT INTO companies (name, industry, size_bracket) "
-            "VALUES (%s, %s, %s) RETURNING id",
-            (company_name, company_industry, company_size_bracket),
+            "INSERT INTO companies "
+            "(name, industry, size_bracket, annual_revenue, geographic_footprint) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (company_name, company_industry, company_size_bracket,
+             annual_revenue or None, geographic_footprint or None),
         )
         row = cursor.fetchone()
+    else:
+        # Company already existed — update the profile fields to whatever
+        # this latest signup declared (last-write-wins).
+        cursor.execute(
+            "UPDATE companies SET "
+            "  industry = COALESCE(NULLIF(%s, ''), industry), "
+            "  size_bracket = COALESCE(NULLIF(%s, ''), size_bracket), "
+            "  annual_revenue = COALESCE(NULLIF(%s, ''), annual_revenue), "
+            "  geographic_footprint = COALESCE(NULLIF(%s, ''), geographic_footprint) "
+            "WHERE id = %s",
+            (company_industry, company_size_bracket,
+             annual_revenue, geographic_footprint, row[0]),
+        )
     company_id = row[0]
 
     cursor.execute(

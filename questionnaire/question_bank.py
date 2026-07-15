@@ -184,7 +184,7 @@ TIER_1_QUESTIONS = [
         "matrix_columns": None,
         "skip_logic": None,
         "role_visibility": ['all'],
-        "required": True,
+        "required": False,
         "scoring_weight": Decimal('1.00'),
         "framework_mappings": [
             {
@@ -193,8 +193,8 @@ TIER_1_QUESTIONS = [
                 'framework': 'context'
             }
         ],
-        "notes": None,
-        "is_active": True,
+        "notes": "DEACTIVATED 2026-07-15 — geographic footprint now captured at signup as companies.geographic_footprint.",
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": None,
     },
@@ -256,7 +256,7 @@ TIER_1_QUESTIONS = [
         "matrix_columns": None,
         "skip_logic": None,
         "role_visibility": ['all'],
-        "required": True,
+        "required": False,
         "scoring_weight": Decimal('1.00'),
         "framework_mappings": [
             {
@@ -265,8 +265,8 @@ TIER_1_QUESTIONS = [
                 'framework': 'context'
             }
         ],
-        "notes": None,
-        "is_active": True,
+        "notes": "DEACTIVATED 2026-07-15 — revenue now captured at signup as companies.annual_revenue.",
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": None,
     },
