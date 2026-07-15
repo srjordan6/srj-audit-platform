@@ -432,6 +432,9 @@ def create_engagement_and_respondent(
     annual_revenue: str = "",
     geographic_footprint: str = "",
     access_code_row=None,
+    first_name: str = "",
+    middle_name: str = "",
+    last_name: str = "",
 ) -> str:
     """Create/find company + user, then create engagement + respondent.
 
@@ -505,9 +508,11 @@ def create_engagement_and_respondent(
 
     cursor.execute(
         "INSERT INTO respondents "
-        "(engagement_id, user_id, email, name, role, company_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-        (engagement_id, user_id, email, name, role, company_id),
+        "(engagement_id, user_id, email, name, role, company_id, "
+        " first_name, middle_name, last_name) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (engagement_id, user_id, email, name, role, company_id,
+         first_name or None, middle_name or None, last_name or None),
     )
     respondent_id = cursor.fetchone()[0]
 

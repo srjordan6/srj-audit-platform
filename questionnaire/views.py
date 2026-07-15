@@ -618,6 +618,9 @@ def start(request):
                     annual_revenue=values["annual_revenue"],
                     geographic_footprint=values["geographic_footprint"],
                     access_code_row=access_code_row,
+                    first_name=values["first_name"],
+                    middle_name=values["middle_name"],
+                    last_name=values["last_name"],
                 )
     except ValueError as exc:
         # Currently the only ValueError services raises is the

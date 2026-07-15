@@ -38,12 +38,14 @@ def engagement_list(request):
                    c.name AS company_name, c.industry, c.size_bracket,
                    c.annual_revenue, c.geographic_footprint,
                    r.email, r.name AS respondent_name, r.role,
+                   r.first_name, r.middle_name, r.last_name,
                    (SELECT COUNT(*) FROM responses WHERE respondent_id = r.id)
                        AS answered
             FROM engagements e
             JOIN respondents r ON r.engagement_id = e.id
             JOIN companies c   ON c.id = e.company_id
-            ORDER BY e.created_at DESC
+            ORDER BY r.first_name NULLS LAST, r.last_name NULLS LAST,
+                     e.created_at DESC
             """
         )
         cols = [d[0] for d in cursor.description]
