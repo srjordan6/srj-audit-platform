@@ -365,6 +365,39 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
         }
         return
 
+    # T1-A-011 / T1-A-013 / T1-E-029: filter option list to only the
+    # laws the respondent selected on T1-A-006. Universal options (not
+    # in the option->law map) always remain.
+    from questionnaire.law_option_map import (
+        QUESTION_OPTION_LAW_MAP,
+        WHOLE_QUESTION_LAW_GATE,
+    )
+    law_answer = answered.get("T1-A-006")
+    selected_laws: set = set()
+    if isinstance(law_answer, dict):
+        raw = law_answer.get("selected") or []
+        if isinstance(raw, list):
+            selected_laws = set(raw)
+        elif isinstance(raw, str):
+            selected_laws = {raw}
+
+    if q.id in QUESTION_OPTION_LAW_MAP and q.options:
+        opt_map = QUESTION_OPTION_LAW_MAP[q.id]
+        if opt_map:  # skip if empty (whole-question gate handled elsewhere)
+            filtered: list = []
+            for opt in q.options:
+                mapped = opt_map.get(opt)
+                if mapped is None:
+                    filtered.append(opt)  # universal — keep
+                    continue
+                if isinstance(mapped, str):
+                    if not selected_laws or mapped in selected_laws:
+                        filtered.append(opt)
+                elif isinstance(mapped, (list, tuple, set)):
+                    if not selected_laws or any(m in selected_laws for m in mapped):
+                        filtered.append(opt)
+            q.options = filtered
+
     if q.id == "T1-B-017":
         # load_answered_by_id returns {question_id: answer_value}. The
         # T1-A-000 answer_value is {"selected": [...], "other": "..."}.
