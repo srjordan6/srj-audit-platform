@@ -112,6 +112,7 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
     # Track cursor position so the Previous / Forward buttons know where
     # the user just was without depending on client-side JS.
     request.session["current_question_id"] = ctx["question"].id
+    request.session.modified = True  # force write; Django sometimes skips
 
     countdown_text = None
     if state == lifecycle.EDITABLE:
@@ -146,6 +147,7 @@ def _render_ctx(request, ctx):
     Forward / Save clicks know where the user just was.
     """
     request.session["current_question_id"] = ctx["question"].id
+    request.session.modified = True  # force write; Django sometimes skips
     progress = _normalize_progress(ctx.get("progress"))
     template = ctx["partial"]
     is_htmx = request.headers.get("HX-Request") == "true"
@@ -328,10 +330,14 @@ def start(request):
         # Pre-fill the access-code input from ?code=<CODE> so LinkedIn/
         # marketing URLs can include the promo in the query string.
         prefill_code = request.GET.get("code", "").strip()
+        from questionnaire.naics_catalog import SECTORS as NAICS_SECTORS
         return render(
             request,
             "questionnaire/start.html",
-            {"prefill_code": prefill_code},
+            {
+                "prefill_code": prefill_code,
+                "naics_sectors": NAICS_SECTORS,
+            },
         )
 
     required = [
@@ -360,12 +366,14 @@ def start(request):
             # Re-render the form with the user's inputs preserved and an
             # error surface on the code field. Do NOT proceed to create
             # an engagement.
+            from questionnaire.naics_catalog import SECTORS as NAICS_SECTORS
             return render(
                 request,
                 "questionnaire/start.html",
                 {
                     "prefill_code": submitted_code,
                     "prefill_values": values,
+                    "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
                         "That code is not recognized, has already been "
                         "fully redeemed, or has expired. Double-check "
@@ -393,11 +401,13 @@ def start(request):
         # access_code_exhausted race. Re-render the form with a friendly
         # error rather than blow up.
         if str(exc) == "access_code_exhausted":
+            from questionnaire.naics_catalog import SECTORS as NAICS_SECTORS
             return render(
                 request,
                 "questionnaire/start.html",
                 {
                     "prefill_values": values,
+                    "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
                         "That code was just fully redeemed by another "
                         "user before you finished submitting. Try a "

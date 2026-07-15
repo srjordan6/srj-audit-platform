@@ -56,35 +56,28 @@
         </div>
 
         <div class="mb-3">
-            <label for="company_industry" class="form-label">Industry (NAICS sector)</label>
+            <label for="company_industry" class="form-label">Industry (NAICS)</label>
+            {% with sel=prefill_values.company_industry|default:'' %}
             <select id="company_industry" name="company_industry"
                     class="form-select" required>
-                <option value="">Select…</option>
-                {% with sel=prefill_values.company_industry|default:'' %}
-                <option value="11 — Agriculture, Forestry, Fishing and Hunting"           {% if sel == '11 — Agriculture, Forestry, Fishing and Hunting'           %}selected{% endif %}>11 — Agriculture, Forestry, Fishing and Hunting</option>
-                <option value="21 — Mining, Quarrying, and Oil and Gas Extraction"       {% if sel == '21 — Mining, Quarrying, and Oil and Gas Extraction'       %}selected{% endif %}>21 — Mining, Quarrying, and Oil and Gas Extraction</option>
-                <option value="22 — Utilities"                                            {% if sel == '22 — Utilities'                                            %}selected{% endif %}>22 — Utilities</option>
-                <option value="23 — Construction"                                         {% if sel == '23 — Construction'                                         %}selected{% endif %}>23 — Construction</option>
-                <option value="31-33 — Manufacturing"                                     {% if sel == '31-33 — Manufacturing'                                     %}selected{% endif %}>31-33 — Manufacturing</option>
-                <option value="42 — Wholesale Trade"                                      {% if sel == '42 — Wholesale Trade'                                      %}selected{% endif %}>42 — Wholesale Trade</option>
-                <option value="44-45 — Retail Trade"                                      {% if sel == '44-45 — Retail Trade'                                      %}selected{% endif %}>44-45 — Retail Trade</option>
-                <option value="48-49 — Transportation and Warehousing"                    {% if sel == '48-49 — Transportation and Warehousing'                    %}selected{% endif %}>48-49 — Transportation and Warehousing</option>
-                <option value="51 — Information"                                          {% if sel == '51 — Information'                                          %}selected{% endif %}>51 — Information</option>
-                <option value="52 — Finance and Insurance"                                {% if sel == '52 — Finance and Insurance'                                %}selected{% endif %}>52 — Finance and Insurance</option>
-                <option value="53 — Real Estate and Rental and Leasing"                   {% if sel == '53 — Real Estate and Rental and Leasing'                   %}selected{% endif %}>53 — Real Estate and Rental and Leasing</option>
-                <option value="54 — Professional, Scientific, and Technical Services"     {% if sel == '54 — Professional, Scientific, and Technical Services'     %}selected{% endif %}>54 — Professional, Scientific, and Technical Services</option>
-                <option value="55 — Management of Companies and Enterprises"              {% if sel == '55 — Management of Companies and Enterprises'              %}selected{% endif %}>55 — Management of Companies and Enterprises</option>
-                <option value="56 — Administrative, Support, Waste Management and Remediation" {% if sel == '56 — Administrative, Support, Waste Management and Remediation' %}selected{% endif %}>56 — Administrative, Support, Waste Management and Remediation</option>
-                <option value="61 — Educational Services"                                 {% if sel == '61 — Educational Services'                                 %}selected{% endif %}>61 — Educational Services</option>
-                <option value="62 — Health Care and Social Assistance"                    {% if sel == '62 — Health Care and Social Assistance'                    %}selected{% endif %}>62 — Health Care and Social Assistance</option>
-                <option value="71 — Arts, Entertainment, and Recreation"                  {% if sel == '71 — Arts, Entertainment, and Recreation'                  %}selected{% endif %}>71 — Arts, Entertainment, and Recreation</option>
-                <option value="72 — Accommodation and Food Services"                      {% if sel == '72 — Accommodation and Food Services'                      %}selected{% endif %}>72 — Accommodation and Food Services</option>
-                <option value="81 — Other Services (except Public Administration)"        {% if sel == '81 — Other Services (except Public Administration)'        %}selected{% endif %}>81 — Other Services (except Public Administration)</option>
-                <option value="92 — Public Administration"                                {% if sel == '92 — Public Administration'                                %}selected{% endif %}>92 — Public Administration</option>
-                <option value="Other"                                                     {% if sel == 'Other'                                                     %}selected{% endif %}>Other</option>
-                {% endwith %}
+                <option value="">Select your industry…</option>
+                {% for sector_code, sector_title, items in naics_sectors %}
+                <optgroup label="{{ sector_code }} — {{ sector_title }}">
+                    {% for code, title in items %}
+                    {% with val=code|add:" — "|add:title %}
+                    <option value="{{ val }}"{% if sel == val %} selected{% endif %}>{{ val }}</option>
+                    {% endwith %}
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+                <option value="Other"{% if sel == 'Other' %} selected{% endif %}>Other</option>
             </select>
-            <div class="form-text">NAICS 2-digit sector — pick the closest match.</div>
+            {% endwith %}
+            <div class="form-text">
+                NAICS 2022 6-digit code. All 1,012 US industries grouped by sector.
+                Click the dropdown and type a few letters to jump to your industry.
+                Pick the closest match; you can refine later.
+            </div>
         </div>
 
         <div class="mb-3">
