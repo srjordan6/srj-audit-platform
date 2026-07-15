@@ -118,6 +118,7 @@ def partial_template_for_type(question_type: str) -> str:
         "MATRIX": "questionnaire/partials/_question_matrix_grid.html",
         "MATRIX_CHOICE": "questionnaire/partials/_question_matrix_choice.html",
         "TOOL_INVENTORY": "questionnaire/partials/_question_tool_inventory.html",
+        "LAW_INVENTORY": "questionnaire/partials/_question_law_inventory.html",
     }
     if question_type not in mapping:
         raise ValueError(

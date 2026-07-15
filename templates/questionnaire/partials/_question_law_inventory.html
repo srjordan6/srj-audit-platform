@@ -1,0 +1,104 @@
+{% comment %}
+Law inventory question partial (question_type == "LAW_INVENTORY").
+
+Used on T1-A-006 to capture every AI-relevant law/framework the company
+is governed by. Renders a categorized collapsible checkbox grid + a
+free-form "other" textarea for laws not in the canonical CSV.
+
+Answer shape (compatible with existing MS consumers):
+    {
+        "selected": ["law_name_1", "law_name_2", ...],
+        "other":    "Custom Law X, Local Statute Y"
+    }
+
+Context contract
+----------------
+question        Question dict. Uses question.law_categories injected by
+                services._decorate_question (from questionnaire.law_catalog).
+prior_answer    Optional dict: {"selected": [...], "other": "..."}
+submit_url      HTMX hx-post target.
+swap_target     HTMX hx-target CSS selector.
+{% endcomment %}
+{% load glossary %}
+<form class="srj-question srj-question--law-inventory"
+      hx-post="{{ submit_url }}"
+      hx-target="{{ swap_target|default:'#question-shell' }}"
+      hx-swap="innerHTML"
+      hx-disabled-elt="find button[type=submit]"
+      data-question-id="{{ question.id }}"
+      data-question-type="LAW_INVENTORY">
+  {% csrf_token %}
+  <input type="hidden" name="question_id" value="{{ question.id }}">
+
+  <fieldset>
+    <legend class="srj-question__heading h5 mb-3">
+      <span class="srj-question__id text-muted small d-block">Section {{ question.section }} &mdash; {{ question.section|section_name }}</span>
+      <span class="srj-question__text">{{ question.question_text }}</span>
+    </legend>
+
+    <p class="text-muted small mb-3">
+      Check every AI-relevant law, regulation, or framework your company
+      is governed by, complies with, or must respond to. Sections are
+      collapsible. Anything not listed goes in the "Other" box at the
+      bottom. If none apply, leave everything unchecked.
+    </p>
+
+    {% for category_name, laws in question.law_categories %}
+      <details class="mb-3" {% if forloop.first %}open{% endif %}>
+        <summary class="fw-semibold" style="cursor:pointer;">
+          {{ category_name }}
+          <span class="text-muted small">({{ laws|length }})</span>
+        </summary>
+        <div class="row g-2 mt-2 ms-3">
+          {% for law_name, law_url in laws %}
+            {% with input_id="law-"|add:question.id|add:"-"|add:forloop.parentloop.counter|stringformat:"s"|add:"-"|add:forloop.counter|stringformat:"s" %}
+            <div class="col-md-6">
+              <div class="form-check">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="answer"
+                       id="{{ input_id }}"
+                       value="{{ law_name }}"
+                       {% if prior_answer and law_name in prior_answer.selected %}checked{% endif %}>
+                <label class="form-check-label" for="{{ input_id }}">
+                  {{ law_name|glossary_annotate|safe }}
+                  <a href="{{ law_url }}" target="_blank" rel="noopener"
+                     class="ms-1 text-muted small" title="Learn about {{ law_name }}">&#9432;</a>
+                </label>
+              </div>
+            </div>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </details>
+    {% endfor %}
+
+    <div class="mt-4">
+      <label for="other_laws-{{ question.id }}" class="form-label fw-semibold">
+        Other laws, regulations, or frameworks not listed above
+        <span class="text-muted small">(comma-separated, optional)</span>
+      </label>
+      <textarea class="form-control"
+                id="other_laws-{{ question.id }}"
+                name="other_tools"
+                rows="2"
+                maxlength="1000"
+                placeholder="e.g., State AG guidance letter, contract-specific compliance requirement">{% if prior_answer %}{{ prior_answer.other|default:'' }}{% endif %}</textarea>
+      <div class="form-text">
+        Any law or framework your company is subject to that wasn't in
+        the checklist above.
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="srj-question__actions mt-4 d-flex justify-content-between align-items-center">
+    <button type="submit" class="btn btn-primary">
+      Save &amp; continue
+    </button>
+    <span class="srj-question__hint text-muted small">
+      None apply? Leave everything unchecked and continue.
+    </span>
+  </div>
+</form>
+
+{% include "questionnaire/partials/_progress_oob.html" %}

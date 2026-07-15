@@ -308,6 +308,11 @@ def _decorate_question(q, answered, visible=None):
         q.tool_categories = CATEGORIES
         return
 
+    if q.question_type == "LAW_INVENTORY":
+        from questionnaire.law_catalog import CATEGORIES
+        q.law_categories = CATEGORIES
+        return
+
     if q.id == "T1-B-017":
         # load_answered_by_id returns {question_id: answer_value}. The
         # T1-A-000 answer_value is {"selected": [...], "other": "..."}.
