@@ -348,6 +348,44 @@ def submit_response(request):
     answer_value_json = request.POST.get("answer_value_json")
     other_tools = request.POST.get("other_tools", "").strip()
     other_specify = request.POST.get("other_specify", "").strip()
+
+    # Detect TEXT-type questions so we can accept an empty submit (they're
+    # typically optional) and store the answer under the shape the TEXT
+    # partial reads back for prefill: {"text": "..."}.
+    try:
+        from questionnaire.question_bank import QUESTIONS as _Q
+        _q_lookup = {q['id']: q for q in _Q}
+        _q_type = (_q_lookup.get(question_id) or {}).get('question_type')
+        _q_required = (_q_lookup.get(question_id) or {}).get('required', True)
+    except Exception:  # noqa: BLE001
+        _q_type = None
+        _q_required = True
+
+    if _q_type == "TEXT":
+        text_val = request.POST.get("answer", "")
+        # Strip only leading/trailing whitespace; preserve internal.
+        text_val = text_val.strip() if isinstance(text_val, str) else ""
+        # Optional TEXT questions accept empty submits (stored as empty string).
+        if not text_val and _q_required:
+            return HttpResponseBadRequest("answer required")
+        answer_value = {"text": text_val}
+        is_dont_know = request.POST.get("is_dont_know") == "true"
+        with connection.cursor() as cursor:
+            services.save_response(
+                cursor, rid, question_id, answer_value, is_dont_know
+            )
+            if services.get_next_question_context(cursor, rid) is None:
+                try:
+                    from reports.auto_delivery import on_respondent_complete
+                    on_respondent_complete(cursor, rid)
+                except Exception:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "auto delivery trigger failed for %s", rid
+                    )
+            if request.GET.get("next") == "review" or request.POST.get("next") == "review":
+                return redirect("questionnaire:review")
+            return _dispatch_by_state(request, cursor, rid)
     if answer_value_json:
         try:
             answer_value = json.loads(answer_value_json)
