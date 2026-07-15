@@ -253,13 +253,33 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
         "status": "queued_regeneration",
         "respondent_id": respondent_id,
     })
-    thread = threading.Thread(
-        target=_worker,
-        args=(engagement_id, email, name, company),
-        daemon=True,
-        name=f"report-regen-{engagement_id[:8]}",
-    )
-    thread.start()
+    # DIAGNOSTIC 2026-07-15: run synchronously in the request thread so
+    # any exception surfaces with a proper traceback logged to events.
+    # Once regen is confirmed working we can flip back to daemon thread.
+    import traceback
+    try:
+        _log_event(cursor, {
+            "engagement_id": engagement_id, "to": email,
+            "status": "regen_sync_started", "respondent_id": respondent_id,
+        })
+        _worker(engagement_id, email, name, company)
+        _log_event(cursor, {
+            "engagement_id": engagement_id, "to": email,
+            "status": "regen_sync_returned", "respondent_id": respondent_id,
+        })
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("regenerate_after_edit: sync worker crashed for %s",
+                         engagement_id)
+        try:
+            _log_event(cursor, {
+                "engagement_id": engagement_id, "to": email,
+                "status": "regen_sync_failed",
+                "respondent_id": respondent_id,
+                "error": f"{type(exc).__name__}: {exc}",
+                "traceback": traceback.format_exc()[:4000],
+            })
+        except Exception:  # noqa: BLE001
+            logger.exception("could not log regen_sync_failed")
     return True
 
 
