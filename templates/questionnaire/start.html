@@ -17,10 +17,12 @@
     <form method="post" action="{% url 'questionnaire:start' %}">
         {% csrf_token %}
 
-        {# --- Honeypot: real users never see or fill this. Bots that blindly
-             fill every input trip this and the server silently rejects.
-             Wrapped in visually-hidden + aria-hidden so accessibility tools
-             don't announce it either. --- #}
+        {% comment %}
+        Honeypot: real users never see or fill this. Bots that blindly fill
+        every input trip this and the server silently rejects. Wrapped in
+        visually-hidden + aria-hidden so accessibility tools don't announce
+        it either.
+        {% endcomment %}
         <div aria-hidden="true"
              style="position:absolute; left:-10000px; top:auto;
                     width:1px; height:1px; overflow:hidden;">
@@ -37,10 +39,30 @@
         </div>
 
         <div class="mb-3">
-            <label for="name" class="form-label">Your name</label>
-            <input type="text" id="name" name="name" class="form-control"
-                   value="{{ prefill_values.name|default:'' }}"
-                   required autocomplete="name">
+            <label class="form-label">Your name</label>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <input type="text" id="first_name" name="first_name"
+                           class="form-control"
+                           value="{{ prefill_values.first_name|default:'' }}"
+                           required autocomplete="given-name"
+                           placeholder="First name">
+                </div>
+                <div class="col-md-3">
+                    <input type="text" id="middle_name" name="middle_name"
+                           class="form-control"
+                           value="{{ prefill_values.middle_name|default:'' }}"
+                           autocomplete="additional-name"
+                           placeholder="Middle (optional)">
+                </div>
+                <div class="col-md-5">
+                    <input type="text" id="last_name" name="last_name"
+                           class="form-control"
+                           value="{{ prefill_values.last_name|default:'' }}"
+                           required autocomplete="family-name"
+                           placeholder="Last name">
+                </div>
+            </div>
         </div>
 
         <div class="mb-3">
@@ -155,10 +177,12 @@
             </div>
         </div>
 
-        {# --- Cloudflare Turnstile (invisible / interactive CAPTCHA) ---
-             Rendered only if TURNSTILE_SITE_KEY is set. If the env var is
-             missing the widget silently disappears — the honeypot + rate
-             limit still protect the endpoint. --- #}
+        {% comment %}
+        Cloudflare Turnstile (invisible / interactive CAPTCHA). Rendered
+        only if TURNSTILE_SITE_KEY is set. If the env var is missing the
+        widget silently disappears — the honeypot + rate limit still
+        protect the endpoint.
+        {% endcomment %}
         {% if turnstile_site_key %}
         <div class="mb-3">
             <div class="cf-turnstile"

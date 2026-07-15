@@ -535,7 +535,8 @@ def start(request):
             "questionnaire/start.html",
             {
                 "prefill_values": {k: request.POST.get(k, "") for k in [
-                    "email", "name", "role", "company_name",
+                    "email", "first_name", "middle_name", "last_name",
+                    "role", "company_name",
                     "company_industry", "company_size_bracket",
                     "annual_revenue", "geographic_footprint",
                 ]},
@@ -551,7 +552,8 @@ def start(request):
 
     required = [
         "email",
-        "name",
+        "first_name",
+        "last_name",
         "role",
         "company_name",
         "company_industry",
@@ -560,11 +562,19 @@ def start(request):
         "geographic_footprint",
     ]
     values = {k: request.POST.get(k, "").strip() for k in required}
-    missing = [k for k, v in values.items() if not v]
+    # Middle name is optional — read separately and don't include in missing check.
+    values["middle_name"] = request.POST.get("middle_name", "").strip()
+    missing = [k for k, v in values.items() if k != "middle_name" and not v]
     if missing:
         return HttpResponseBadRequest(
             f"Missing fields: {', '.join(missing)}"
         )
+    # Combine first / middle / last into the single 'name' the DB stores.
+    values["name"] = " ".join(
+        part for part in (
+            values["first_name"], values["middle_name"], values["last_name"]
+        ) if part
+    )
 
     # Optional access code - promotional/tester full-comp code.
     submitted_code = request.POST.get("access_code", "").strip()
