@@ -29,6 +29,7 @@ live counter later.
 The partial does NOT extend base.html — pure fragment, same swap-target
 pattern as the other question partials.
 {% endcomment %}
+{% load glossary %}
 {% with max_length=question.extended_metadata.max_length|default:1000 %}
 <form class="srj-question srj-question--text"
       hx-post="{{ submit_url }}"
