@@ -163,6 +163,11 @@ AI_ANALYSIS_ENABLED = env.bool('AI_ANALYSIS_ENABLED', default=True)
 # Platform configuration
 PLATFORM_BASE_URL = env('PLATFORM_BASE_URL', default='http://localhost:8000')
 
+# Bot protection (Cloudflare Turnstile). Leave both empty in dev to disable
+# the CAPTCHA — the honeypot + rate limit still guard /startaiaudit/.
+TURNSTILE_SITE_KEY = env('TURNSTILE_SITE_KEY', default='')
+TURNSTILE_SECRET_KEY = env('TURNSTILE_SECRET_KEY', default='')
+
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = env('DEFAULT_TIMEZONE', default='America/Chicago')

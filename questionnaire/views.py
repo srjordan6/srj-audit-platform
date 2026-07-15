@@ -495,6 +495,8 @@ def submit_response(request):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def start(request):
+    from questionnaire import bot_protection as bp
+
     if request.method == "GET":
         # Pre-fill the access-code input from ?code=<CODE> so LinkedIn/
         # marketing URLs can include the promo in the query string.
@@ -506,7 +508,45 @@ def start(request):
             {
                 "prefill_code": prefill_code,
                 "naics_sectors": NAICS_SECTORS,
+                "turnstile_site_key": bp.turnstile_site_key(),
             },
+        )
+
+    # --- Bot protection layer 1: honeypot ---
+    # Silent success: pretend it worked so bots don't retune. Do not
+    # create any DB rows, do not send any email.
+    if bp.is_honeypot_hit(request):
+        return redirect("questionnaire:start")
+
+    # --- Bot protection layer 2: rate limit (3 POSTs/hr/IP) ---
+    if bp.is_rate_limited(request, key_suffix="start"):
+        from django.http import HttpResponse
+        return HttpResponse(
+            "Too many attempts. Please try again in an hour.",
+            status=429,
+            content_type="text/plain",
+        )
+
+    # --- Bot protection layer 3: Cloudflare Turnstile ---
+    if not bp.verify_turnstile(request):
+        from questionnaire.naics_catalog import SECTORS as NAICS_SECTORS
+        return render(
+            request,
+            "questionnaire/start.html",
+            {
+                "prefill_values": {k: request.POST.get(k, "") for k in [
+                    "email", "name", "role", "company_name",
+                    "company_industry", "company_size_bracket",
+                    "annual_revenue", "geographic_footprint",
+                ]},
+                "prefill_code": request.POST.get("access_code", ""),
+                "naics_sectors": NAICS_SECTORS,
+                "turnstile_site_key": bp.turnstile_site_key(),
+                "access_code_error": (
+                    "We could not verify you are human. Please try again."
+                ),
+            },
+            status=400,
         )
 
     required = [

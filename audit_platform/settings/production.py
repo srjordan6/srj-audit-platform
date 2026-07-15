@@ -6,6 +6,19 @@ from .base import *  # noqa: F401,F403
 
 DEBUG = False
 
+# Redis-backed cache — required for the rate-limiter in bot_protection.py
+# to share counter state across gunicorn workers. Falls back to LocMem
+# (per-process) if REDIS_URL is missing; still functional in dev.
+_redis_url = env('REDIS_URL', default='')  # noqa: F405
+if _redis_url:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _redis_url,
+            'TIMEOUT': 3600,
+        },
+    }
+
 # Security headers
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = True

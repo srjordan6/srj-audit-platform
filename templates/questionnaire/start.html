@@ -17,6 +17,18 @@
     <form method="post" action="{% url 'questionnaire:start' %}">
         {% csrf_token %}
 
+        {# --- Honeypot: real users never see or fill this. Bots that blindly
+             fill every input trip this and the server silently rejects.
+             Wrapped in visually-hidden + aria-hidden so accessibility tools
+             don't announce it either. --- #}
+        <div aria-hidden="true"
+             style="position:absolute; left:-10000px; top:auto;
+                    width:1px; height:1px; overflow:hidden;">
+            <label for="website">Do not fill this in</label>
+            <input type="text" id="website" name="website"
+                   tabindex="-1" autocomplete="off">
+        </div>
+
         <div class="mb-3">
             <label for="email" class="form-label">Your email</label>
             <input type="email" id="email" name="email" class="form-control"
@@ -142,6 +154,20 @@
                 If you were invited to test the audit, enter your code to skip payment.
             </div>
         </div>
+
+        {# --- Cloudflare Turnstile (invisible / interactive CAPTCHA) ---
+             Rendered only if TURNSTILE_SITE_KEY is set. If the env var is
+             missing the widget silently disappears — the honeypot + rate
+             limit still protect the endpoint. --- #}
+        {% if turnstile_site_key %}
+        <div class="mb-3">
+            <div class="cf-turnstile"
+                 data-sitekey="{{ turnstile_site_key }}"
+                 data-theme="light"></div>
+        </div>
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+                async defer></script>
+        {% endif %}
 
         <button type="submit" class="btn btn-primary btn-lg">
             Begin assessment →
