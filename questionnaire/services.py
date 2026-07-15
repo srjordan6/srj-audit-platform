@@ -211,11 +211,11 @@ def get_question_context_by_position(
 
     if pos < 1 or pos > len(visible):
         return None
-    # Allow jumping to any already-answered position, OR to the current
-    # first-unanswered (which equals last_answered + 1).
-    max_reachable = min(len(visible), max(last_answered, 1) + 1)
-    if pos > max_reachable:
-        pos = max_reachable
+    # Slider may only visit already-answered territory. If no questions
+    # answered yet, reject any jump (nothing to go back to). Save & continue
+    # is the only path that opens new territory.
+    if last_answered < 1 or pos > last_answered:
+        return None
 
     target = visible[pos - 1]
     _decorate_question(target, answered, visible=visible)
