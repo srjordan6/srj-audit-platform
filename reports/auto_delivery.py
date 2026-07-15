@@ -139,7 +139,14 @@ def _owner_password() -> str:
 
 
 def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
-    """Background thread: generate report, mark delivered, email PDF."""
+    """Background thread: generate report, mark delivered, email PDF.
+
+    Two-phase logging: emit an event at EACH major step so a crash mid-
+    pipeline pinpoints the failing step. Traceback string is captured
+    into the final failure event so we don't need to correlate with
+    Render live logs.
+    """
+    import traceback
     # A new thread gets its own DB connection; close it when done.
     from django.db import connection, transaction
 
@@ -148,9 +155,19 @@ def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
         "to": email,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    def _log_step(step: str, extra=None):
+        try:
+            with connection.cursor() as c:
+                _log_event(c, {**result, "step": step, **(extra or {})})
+        except Exception:  # noqa: BLE001
+            logger.exception("auto_delivery: log_step %s failed", step)
+
     try:
+        _log_step("worker_started")
         from reports.services import generate_and_lock
 
+        _log_step("calling_generate_and_lock")
         with transaction.atomic():
             with connection.cursor() as cursor:
                 report_id, pdf_bytes, pdf_hash = generate_and_lock(
@@ -162,11 +179,13 @@ def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
         result["report_id"] = report_id
         result["pdf_bytes"] = len(pdf_bytes)
         result["pdf_hash"] = pdf_hash
+        _log_step("pdf_generated", {"report_id": report_id, "pdf_bytes": len(pdf_bytes)})
 
         sent, detail = _send_postmark(email, name, company,
                                       pdf_bytes, engagement_id)
         result["email_sent"] = sent
         result["email_detail"] = detail
+        _log_step("postmark_return", {"email_sent": sent, "email_detail": detail[:200] if detail else None})
 
         with connection.cursor() as cursor:
             if sent:
@@ -181,13 +200,17 @@ def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
                          engagement_id)
         result["status"] = "failed"
         result["error"] = f"{type(exc).__name__}: {exc}"
+        result["traceback"] = traceback.format_exc()[:4000]
         try:
             with connection.cursor() as cursor:
                 _log_event(cursor, result)
         except Exception:  # noqa: BLE001
             logger.exception("auto_delivery: failed to log failure event")
     finally:
-        connection.close()
+        try:
+            connection.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def regenerate_after_edit(cursor, respondent_id: str) -> bool:
