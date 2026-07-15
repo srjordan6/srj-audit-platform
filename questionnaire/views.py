@@ -107,7 +107,21 @@ def _dispatch_by_state(request, cursor, respondent_id: str):
         template = COMPLETE_TEMPLATE
         if not is_htmx and request.method == "GET":
             template = COMPLETE_SHELL_TEMPLATE
-        return render(request, template, {})
+        # Pass payment_status so the completion template can skip the
+        # paywall for comped / paid engagements and instead confirm the
+        # report is being generated + emailed.
+        try:
+            cursor.execute(
+                "SELECT e.payment_status FROM engagements e "
+                "JOIN respondents r ON r.engagement_id = e.id "
+                "WHERE r.id = %s LIMIT 1",
+                (respondent_id,),
+            )
+            row = cursor.fetchone()
+            payment_status = row[0] if row else "free"
+        except Exception:  # noqa: BLE001
+            payment_status = "free"
+        return render(request, template, {"payment_status": payment_status})
 
     # Track cursor position so the Previous / Forward buttons know where
     # the user just was without depending on client-side JS.
