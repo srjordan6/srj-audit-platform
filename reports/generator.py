@@ -64,17 +64,44 @@ def html_to_pdf_bytes(html: str) -> bytes:
     return HTML(string=html).write_pdf()
 
 
-def encrypt_pdf(pdf_bytes: bytes, owner_password: str) -> bytes:
-    """Apply AES-256 encryption + zero-permissions flags via pypdf.
+def encrypt_pdf(
+    pdf_bytes: bytes,
+    owner_password: str,
+    buyer_email: str = "",
+    snapshot_id: str = "",
+    generated_at_iso: str = "",
+) -> bytes:
+    """Apply AES-256 encryption + zero-permissions flags + attribution metadata.
 
     User password None (opens without prompt). Owner password gates
     permission changes. permissions_flag=0 blocks copy/print/edit/annotate.
+
+    Buyer attribution moved to PDF /Info metadata (Author/Subject/Keywords)
+    2026-07-15 so the visible watermark can be brand-only while any leaked
+    copy remains traceable via `pdfinfo` or similar readers.
     """
     from pypdf import PdfReader, PdfWriter
     reader = PdfReader(io.BytesIO(pdf_bytes))
     writer = PdfWriter()
     for page in reader.pages:
         writer.add_page(page)
+
+    # Embed attribution in PDF metadata (Info dictionary). These fields
+    # are readable by any PDF tool and survive re-encryption; a leaked
+    # copy still points back to the buyer.
+    metadata = {
+        "/Title": f"SRJ AI Audit Snapshot Report - {snapshot_id or 'confidential'}",
+        "/Author": "SRJ Consulting & Services LLC",
+        "/Subject": f"Confidential audit report issued to {buyer_email or 'the named buyer'}",
+        "/Producer": "SRJ AI Audit Platform (aiauditforcompanies.com)",
+        "/Creator": "SRJ Consulting & Services LLC",
+        "/Keywords": (
+            f"confidential;not-for-redistribution;buyer={buyer_email};"
+            f"snapshot_id={snapshot_id};generated_at={generated_at_iso}"
+        ),
+    }
+    writer.add_metadata(metadata)
+
     writer.encrypt(
         user_password="",
         owner_password=owner_password,
@@ -110,5 +137,11 @@ def generate_locked_report(
         generated_at.isoformat(),
     )
     pdf = html_to_pdf_bytes(watermarked)
-    encrypted = encrypt_pdf(pdf, owner_password)
+    encrypted = encrypt_pdf(
+        pdf,
+        owner_password,
+        buyer_email=buyer_email,
+        snapshot_id=snapshot_id,
+        generated_at_iso=generated_at.isoformat(),
+    )
     return encrypted, compute_pdf_hash(encrypted)
