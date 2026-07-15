@@ -335,6 +335,59 @@
     document.body.addEventListener('htmx:afterSwap', srjAttachSortable);
 
     // ------------------------------------------------------------------
+    // Enter-to-submit for radio + checkbox question forms.
+    //
+    // The "Press Enter to continue" hint on SS / L5 / MS partials only
+    // works if the browser picks the form's default submit button on
+    // Enter. On radios/checkboxes, some browsers don't fire submit —
+    // and HTMX intercepts submit events, so the browser default can be
+    // brittle. This delegated listener catches Enter on any input
+    // inside a .srj-question form and triggers form.requestSubmit(),
+    // which HTMX handles normally.
+    // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // "None of these" mutual exclusivity on MULTI-SELECT (MS) questions.
+    // If the user ticks a checkbox whose value starts with "None" (case-
+    // insensitive) — e.g. "None of these", "None of the above", "None
+    // apply" — every other checkbox in that form is unchecked. If the
+    // user ticks anything else while "None" is checked, the "None" box
+    // is unchecked. Delegated so it survives HTMX swaps.
+    // ------------------------------------------------------------------
+    document.body.addEventListener('change', function (evt) {
+      var el = evt.target;
+      if (!el || el.type !== 'checkbox' || el.name !== 'answer') return;
+      var form = el.closest && el.closest('form.srj-question--multi-select, form.srj-question--law-inventory, form.srj-question--tool-inventory');
+      if (!form) return;
+      var isNone = /^\s*none\b/i.test(el.value || '');
+      var allBoxes = form.querySelectorAll('input[type=checkbox][name=answer]');
+      if (isNone && el.checked) {
+        allBoxes.forEach(function (b) { if (b !== el) b.checked = false; });
+      } else if (!isNone && el.checked) {
+        allBoxes.forEach(function (b) {
+          if (b !== el && /^\s*none\b/i.test(b.value || '')) b.checked = false;
+        });
+      }
+    });
+
+    document.body.addEventListener('keydown', function (evt) {
+      if (evt.key !== 'Enter' || evt.shiftKey || evt.ctrlKey || evt.metaKey) return;
+      var target = evt.target;
+      if (!target || !target.tagName) return;
+      // TEXTAREA: let Enter insert newlines (T1-H-006 free text).
+      if (target.tagName === 'TEXTAREA') return;
+      var form = target.closest && target.closest('form.srj-question');
+      if (!form) return;
+      evt.preventDefault();
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        // Fallback for old browsers.
+        var btn = form.querySelector('button[type=submit]');
+        if (btn) btn.click();
+      }
+    });
+
+    // ------------------------------------------------------------------
     // RANK click-fallback wiring — works regardless of drag reliability.
     //
     // Buttons on each list item (data-role="rank-add" / rank-remove /
