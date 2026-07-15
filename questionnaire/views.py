@@ -388,25 +388,20 @@ def submit_response(request):
             services.save_response(
                 cursor, rid, question_id, answer_value, is_dont_know
             )
-            if services.get_next_question_context(cursor, rid) is None:
-                try:
-                    from reports.auto_delivery import on_respondent_complete
-                    on_respondent_complete(cursor, rid)
-                except Exception:  # noqa: BLE001
-                    import logging
-                    logging.getLogger(__name__).exception(
-                        "auto delivery trigger failed for %s", rid
-                    )
-            else:
-                # Edit path: if engagement is already Editable, regenerate.
-                try:
+            try:
+                more_ahead = services.get_next_question_context(cursor, rid) is not None
+                if not more_ahead:
+                    from reports.auto_delivery import on_respondent_complete, regenerate_after_edit
+                    if not on_respondent_complete(cursor, rid):
+                        regenerate_after_edit(cursor, rid)
+                else:
                     from reports.auto_delivery import regenerate_after_edit
                     regenerate_after_edit(cursor, rid)
-                except Exception:  # noqa: BLE001
-                    import logging
-                    logging.getLogger(__name__).exception(
-                        "regeneration trigger failed for %s", rid
-                    )
+            except Exception:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).exception(
+                    "post-TEXT auto-delivery / regeneration trigger failed for %s", rid
+                )
             if request.GET.get("next") == "review" or request.POST.get("next") == "review":
                 return redirect("questionnaire:review")
             return _dispatch_by_state(request, cursor, rid)
@@ -455,30 +450,30 @@ def submit_response(request):
         services.save_response(
             cursor, rid, question_id, answer_value, is_dont_know
         )
-        # Phase 2c: if that was the final question, stamp completion and
-        # kick off report generation + email delivery in the background.
-        # Never fatal - the respondent always gets the completion page.
-        if services.get_next_question_context(cursor, rid) is None:
-            try:
-                from reports.auto_delivery import on_respondent_complete
-                on_respondent_complete(cursor, rid)
-            except Exception:  # noqa: BLE001
-                import logging
-                logging.getLogger(__name__).exception(
-                    "auto delivery trigger failed for %s", rid
-                )
-        else:
-            # Edit path: engagement already Editable => regenerate the
-            # locked PDF using the cached AI narrative (no fresh Claude
-            # call — see reports.auto_delivery.regenerate_after_edit).
-            try:
+        # Two branches:
+        # (a) more questions remain — this may or may not be an edit; if
+        #     engagement is already Editable, regenerate too.
+        # (b) all questions answered — first completion triggers
+        #     on_respondent_complete (generates + emails). Idempotent:
+        #     if already completed, this is an edit of an answered
+        #     question inside the 7-day window, so we regenerate.
+        try:
+            more_ahead = services.get_next_question_context(cursor, rid) is not None
+            if not more_ahead:
+                from reports.auto_delivery import on_respondent_complete, regenerate_after_edit
+                fired = on_respondent_complete(cursor, rid)
+                if not fired:
+                    # Idempotent no-op => this was an edit of an already-
+                    # completed engagement. Regenerate.
+                    regenerate_after_edit(cursor, rid)
+            else:
                 from reports.auto_delivery import regenerate_after_edit
                 regenerate_after_edit(cursor, rid)
-            except Exception:  # noqa: BLE001
-                import logging
-                logging.getLogger(__name__).exception(
-                    "regeneration trigger failed for %s", rid
-                )
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception(
+                "post-save auto-delivery / regeneration trigger failed for %s", rid
+            )
         # Phase 2d: edits from the review page return to the review list.
         if request.GET.get("next") == "review" or request.POST.get("next") == "review":
             return redirect("questionnaire:review")
