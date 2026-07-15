@@ -199,6 +199,15 @@ def evaluate_skip_logic(
     depends_on = sl.get("depends_on")
     operator = sl.get("operator")
 
+    # New-format skip_logic uses {combine, conditions[]} instead of the
+    # legacy {depends_on, operator, value}. Full evaluator for the new
+    # shape is a separate work-item; for now treat it as PERMISSIVE (show)
+    # and skip the warning so logs don't flood. This preserves current
+    # behavior — questions with new-format skip_logic have always been
+    # shown since the evaluator never understood them.
+    if "conditions" in sl and "combine" in sl:
+        return SkipDecision.show_(REASON_NO_SKIP_LOGIC)
+
     if not depends_on or not operator:
         logger.warning("Question %s has malformed skip_logic: %r", question.id, sl)
         return SkipDecision.show_(REASON_MALFORMED_SKIP_LOGIC)
