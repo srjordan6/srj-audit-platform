@@ -61,9 +61,9 @@ swap_target     HTMX hx-target CSS selector.
                        value="{{ law_name }}"
                        {% if prior_answer and law_name in prior_answer.selected %}checked{% endif %}>
                 <label class="form-check-label" for="{{ input_id }}">
-                  {{ law_name|glossary_annotate|safe }}
-                  <a href="{{ law_url }}" target="_blank" rel="noopener"
-                     class="ms-1 text-muted small" title="Learn about {{ law_name }}">&#9432;</a>
+                  {{ law_name }}<a href="{{ law_url }}" target="_blank" rel="noopener"
+                     class="glossary-info ms-1" aria-label="Learn about {{ law_name }}"
+                     title="Learn about {{ law_name }}">&#9432;</a>
                 </label>
               </div>
             </div>
