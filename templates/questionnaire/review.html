@@ -37,8 +37,23 @@
   {% if editable %}
     <div class="banner">
       You can update any answer below{% if countdown_text %} &mdash; {{ countdown_text }}{% endif %}.
-      Changed answers are reflected the next time your report is generated.
+      Edit as many questions as you like, then click <strong>Regenerate report</strong>
+      to receive a new PDF by email with your changes reflected.
     </div>
+    <form method="post" action="{% url 'questionnaire:regenerate_report' %}"
+          style="margin: 0 0 18px 0;">
+      {% csrf_token %}
+      <button type="submit"
+              style="background:#201868;color:#fff;border:none;
+                     padding:12px 22px;border-radius:6px;font-size:15px;
+                     font-weight:600;cursor:pointer;"
+              onclick="this.disabled=true;this.innerText='Regenerating…';this.form.submit();">
+        &#128260; Regenerate report and email me a new PDF
+      </button>
+      <span style="color:#6B7280;font-size:12px;margin-left:12px;">
+        Takes ~30 seconds. AI analysis is reused from your first report.
+      </span>
+    </form>
   {% else %}
     <div class="banner locked">
       This snapshot is {{ state }} &mdash; responses are read-only.

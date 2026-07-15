@@ -20,4 +20,5 @@ urlpatterns = [
     path("submit/", views.submit_response, name="submit_response"),
     path("review/", review_views.review, name="review"),
     path("edit/<str:question_id>/", review_views.edit_question, name="edit_question"),
+    path("regenerate/", views.regenerate_report_view, name="regenerate_report"),
 ]

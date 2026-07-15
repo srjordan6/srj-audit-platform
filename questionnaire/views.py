@@ -210,6 +210,30 @@ def forward_question(request):
 
 @require_http_methods(["POST"])
 @csrf_protect
+def regenerate_report_view(request):
+    """Explicit user-triggered regeneration from /q/review/.
+
+    User batches multiple edits, then clicks "Regenerate report" to
+    trigger a single new PDF + Postmark send. AI narrative is reused
+    from the ai_analysis_v2 events cache (no new Claude call).
+    """
+    rid = _resolve_respondent_id(request)
+    if not rid:
+        return HttpResponseNotFound("respondent_id required")
+    with connection.cursor() as cursor:
+        try:
+            from reports.auto_delivery import regenerate_after_edit
+            regenerate_after_edit(cursor, rid)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception(
+                "manual regenerate failed for %s", rid
+            )
+    return redirect("questionnaire:review")
+
+
+@require_http_methods(["POST"])
+@csrf_protect
 def ai_recommend_laws_view(request):
     """Trigger a Claude Sonnet call to recommend AI-relevant laws.
 
@@ -388,19 +412,16 @@ def submit_response(request):
             services.save_response(
                 cursor, rid, question_id, answer_value, is_dont_know
             )
+            # First completion auto-generates; post-completion edits do
+            # not — user clicks Regenerate on /q/review/.
             try:
-                more_ahead = services.get_next_question_context(cursor, rid) is not None
-                if not more_ahead:
-                    from reports.auto_delivery import on_respondent_complete, regenerate_after_edit
-                    if not on_respondent_complete(cursor, rid):
-                        regenerate_after_edit(cursor, rid)
-                else:
-                    from reports.auto_delivery import regenerate_after_edit
-                    regenerate_after_edit(cursor, rid)
+                if services.get_next_question_context(cursor, rid) is None:
+                    from reports.auto_delivery import on_respondent_complete
+                    on_respondent_complete(cursor, rid)
             except Exception:  # noqa: BLE001
                 import logging
                 logging.getLogger(__name__).exception(
-                    "post-TEXT auto-delivery / regeneration trigger failed for %s", rid
+                    "post-TEXT auto-delivery trigger failed for %s", rid
                 )
             if request.GET.get("next") == "review" or request.POST.get("next") == "review":
                 return redirect("questionnaire:review")
@@ -450,29 +471,20 @@ def submit_response(request):
         services.save_response(
             cursor, rid, question_id, answer_value, is_dont_know
         )
-        # Two branches:
-        # (a) more questions remain — this may or may not be an edit; if
-        #     engagement is already Editable, regenerate too.
-        # (b) all questions answered — first completion triggers
-        #     on_respondent_complete (generates + emails). Idempotent:
-        #     if already completed, this is an edit of an answered
-        #     question inside the 7-day window, so we regenerate.
+        # Phase 2c: first completion auto-generates + emails the report.
+        # Post-completion edits do NOT auto-regenerate — the user clicks
+        # "Regenerate report" on /q/review/ once they're done batching
+        # edits. Keeps Postmark + WeasyPrint cost bounded to one run per
+        # batch instead of one per keystroke.
         try:
             more_ahead = services.get_next_question_context(cursor, rid) is not None
             if not more_ahead:
-                from reports.auto_delivery import on_respondent_complete, regenerate_after_edit
-                fired = on_respondent_complete(cursor, rid)
-                if not fired:
-                    # Idempotent no-op => this was an edit of an already-
-                    # completed engagement. Regenerate.
-                    regenerate_after_edit(cursor, rid)
-            else:
-                from reports.auto_delivery import regenerate_after_edit
-                regenerate_after_edit(cursor, rid)
+                from reports.auto_delivery import on_respondent_complete
+                on_respondent_complete(cursor, rid)
         except Exception:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).exception(
-                "post-save auto-delivery / regeneration trigger failed for %s", rid
+                "post-save auto-delivery trigger failed for %s", rid
             )
         # Phase 2d: edits from the review page return to the review list.
         if request.GET.get("next") == "review" or request.POST.get("next") == "review":
