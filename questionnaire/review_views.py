@@ -111,18 +111,30 @@ def edit_question(request, question_id: str):
 
     with connection.cursor() as cursor:
         lifecycle_ctx = services.get_lifecycle_context(cursor, rid)
-    if lifecycle_ctx is None:
-        return HttpResponseNotFound("respondent not found")
-    if not lifecycle.is_writable(lifecycle_ctx["state"]):
-        return render(request, "questionnaire/partials/_locked.html", {})
+        if lifecycle_ctx is None:
+            return HttpResponseNotFound("respondent not found")
+        if not lifecycle.is_writable(lifecycle_ctx["state"]):
+            return render(request, "questionnaire/partials/_locked.html", {})
 
-    q = next((x for x in QUESTIONS if x["id"] == question_id), None)
-    if q is None:
+        # Load the respondent's stored answer for this question so the
+        # partial pre-selects / pre-fills it. Also decorate the question
+        # so TOOL_INVENTORY / LAW_INVENTORY / T1-B-017 pick up their
+        # dynamic context.
+        answered = services.load_answered_by_id(cursor, rid)
+        respondent_ctx = services._load_respondent_context(cursor, rid)
+
+    from types import SimpleNamespace
+    q_dict = next((x for x in QUESTIONS if x["id"] == question_id), None)
+    if q_dict is None:
         return HttpResponseNotFound("question not found")
+    q = SimpleNamespace(**q_dict)
+    services._decorate_question(q, answered, visible=None, respondent_ctx=respondent_ctx)
 
-    partial = flow.partial_template_for_type(q["question_type"])
+    prior = answered.get(question_id)
+    partial = flow.partial_template_for_type(q.question_type)
     return render(request, "questionnaire/question_shell.html", {
         "question": q,
+        "prior_answer": prior,
         "progress": {},
         "countdown_text": None,
         "submit_url": "/q/submit/?next=review",
