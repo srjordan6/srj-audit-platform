@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Engagement &mdash; {{ eng.company_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <a href="{% url 'dashboard:engagement_list' %}"
+     class="text-muted small text-decoration-none">&larr; back to engagements</a>
+
+  <h2 class="mt-2 mb-3" style="color: var(--srj-navy);">
+    {{ eng.company_name }}
+    <small class="text-muted h5">&middot; {{ eng.respondent_name|default:"" }} ({{ eng.role }})</small>
+  </h2>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="text-uppercase text-muted small mb-2">Company Profile</h6>
+          <table class="table table-sm mb-0">
+            <tr><th style="width:35%;">Industry</th><td>{{ eng.industry|default:"—" }}</td></tr>
+            <tr><th>Size</th><td>{{ eng.size_bracket|default:"—" }} employees</td></tr>
+            <tr><th>Revenue</th><td>{{ eng.annual_revenue|default:"—" }}</td></tr>
+            <tr><th>Geography</th><td>{{ eng.geographic_footprint|default:"—" }}</td></tr>
+            <tr><th>Buyer email</th><td>{{ eng.email }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="text-uppercase text-muted small mb-2">Engagement State</h6>
+          <table class="table table-sm mb-0">
+            <tr><th style="width:40%;">Payment</th><td><span class="badge bg-primary">{{ eng.payment_status }}</span></td></tr>
+            <tr><th>Snapshot state</th><td><span class="badge bg-dark">{{ eng.snapshot_state }}</span></td></tr>
+            <tr><th>Tier</th><td>{{ eng.tier }}</td></tr>
+            <tr><th>Answered</th><td>{{ answered_count }} of {{ total_visible }}</td></tr>
+            <tr><th>Generation count</th><td>{{ eng.generation_count }}</td></tr>
+            <tr><th>Started</th><td>{{ eng.created_at|date:"Y-m-d H:i" }}</td></tr>
+            <tr><th>Completed</th><td>{{ eng.completed_at|date:"Y-m-d H:i"|default:"—" }}</td></tr>
+            <tr><th>Edit window ends</th><td>{{ eng.window_end_timestamp|date:"Y-m-d H:i"|default:"—" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-uppercase text-muted small mb-2">Operator Notes &amp; Recommendations</h6>
+      {% for n in notes %}
+        <div class="border-start border-3 border-primary ps-3 mb-3">
+          <div class="small text-muted">{{ n.operator_email }} &middot; {{ n.created_at|date:"Y-m-d H:i" }}</div>
+          <div style="white-space:pre-wrap;">{{ n.note }}</div>
+        </div>
+      {% empty %}
+        <p class="text-muted small mb-3">No notes yet.</p>
+      {% endfor %}
+      <form method="post" action="{% url 'dashboard:engagement_add_note' engagement_id=eng.id %}">
+        {% csrf_token %}
+        <textarea name="note" class="form-control mb-2" rows="3"
+                  placeholder="Recommendation, follow-up, or observation based on this respondent's answers…"></textarea>
+        <button type="submit" class="btn btn-primary btn-sm">Add note</button>
+      </form>
+    </div>
+  </div>
+
+  <h4 class="mt-4 mb-3" style="color: var(--srj-navy);">Answers by section</h4>
+  {% for block in sections %}
+    <div class="card mb-3">
+      <div class="card-header" style="background:#F4F3FA; font-weight:600;">
+        Section {{ block.section|default:"—" }}
+        <span class="text-muted small">
+          {{ block.questions|length }} question{{ block.questions|length|pluralize }}
+        </span>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th style="width:8%;">ID</th>
+            <th style="width:50%;">Question</th>
+            <th style="width:8%;">Type</th>
+            <th>Answer</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in block.questions %}
+          <tr {% if not q.answered %}class="text-muted"{% endif %}>
+            <td class="small">{{ q.qid }}</td>
+            <td class="small">{{ q.question_text }}</td>
+            <td class="small">{{ q.question_type }}</td>
+            <td class="small">
+              {{ q.answer_text }}
+              {% if q.is_dont_know %}<span class="badge bg-warning text-dark ms-1">Don't know</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

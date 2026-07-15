@@ -42,4 +42,5 @@ urlpatterns = [
     path('q/', include('questionnaire.urls', namespace='questionnaire')),
     # path('r/', include('questionnaire.respondent_urls')),
     path('billing/', include('billing.urls', namespace='billing')),
+    path('dashboard/', include('dashboard.urls', namespace='dashboard')),
 ]

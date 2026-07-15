@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Cumulative Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <a href="{% url 'dashboard:engagement_list' %}"
+     class="text-muted small text-decoration-none">&larr; back to engagements</a>
+
+  <div class="d-flex align-items-baseline gap-3 mt-2 mb-3">
+    <h2 class="mb-0" style="color: var(--srj-navy);">Cumulative Analytics</h2>
+    <span class="text-muted small">
+      {{ total_engagements }} engagement{{ total_engagements|pluralize }} &middot;
+      {{ total_responses }} response{{ total_responses|pluralize }}
+    </span>
+  </div>
+
+  <p class="text-muted small">
+    Every response captured since day one. For each question: frequency + %
+    per option, mode (most-picked), and for questions with numeric-mappable
+    options (Likert 1&ndash;5, revenue brackets, employee counts) also mean, median,
+    and standard deviation.
+  </p>
+
+  {% for block in sections %}
+    <h4 class="mt-4 mb-2" style="color: var(--srj-navy);">Section {{ block.section }}</h4>
+    {% for q in block.questions %}
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-baseline mb-2">
+            <div>
+              <strong>{{ q.question_id }}</strong>
+              <span class="small text-muted">&middot; {{ q.question_type }}</span>
+            </div>
+            <div class="small text-muted">
+              n={{ q.n_answered }} respondent{{ q.n_answered|pluralize }}
+              {% if q.n_dont_know %}&middot; {{ q.n_dont_know }} Don't&nbsp;know{% endif %}
+            </div>
+          </div>
+          <div class="mb-2">{{ q.question_text }}</div>
+
+          {% if q.mode %}
+            <div class="small mb-2">
+              <strong>Mode:</strong> {{ q.mode }}
+              {% if q.mean is not None %}
+                &middot; <strong>Mean:</strong> {{ q.mean }}
+                &middot; <strong>Median:</strong> {{ q.median }}
+                {% if q.stdev is not None %}
+                  &middot; <strong>Stdev:</strong> {{ q.stdev }}
+                {% endif %}
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if q.options %}
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Option</th>
+                  <th style="width:12%;" class="text-end">Count</th>
+                  <th style="width:12%;" class="text-end">%</th>
+                  <th style="width:30%;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for opt in q.options %}
+                <tr>
+                  <td class="small">{{ opt.label }}</td>
+                  <td class="text-end">{{ opt.count }}</td>
+                  <td class="text-end">{{ opt.pct }}</td>
+                  <td>
+                    <div class="progress" style="height:8px;">
+                      <div class="progress-bar" role="progressbar"
+                           style="width:{{ opt.pct }}%; background-color:var(--srj-orange);"></div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="small text-muted mb-0">No responses yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+</div>
+{% endblock %}

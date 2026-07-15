@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Operator Dashboard &mdash; Engagements{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex align-items-baseline gap-3 mb-3">
+    <h2 class="mb-0" style="color: var(--srj-navy);">Operator Dashboard</h2>
+    <span class="text-muted small">{{ engagements|length }} engagement{{ engagements|length|pluralize }}</span>
+    <a href="{% url 'dashboard:analytics' %}" class="btn btn-outline-primary btn-sm ms-auto">
+      Cumulative analytics &rarr;
+    </a>
+  </div>
+
+  <table class="table table-hover table-sm bg-white shadow-sm">
+    <thead style="background:var(--srj-navy); color:#fff;">
+      <tr>
+        <th>Started</th>
+        <th>Buyer</th>
+        <th>Company</th>
+        <th>Industry</th>
+        <th>Size / Revenue</th>
+        <th>Geography</th>
+        <th>Payment</th>
+        <th>State</th>
+        <th class="text-end">Answered</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in engagements %}
+      <tr>
+        <td class="small text-muted">{{ e.created_at|date:"Y-m-d H:i" }}</td>
+        <td>
+          <div><strong>{{ e.respondent_name|default:"" }}</strong></div>
+          <div class="small text-muted">{{ e.email }} &middot; {{ e.role }}</div>
+        </td>
+        <td>{{ e.company_name }}</td>
+        <td class="small">{{ e.industry|default:"" }}</td>
+        <td class="small">
+          {{ e.size_bracket|default:"" }}<br>
+          <span class="text-muted">{{ e.annual_revenue|default:"" }}</span>
+        </td>
+        <td class="small">{{ e.geographic_footprint|default:"" }}</td>
+        <td>
+          {% if e.payment_status == 'paid' %}
+            <span class="badge bg-success">Paid</span>
+          {% elif e.payment_status == 'comped' %}
+            <span class="badge bg-primary">Comped</span>
+          {% elif e.payment_status == 'refunded' %}
+            <span class="badge bg-warning text-dark">Refunded</span>
+          {% else %}
+            <span class="badge bg-secondary">{{ e.payment_status }}</span>
+          {% endif %}
+        </td>
+        <td><span class="badge bg-dark">{{ e.snapshot_state }}</span></td>
+        <td class="text-end">
+          <strong>{{ e.answered }}</strong>
+          <span class="text-muted small">/ {{ total_baseline }}</span>
+          <div class="progress" style="height:4px; width:60px; margin-left:auto;">
+            <div class="progress-bar" role="progressbar"
+                 style="width:{{ e.progress_pct }}%; background-color:var(--srj-orange);"></div>
+          </div>
+        </td>
+        <td>
+          <a href="{% url 'dashboard:engagement_detail' engagement_id=e.id %}"
+             class="btn btn-sm btn-outline-primary">Open &rarr;</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="10" class="text-center text-muted py-4">No engagements yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
