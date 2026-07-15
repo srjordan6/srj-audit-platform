@@ -109,7 +109,7 @@ def get_next_question_context(
             break
     if q is None:
         return None
-    _decorate_question(q, answered, visible=visible)
+    _decorate_question(q, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": q,
         "partial": flow.partial_template_for_type(q.question_type),
@@ -175,7 +175,7 @@ def get_next_visible_question_context_by_position(
             return None
         next_q = visible[next_pos - 1]
 
-    _decorate_question(next_q, answered, visible=visible)
+    _decorate_question(next_q, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": next_q,
         "partial": flow.partial_template_for_type(next_q.question_type),
@@ -218,7 +218,7 @@ def get_question_context_by_position(
         return None
 
     target = visible[pos - 1]
-    _decorate_question(target, answered, visible=visible)
+    _decorate_question(target, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": target,
         "partial": flow.partial_template_for_type(target.question_type),
@@ -268,7 +268,7 @@ def get_previous_visible_question_context(
     if prev_q is None:
         return None
 
-    _decorate_question(prev_q, answered, visible=visible)
+    _decorate_question(prev_q, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": prev_q,
         "partial": flow.partial_template_for_type(prev_q.question_type),
@@ -278,7 +278,33 @@ def get_previous_visible_question_context(
     }
 
 
-def _decorate_question(q, answered, visible=None):
+def _load_respondent_context(cursor, respondent_id: str) -> dict:
+    """Return company-level context for recommendation logic.
+
+    {company_industry, company_size_bracket, respondent_role, respondent_email}.
+    Non-fatal — returns {} if the lookup fails.
+    """
+    try:
+        cursor.execute(
+            "SELECT c.industry, c.size_bracket, r.role, r.email "
+            "FROM respondents r JOIN companies c ON c.id = r.company_id "
+            "WHERE r.id = %s LIMIT 1",
+            (respondent_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return {}
+        return {
+            "company_industry": row[0],
+            "company_size_bracket": row[1],
+            "respondent_role": row[2],
+            "respondent_email": row[3],
+        }
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _decorate_question(q, answered, visible=None, respondent_ctx=None):
     """Inject dynamic context onto a question SimpleNamespace before render.
 
     - display_number: 1-based position in the visible list, so the header
@@ -310,7 +336,23 @@ def _decorate_question(q, answered, visible=None):
 
     if q.question_type == "LAW_INVENTORY":
         from questionnaire.law_catalog import CATEGORIES
+        from questionnaire.law_recommender import recommend_laws
         q.law_categories = CATEGORIES
+        ctx = respondent_ctx or {}
+        q.recommended_laws = recommend_laws(
+            industry=ctx.get("company_industry"),
+            size_bracket=ctx.get("company_size_bracket"),
+            geographic=answered.get("T1-A-005"),
+        )
+        q.recommended_set = set(q.recommended_laws)
+        q.recommendation_inputs = {
+            "industry": ctx.get("company_industry"),
+            "size_bracket": ctx.get("company_size_bracket"),
+            "geographic": (
+                (answered.get("T1-A-005") or {}).get("selected")
+                if isinstance(answered.get("T1-A-005"), dict) else None
+            ),
+        }
         return
 
     if q.id == "T1-B-017":

@@ -43,6 +43,30 @@ swap_target     HTMX hx-target CSS selector.
       bottom. If none apply, leave everything unchecked.
     </p>
 
+    {% if question.recommended_laws %}
+      <div class="alert alert-warning border-warning mb-3" role="status">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <strong>&#127919; Recommended for you</strong>
+            <span class="text-muted small">
+              &middot; {{ question.recommended_laws|length }} laws based on your
+              industry, footprint, and size
+            </span>
+          </div>
+          <button type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  onclick="document.querySelectorAll('input[name=answer][data-recommended=\'1\']').forEach(function(el){el.checked=true;});">
+            Check all recommended
+          </button>
+        </div>
+        <div class="mt-2 small">
+          {% for name in question.recommended_laws %}
+            <span class="badge bg-warning text-dark me-1 mb-1">{{ name }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
     {% for category_name, laws in question.law_categories %}
       <details class="mb-3" {% if forloop.first %}open{% endif %}>
         <summary class="fw-semibold" style="cursor:pointer;">
@@ -59,11 +83,15 @@ swap_target     HTMX hx-target CSS selector.
                        name="answer"
                        id="{{ input_id }}"
                        value="{{ law_name }}"
+                       data-recommended="{% if law_name in question.recommended_set %}1{% else %}0{% endif %}"
                        {% if prior_answer and law_name in prior_answer.selected %}checked{% endif %}>
                 <label class="form-check-label" for="{{ input_id }}">
                   {{ law_name }}<a href="{{ law_url }}" target="_blank" rel="noopener"
                      class="glossary-info ms-1" aria-label="Learn about {{ law_name }}"
                      title="Learn about {{ law_name }}">&#9432;</a>
+                  {% if law_name in question.recommended_set %}
+                    <span class="badge bg-warning text-dark ms-1" title="Recommended based on your company profile">&#127919;</span>
+                  {% endif %}
                 </label>
               </div>
             </div>
