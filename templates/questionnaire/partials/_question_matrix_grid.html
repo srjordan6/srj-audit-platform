@@ -88,7 +88,9 @@ so the grid remains usable on mobile without cropping cells.
           <tr>
             <th scope="col" class="srj-question__matrix-row-header">Item</th>
             {% for column in question.matrix_columns %}
-              <th scope="col" class="srj-question__matrix-col-header">
+              <th scope="col" class="srj-question__matrix-col-header text-center"
+                  style="min-width: 130px; max-width: 220px; white-space: normal;
+                         vertical-align: bottom; font-size: 12px; font-weight: 600;">
                 {{ column|glossary_annotate|safe }}
               </th>
             {% endfor %}
@@ -117,28 +119,31 @@ so the grid remains usable on mobile without cropping cells.
               </th>
               {% for column in question.matrix_columns %}
                 {% with col_index=forloop.counter0 %}
-                <td class="srj-question__matrix-cell"
+                <td class="srj-question__matrix-cell text-center"
                     data-col-index="{{ col_index }}"
-                    data-col-label="{{ column }}">
+                    data-col-label="{{ column }}"
+                    style="vertical-align: middle;">
                   <fieldset class="srj-question__matrix-cell-fieldset">
                     <legend class="visually-hidden">
                       {{ row }} — {{ column }}
                     </legend>
-                    {% for opt in cell_options %}
-                      {% with input_id="cell-"|add:question.id|add:"-"|add:row_index|stringformat:"s"|add:"-"|add:col_index|stringformat:"s"|add:"-"|add:forloop.counter|stringformat:"s" %}
-                      <div class="form-check form-check-inline srj-question__matrix-cell-option">
+                    <div class="btn-group btn-group-sm" role="group"
+                         aria-label="{{ row }} — {{ column }}">
+                      {% for opt in cell_options %}
+                        {% with input_id="cell-"|add:question.id|add:"-"|add:row_index|stringformat:"s"|add:"-"|add:col_index|stringformat:"s"|add:"-"|add:forloop.counter|stringformat:"s" %}
                         <input type="radio"
-                               class="form-check-input"
+                               class="btn-check"
                                id="{{ input_id }}"
                                name="cell_{{ row_index }}_{{ col_index }}"
                                value="{{ opt }}"
+                               autocomplete="off"
                                {% if question.required %}required{% endif %}>
-                        <label class="form-check-label small" for="{{ input_id }}">
-                          {{ opt|glossary_annotate|safe }}
+                        <label class="btn btn-outline-primary" for="{{ input_id }}">
+                          {{ opt }}
                         </label>
-                      </div>
-                      {% endwith %}
-                    {% endfor %}
+                        {% endwith %}
+                      {% endfor %}
+                    </div>
                   </fieldset>
                 </td>
                 {% endwith %}
