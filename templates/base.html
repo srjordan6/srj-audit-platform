@@ -79,6 +79,27 @@
     /* Links */
     a { color: var(--srj-navy); text-decoration: underline; text-underline-offset: 3px; }
 
+    /* Matrix cell toggle-button highlight. Bootstrap btn-check styles
+       occasionally lose against inline overrides inside table cells;
+       force the "picked" state so the respondent sees confirmation. */
+    .srj-question--matrix-grid .btn-check + .btn.btn-outline-primary {
+      color: var(--srj-navy);
+      background-color: #fff;
+      border-color: var(--srj-navy);
+      transition: background-color .12s, color .12s;
+    }
+    .srj-question--matrix-grid .btn-check:checked + .btn.btn-outline-primary,
+    .srj-question--matrix-grid .btn-check:focus + .btn.btn-outline-primary {
+      color: #fff !important;
+      background-color: var(--srj-navy) !important;
+      border-color: var(--srj-navy) !important;
+      font-weight: 600;
+      box-shadow: 0 0 0 0.15rem rgba(240, 120, 0, 0.35);
+    }
+    .srj-question--matrix-grid .btn-check + .btn.btn-outline-primary:hover {
+      background-color: var(--srj-bg);
+    }
+
     /* Glossary term info-icon links (see questionnaire/glossary.py).
        Rendered inline next to a matched governance term in an option
        label. Small, non-intrusive, opens the srjconsultingservices.com
