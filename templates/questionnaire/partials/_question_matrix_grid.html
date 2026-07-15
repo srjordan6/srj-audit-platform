@@ -98,16 +98,21 @@ so the grid remains usable on mobile without cropping cells.
           {% for row in question.matrix_rows %}
             {% with row_index=forloop.counter0 %}
             <tr data-row-index="{{ row_index }}" data-row-placeholder="{{ row }}">
-              <th scope="row" class="srj-question__matrix-row-name">
+              <th scope="row" class="srj-question__matrix-row-name"
+                  style="min-width: 200px; vertical-align: middle;">
+                <div class="fw-semibold mb-1" style="white-space: normal; line-height: 1.25;">
+                  {{ row }}
+                </div>
                 <label class="visually-hidden"
                        for="row-name-{{ question.id }}-{{ row_index }}">
-                  Name for {{ row }}
+                  Rename {{ row }}
                 </label>
                 <input type="text"
                        class="form-control form-control-sm"
                        id="row-name-{{ question.id }}-{{ row_index }}"
                        name="row_name_{{ row_index }}"
-                       placeholder="{{ row }}"
+                       value="{{ row }}"
+                       placeholder="Rename if needed"
                        maxlength="120">
               </th>
               {% for column in question.matrix_columns %}
