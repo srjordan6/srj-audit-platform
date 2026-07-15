@@ -194,6 +194,76 @@ def forward_question(request):
     return _render_ctx(request, ctx)
 
 
+@require_http_methods(["POST"])
+@csrf_protect
+def ai_recommend_laws_view(request):
+    """Trigger a Claude Sonnet call to recommend AI-relevant laws.
+
+    Uses the company profile we already know (industry, size, geographic
+    footprint, revenue) + the 59-law catalog. Returns the LAW_INVENTORY
+    partial re-rendered with recommendations overridden by the AI result.
+    Cached in events.law_ai_recommendation so re-clicks return instantly.
+    """
+    rid = _resolve_respondent_id(request)
+    if not rid:
+        return HttpResponseNotFound("respondent_id required")
+
+    force = request.POST.get("force") == "1"
+    with connection.cursor() as cursor:
+        rctx = services._load_respondent_context(cursor, rid)
+        answered = services.load_answered_by_id(cursor, rid)
+        # Assemble the profile we send to Claude. Include revenue if the
+        # respondent has already answered T1-A-007; otherwise omit it.
+        profile = {
+            "industry": rctx.get("company_industry"),
+            "size_bracket": rctx.get("company_size_bracket"),
+            "role_of_respondent": rctx.get("respondent_role"),
+            "geographic_footprint": (
+                (answered.get("T1-A-005") or {}).get("selected")
+                if isinstance(answered.get("T1-A-005"), dict) else None
+            ),
+            "annual_revenue": (
+                (answered.get("T1-A-007") or {}).get("selected")
+                if isinstance(answered.get("T1-A-007"), dict) else None
+            ),
+            "regulations_the_user_already_checked": (
+                (answered.get("T1-A-006") or {}).get("selected")
+                if isinstance(answered.get("T1-A-006"), dict) else None
+            ),
+        }
+
+        from questionnaire.law_ai_recommender import ai_recommend_laws
+        ai_result = ai_recommend_laws(rid, profile, force_refresh=force)
+
+        # Re-render the T1-A-006 partial with AI recommendations layered on top.
+        # Find the T1-A-006 question object.
+        from questionnaire import flow
+        role = services.get_respondent_role(cursor, rid)
+        visible = flow.questions_visible_to_role(role, answered)
+        q_target = next((q for q in visible if q.id == "T1-A-006"), None)
+        if not q_target:
+            return HttpResponseNotFound("T1-A-006 not visible")
+        services._decorate_question(q_target, answered, visible=visible, respondent_ctx=rctx)
+
+        # Override recommendations with AI selections if the call succeeded.
+        if ai_result.get("ok") and ai_result.get("selected"):
+            q_target.recommended_laws = ai_result["selected"]
+            q_target.recommended_set = set(ai_result["selected"])
+        q_target.ai_recommendation = ai_result
+
+    template = flow.partial_template_for_type(q_target.question_type)
+    return render(
+        request,
+        template,
+        {
+            "question": q_target,
+            "prior_answer": answered.get("T1-A-006"),
+            "progress": _normalize_progress(flow.progress_for_role(role, answered)),
+            "submit_url": "/q/submit/",
+        },
+    )
+
+
 @require_http_methods(["GET"])
 def jump_to_position(request):
     """Slider-driven jump to a specific position in the visible flow.

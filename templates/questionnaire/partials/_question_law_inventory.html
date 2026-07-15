@@ -45,25 +45,54 @@ swap_target     HTMX hx-target CSS selector.
 
     {% if question.recommended_laws %}
       <div class="alert alert-warning border-warning mb-3" role="status">
-        <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
-            <strong>&#127919; Recommended for you</strong>
+            <strong>&#127919;
+              {% if question.ai_recommendation.ok %}AI recommends{% else %}Recommended for you{% endif %}</strong>
             <span class="text-muted small">
               &middot; {{ question.recommended_laws|length }} laws based on your
-              industry, footprint, and size
+              industry, footprint, and size{% if question.ai_recommendation.ok %} (Claude Sonnet){% endif %}
             </span>
           </div>
-          <button type="button"
-                  class="btn btn-sm btn-outline-primary"
-                  onclick="document.querySelectorAll('input[name=answer][data-recommended=\'1\']').forEach(function(el){el.checked=true;});">
-            Check all recommended
-          </button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    onclick="document.querySelectorAll('input[name=answer][data-recommended=\'1\']').forEach(function(el){el.checked=true;});">
+              Check all recommended
+            </button>
+            <button type="button"
+                    class="btn btn-sm btn-primary"
+                    hx-post="{% url 'questionnaire:ai_recommend_laws' %}"
+                    hx-target="#question-shell"
+                    hx-swap="innerHTML"
+                    hx-vals='{"force": "{% if question.ai_recommendation.ok %}1{% else %}0{% endif %}"}'
+                    hx-indicator="#srj-ai-spinner"
+                    hx-disabled-elt="this">
+              {% if question.ai_recommendation.ok %}
+                &#128260; Re-run AI
+              {% else %}
+                &#129302; Ask AI for a smarter recommendation
+              {% endif %}
+              <span id="srj-ai-spinner" class="spinner-border spinner-border-sm ms-1 htmx-indicator" role="status"></span>
+            </button>
+          </div>
         </div>
+        {% if question.ai_recommendation.summary %}
+          <div class="mt-2 small fst-italic">
+            {{ question.ai_recommendation.summary }}
+          </div>
+        {% endif %}
         <div class="mt-2 small">
           {% for name in question.recommended_laws %}
             <span class="badge bg-warning text-dark me-1 mb-1">{{ name }}</span>
           {% endfor %}
         </div>
+        {% if question.ai_recommendation.error %}
+          <div class="mt-2 small text-danger">
+            AI call failed: {{ question.ai_recommendation.error }}.
+            Falling back to rule-based recommendations.
+          </div>
+        {% endif %}
       </div>
     {% endif %}
 
