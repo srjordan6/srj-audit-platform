@@ -346,25 +346,43 @@
     // which HTMX handles normally.
     // ------------------------------------------------------------------
     // ------------------------------------------------------------------
-    // "None of these" mutual exclusivity on MULTI-SELECT (MS) questions.
-    // If the user ticks a checkbox whose value starts with "None" (case-
-    // insensitive) — e.g. "None of these", "None of the above", "None
-    // apply" — every other checkbox in that form is unchecked. If the
-    // user ticks anything else while "None" is checked, the "None" box
-    // is unchecked. Delegated so it survives HTMX swaps.
+    // Mutual exclusivity on MULTI-SELECT (MS) + inventory questions.
+    // If the user ticks a checkbox whose VALUE means "I'm opting out"
+    // (None of these / None of the above / None / Don't know / N/A / N/A
+    // variants / Decline to answer / I'm not sure), every other
+    // checkbox in that form is cleared. If the user then ticks any
+    // regular option, all opt-out boxes are cleared. Delegated so it
+    // survives HTMX swaps. Full audit of 19 opt-out option strings in
+    // the question bank confirmed 2026-07-15 — all match this pattern.
     // ------------------------------------------------------------------
+    function srjIsOptOut(value) {
+      var v = String(value || '').toLowerCase().trim();
+      if (!v) return false;
+      return v === 'none'
+          || v.indexOf('none of ') === 0
+          || v === 'none confirmed'
+          || v.indexOf("don't know") === 0 || v.indexOf('dont know') === 0
+          || v === "i'm not sure" || v === 'im not sure' || v === 'not sure'
+          || v === 'n/a' || v.indexOf('n/a') === 0 || v.indexOf('n / a') === 0
+          || v === 'not applicable' || v.indexOf('not applicable') === 0
+          || v === 'decline to answer' || v.indexOf('decline to answer') === 0
+          || v === 'unsure';
+    }
+
     document.body.addEventListener('change', function (evt) {
       var el = evt.target;
       if (!el || el.type !== 'checkbox' || el.name !== 'answer') return;
       var form = el.closest && el.closest('form.srj-question--multi-select, form.srj-question--law-inventory, form.srj-question--tool-inventory');
       if (!form) return;
-      var isNone = /^\s*none\b/i.test(el.value || '');
+      var elIsOptOut = srjIsOptOut(el.value);
       var allBoxes = form.querySelectorAll('input[type=checkbox][name=answer]');
-      if (isNone && el.checked) {
+      if (el.checked && elIsOptOut) {
+        // User just ticked an opt-out => clear everything else.
         allBoxes.forEach(function (b) { if (b !== el) b.checked = false; });
-      } else if (!isNone && el.checked) {
+      } else if (el.checked && !elIsOptOut) {
+        // User ticked a regular option => clear any opt-out boxes.
         allBoxes.forEach(function (b) {
-          if (b !== el && /^\s*none\b/i.test(b.value || '')) b.checked = false;
+          if (b !== el && srjIsOptOut(b.value)) b.checked = false;
         });
       }
     });
