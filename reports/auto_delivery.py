@@ -190,6 +190,56 @@ def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
         connection.close()
 
 
+def regenerate_after_edit(cursor, respondent_id: str) -> bool:
+    """Regenerate the locked PDF after an in-window answer edit.
+
+    Distinct from on_respondent_complete (which is idempotent on
+    completed_at). This path fires whenever a respondent whose
+    engagement is already Editable saves an answer, so the report of
+    record reflects the latest state. AI narrative is NOT re-called —
+    ai_analysis._load_stored returns the cached sections from the first
+    generation (per operator direction 2026-07-15: no repeat Claude
+    calls on regeneration to keep cost bounded).
+    """
+    try:
+        cursor.execute(
+            "SELECT e.id, r.email, r.name, c.name, e.snapshot_state "
+            "FROM respondents r "
+            "JOIN engagements e ON e.id = r.engagement_id "
+            "JOIN companies c ON c.id = e.company_id "
+            "WHERE r.id = %s LIMIT 1",
+            (respondent_id,),
+        )
+        row = cursor.fetchone()
+    except Exception:  # noqa: BLE001
+        logger.exception("regenerate_after_edit: lookup failed for %s",
+                         respondent_id)
+        return False
+    if not row:
+        return False
+    engagement_id, email, name, company, state = row
+    # Only regenerate for engagements that are already Editable (i.e. have
+    # a report of record). Draft never got past first generation. Locked /
+    # Expired are terminal.
+    if state != "Editable":
+        return False
+
+    _log_event(cursor, {
+        "engagement_id": engagement_id,
+        "to": email,
+        "status": "queued_regeneration",
+        "respondent_id": respondent_id,
+    })
+    thread = threading.Thread(
+        target=_worker,
+        args=(engagement_id, email, name, company),
+        daemon=True,
+        name=f"report-regen-{engagement_id[:8]}",
+    )
+    thread.start()
+    return True
+
+
 def on_respondent_complete(cursor, respondent_id: str) -> bool:
     """Call when the respondent has no next question. Returns True if this
     call triggered generation+delivery, False if it was already done.

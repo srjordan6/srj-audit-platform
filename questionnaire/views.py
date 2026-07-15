@@ -397,6 +397,16 @@ def submit_response(request):
                     logging.getLogger(__name__).exception(
                         "auto delivery trigger failed for %s", rid
                     )
+            else:
+                # Edit path: if engagement is already Editable, regenerate.
+                try:
+                    from reports.auto_delivery import regenerate_after_edit
+                    regenerate_after_edit(cursor, rid)
+                except Exception:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "regeneration trigger failed for %s", rid
+                    )
             if request.GET.get("next") == "review" or request.POST.get("next") == "review":
                 return redirect("questionnaire:review")
             return _dispatch_by_state(request, cursor, rid)
@@ -456,6 +466,18 @@ def submit_response(request):
                 import logging
                 logging.getLogger(__name__).exception(
                     "auto delivery trigger failed for %s", rid
+                )
+        else:
+            # Edit path: engagement already Editable => regenerate the
+            # locked PDF using the cached AI narrative (no fresh Claude
+            # call — see reports.auto_delivery.regenerate_after_edit).
+            try:
+                from reports.auto_delivery import regenerate_after_edit
+                regenerate_after_edit(cursor, rid)
+            except Exception:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).exception(
+                    "regeneration trigger failed for %s", rid
                 )
         # Phase 2d: edits from the review page return to the review list.
         if request.GET.get("next") == "review" or request.POST.get("next") == "review":
