@@ -40,42 +40,11 @@ from decimal import Decimal
 TIER_1_QUESTIONS = [
 
     # ===== Section A — Context & Identity =====
-    # (Tool inventory moved to Section B 2026-07-14 — see T1-A-000
-    #  below with section='B', sequence_number=0. Legacy ID retained
-    #  to preserve existing response history.)
+    # (Tool inventory T1-A-000 was moved to Section B 2026-07-14; its
+    # dict is now defined just above the Section B block below so
+    # document-order rendering places it as the first question of
+    # Section B rather than the first question overall.)
 
-    {
-        "id": 'T1-A-000',
-        "tier": 'tier_1',
-        # Moved 2026-07-14: section changed A -> B so this renders as
-        # the FIRST question of "AI Tool Inventory & Discovery" instead
-        # of the very first question overall.
-        "section": 'B',
-        "sequence_number": 0,
-        "question_text": "Which AI tools does your company currently use? Check every tool anyone at the company uses.",
-        "question_type": 'TOOL_INVENTORY',
-        "options": [],  # Filled from tool_catalog at render time.
-        "matrix_rows": None,
-        "matrix_columns": None,
-        "skip_logic": None,
-        "role_visibility": ['all'],
-        "required": False,
-        "scoring_weight": Decimal('1.00'),
-        "framework_mappings": [
-            {
-                'weight': 0,
-                'framework': 'context',
-                'sub_component': 'tool_inventory_seed'
-            }
-        ],
-        "notes": "Tool inventory. Seeds every downstream tool-related question. Moved from Section A to Section B (AI Tool Inventory & Discovery) on 2026-07-14.",
-        "is_active": True,
-        "scoring_overrides": None,
-        "extended_metadata": {
-            'renders_categorized': True,
-            'allows_other_free_text': True,
-        },
-    },
     {
         "id": 'T1-A-001',
         "tier": 'tier_1',
@@ -718,8 +687,42 @@ TIER_1_QUESTIONS = [
         },
     },
 
-    # ===== Section B — AI Tool Inventory & Discovery (21 questions) =====
+    # ===== Section B — AI Tool Inventory & Discovery (22 questions incl. tool inventory) =====
 
+    # T1-A-000 — TOOL INVENTORY. First question of Section B (moved
+    # from Section A 2026-07-14). Legacy T1-A-000 ID preserved to keep
+    # existing responses valid. Renders here because flow uses
+    # document order — placing this dict at the START of Section B
+    # in the QUESTIONS list makes it the section's first question.
+    {
+        "id": 'T1-A-000',
+        "tier": 'tier_1',
+        "section": 'B',
+        "sequence_number": 0,
+        "question_text": "Which AI tools does your company currently use? Check every tool anyone at the company uses.",
+        "question_type": 'TOOL_INVENTORY',
+        "options": [],  # Filled from tool_catalog at render time.
+        "matrix_rows": None,
+        "matrix_columns": None,
+        "skip_logic": None,
+        "role_visibility": ['all'],
+        "required": False,
+        "scoring_weight": Decimal('1.00'),
+        "framework_mappings": [
+            {
+                'weight': 0,
+                'framework': 'context',
+                'sub_component': 'tool_inventory_seed'
+            }
+        ],
+        "notes": "Tool inventory. Seeds every downstream tool-related question. Placed first in Section B document order to render as first question of that section.",
+        "is_active": True,
+        "scoring_overrides": None,
+        "extended_metadata": {
+            'renders_categorized': True,
+            'allows_other_free_text': True,
+        },
+    },
     {
         "id": 'T1-B-001',
         "tier": 'tier_1',
