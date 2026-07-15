@@ -256,13 +256,26 @@ def ai_recommend_laws_view(request):
             q_target.recommended_set = set(ai_result["selected"])
         q_target.ai_recommendation = ai_result
 
+    # Pre-check the AI's recommendations. Merge with anything the user
+    # already had ticked, so we never LOSE their prior selections; we
+    # only ADD the AI's picks on top. User can uncheck what they don't
+    # want before hitting Save & continue.
+    existing_prior = answered.get("T1-A-006") or {}
+    existing_selected = existing_prior.get("selected") if isinstance(existing_prior, dict) else None
+    existing_selected = list(existing_selected) if isinstance(existing_selected, list) else []
+    merged_selected = list({*existing_selected, *(ai_result.get("selected") or [])})
+    display_prior = {
+        "selected": merged_selected,
+        "other": existing_prior.get("other", "") if isinstance(existing_prior, dict) else "",
+    }
+
     template = flow.partial_template_for_type(q_target.question_type)
     return render(
         request,
         template,
         {
             "question": q_target,
-            "prior_answer": answered.get("T1-A-006"),
+            "prior_answer": display_prior,
             "progress": _normalize_progress(flow.progress_for_role(role, answered)),
             "submit_url": "/q/submit/",
         },
