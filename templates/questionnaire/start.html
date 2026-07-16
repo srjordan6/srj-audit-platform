@@ -1,5 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Start your AI audit — SRJ AI Audit Platform{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+<style>
+  /* Match the height + shadow of Bootstrap form-select so the typeahead
+     looks native inside the rest of the form. */
+  .ts-wrapper.form-select { padding: 0; }
+  .ts-wrapper .ts-control { min-height: calc(1.5em + 0.75rem + 2px); }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container py-5" style="max-width: 640px;">
     <h1 class="mb-3">AI Audit Snapshot</h1>
@@ -108,9 +118,9 @@
             </select>
             {% endwith %}
             <div class="form-text">
-                NAICS 2022 6-digit code. All 1,012 US industries grouped by sector.
-                Click the dropdown and type a few letters to jump to your industry.
-                Pick the closest match; you can refine later.
+                Type any part of your industry to search — e.g. "manufactur",
+                "software", "hospital". All 1,012 US industries grouped by
+                sector. Pick the closest match; you can refine later.
             </div>
         </div>
 
@@ -198,4 +208,24 @@
         </button>
     </form>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+  // Progressive enhancement: replace the giant NAICS <select> with a
+  // typeable search box. If the CDN fails to load, the native select
+  // still works — no functional regression.
+  (function () {
+    if (typeof TomSelect === "undefined") return;
+    var el = document.getElementById("company_industry");
+    if (!el) return;
+    new TomSelect(el, {
+      maxOptions: 200,
+      searchField: ["text"],
+      // Keep sectors visible as headers in the dropdown
+      optgroupField: "optgroup",
+      allowEmptyOption: false,
+      placeholder: "Type to search 1,012 industries…",
+    });
+  })();
+</script>
 {% endblock %}
