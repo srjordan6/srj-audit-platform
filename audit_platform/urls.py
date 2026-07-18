@@ -40,6 +40,7 @@ urlpatterns = [
     # The following includes will be enabled as each app is built.
     # path('', include('engagements.urls')),
     path('q/', include('questionnaire.urls', namespace='questionnaire')),
+    path('reports/', include('reports.urls', namespace='reports')),
     # path('r/', include('questionnaire.respondent_urls')),
     path('billing/', include('billing.urls', namespace='billing')),
     path('dashboard/', include('dashboard.urls', namespace='dashboard')),

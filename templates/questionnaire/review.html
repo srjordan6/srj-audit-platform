@@ -34,6 +34,15 @@
   <h1>Review your responses</h1>
   <p class="sub">{{ answered_count }} answered question{{ answered_count|pluralize }}.</p>
 
+  <p style="margin:0 0 18px 0;">
+    <a href="/reports/mine/download/"
+       style="display:inline-block;background:#F07800;color:#fff;
+              text-decoration:none;font-weight:600;font-size:14px;
+              padding:11px 22px;border-radius:6px;">
+      &#8681; Download my report (PDF)
+    </a>
+  </p>
+
   {% if editable %}
     <div class="banner">
       You can update any answer below{% if countdown_text %} &mdash; {{ countdown_text }}{% endif %}.

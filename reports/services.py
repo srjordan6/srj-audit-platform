@@ -185,6 +185,20 @@ def generate_and_lock(
         cursor, company_id, engagement_id, framework, pdf_bytes, buyer_email, now
     )
 
+    # Phase 2e: persist the PDF to Cloudflare R2 (non-fatal). Replace the
+    # inline:// placeholder with the real object key so the report can be
+    # re-downloaded later. If R2 is down/unset, generation still succeeds.
+    try:
+        from reports import storage
+        _r2_key = storage.upload_report_pdf(engagement_id, report_id, pdf_bytes)
+        if _r2_key:
+            cursor.execute(
+                "UPDATE reports SET file_path = %s WHERE id = %s",
+                (f"r2://{_r2_key}", report_id),
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("r2 persist failed for report %s (non-fatal)", report_id)
+
     if state == lifecycle.DRAFT:
         _apply_first_generation(cursor, engagement_id, state, report_id, pdf_hash, now)
     elif state == lifecycle.EDITABLE:

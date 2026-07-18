@@ -25,11 +25,20 @@ visible question. Branches on payment_status:
             </div>
         </div>
         <div class="mt-3">
+            <a href="{% url 'reports:download_my_report' %}"
+               class="btn btn-lg px-4 me-2"
+               style="background-color: var(--srj-orange); border-color: var(--srj-orange); color:#fff;">
+                &#8681; Download my report (PDF)
+            </a>
             <a href="{% url 'questionnaire:review' %}"
                class="btn btn-outline-primary btn-lg px-4">
                 &#9998; Review &amp; edit my answers
             </a>
         </div>
+        <p class="small text-muted mt-2 mb-0">
+            If the download says it is still generating, give it a minute and
+            refresh &mdash; it is also on its way to your inbox.
+        </p>
         <p class="small text-muted mt-3 mb-0">
             Editing an answer regenerates the report. You have a 7-day
             edit window from the first report generation. The resume link
