@@ -1,7 +1,11 @@
 # SRJ AI Audit Platform — Tier 1 dependencies
-# Locked versions per Part A v1.1 Appendix B.1, refreshed 2026-06-23
+# Locked versions per Part A v1.1 Appendix B.1.
+# Security refresh 2026-07-19: Django 5.1.15, pypdf 6.13.3, WeasyPrint 68.0
+# (62 CVEs closed — see Security_Scan_Report_2026-07-19.md). django-allauth
+# removed (unused; zero imports anywhere in the codebase). Dev/test tools
+# moved to requirements-dev.txt so they don't ship in the production image.
 
-Django==5.1.4
+Django==5.1.15
 psycopg[binary]==3.2.3
 django-environ==0.11.2
 gunicorn==23.0.0
@@ -12,10 +16,13 @@ redis==5.2.1
 django-rq==2.10.2
 rq==1.16.2
 
+# Bot protection (Turnstile server-side verification)
+requests>=2.32.0
+
 # PDF generation
-WeasyPrint==62.3
-pydyf==0.10.0
-pypdf==5.1.0
+WeasyPrint==68.0
+pydyf==0.12.1
+pypdf==6.13.3
 cryptography>=42.0
 
 # S3-compatible storage (Backblaze B2)
@@ -31,17 +38,10 @@ postmarker==1.0
 # Monitoring
 sentry-sdk==2.19.0
 
-# Auth helpers
-django-allauth==65.3.0
-
 # Frontend
 django-htmx==1.21.0
 django-crispy-forms==2.3
 crispy-bootstrap5==2024.10
 
-# Dev / test
-django-debug-toolbar==4.4.6
-pytest==8.3.4
-pytest-django==4.9.0
-factory-boy==3.3.1
+# AI narrative analysis
 anthropic>=0.40.0
