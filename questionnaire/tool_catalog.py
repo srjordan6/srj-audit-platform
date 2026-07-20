@@ -3,9 +3,12 @@
 Grouped by category for visual rendering. Order within each category
 follows the numeric rank Stephen provided in the source list.
 
-Total: 65 tools across 10 categories. Any tool the respondent uses that
-isn't listed here goes into the free-form "other" text field on the
-inventory question.
+Total: 88 tools across 11 categories (2026-07-19 expansion: +16 Western
+tools including GitHub Copilot, Claude Code, Sora, Firefly, plus a new
+Chinese Foundation Models category with Qwen, GLM/Z.AI, Doubao, MiniMax,
+Hunyuan, ERNIE, MiMo — DeepSeek and Kimi were already listed). Any tool
+the respondent uses that isn't listed here goes into the free-form
+"other" text field on the inventory question.
 
 CATEGORIES is the primary data structure the partial iterates over.
 TOOLS_FLAT is a convenience flat list of the same tool names (useful
@@ -33,6 +36,20 @@ CATEGORIES: List[Tuple[str, List[str]]] = [
         "You.com",
         "Character.ai",
         "Janitor AI",
+        "Llama (Meta)",
+        "Mistral / Le Chat",
+        "Notion AI",
+        "Slack AI",
+        "Zoom AI Companion",
+    ]),
+    ("Chinese Foundation Models", [
+        "Qwen / Tongyi Qianwen (Alibaba)",
+        "GLM / Z.AI (Zhipu AI)",
+        "Doubao / Seed (ByteDance)",
+        "MiniMax",
+        "Hunyuan (Tencent)",
+        "ERNIE (Baidu)",
+        "MiMo (Xiaomi)",
     ]),
     ("Writing & Editing", [
         "Grammarly",
@@ -47,6 +64,7 @@ CATEGORIES: List[Tuple[str, List[str]]] = [
         "NotebookLM",
         "Otter.ai",
         "Mem",
+        "Fireflies.ai",
     ]),
     ("Image & Graphic Design", [
         "Canva AI",
@@ -56,6 +74,8 @@ CATEGORIES: List[Tuple[str, List[str]]] = [
         "DeepAI",
         "Microsoft Designer",
         "Remove.bg",
+        "DALL-E (OpenAI)",
+        "Adobe Firefly",
     ]),
     ("Video Generation & Editing", [
         "Runway",
@@ -70,6 +90,7 @@ CATEGORIES: List[Tuple[str, List[str]]] = [
         "Fliki",
         "Lumen5",
         "Luma AI",
+        "Sora (OpenAI)",
     ]),
     ("Voice & Audio", [
         "ElevenLabs",
@@ -91,6 +112,12 @@ CATEGORIES: List[Tuple[str, List[str]]] = [
         "Lovable",
         "Google AI Studio",
         "Hugging Face",
+        "GitHub Copilot",
+        "Claude Code",
+        "Windsurf",
+        "Bolt.new",
+        "v0 (Vercel)",
+        "OpenAI API / GPT models",
     ]),
     ("Automation & Agents", [
         "n8n",
@@ -102,6 +129,7 @@ CATEGORIES: List[Tuple[str, List[str]]] = [
         "DeepL",
         "Wayground",
         "Groq",
+        "Salesforce Einstein / Agentforce",
     ]),
 ]
 
