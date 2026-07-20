@@ -21,6 +21,8 @@ CATEGORIES = [
         ('NIS2 Directive', 'https://srjconsultingservices.com/ai-governance/nis2/'),
         ('DORA', 'https://srjconsultingservices.com/ai-governance/dora/'),
         ('CETS 225', 'https://srjconsultingservices.com/ai-governance/coe-framework-convention/'),
+        ('China AI Regulation', 'https://srjconsultingservices.com/ai-governance/china-ai-regulation/'),
+        ('Global AI Laws', 'https://srjconsultingservices.com/ai-governance/global-ai-laws/'),
     ]),
     ('Top-level Frameworks & US Federal', [
         ('NYDFS Part 500', 'https://srjconsultingservices.com/ai-governance/nydfs-part-500/'),
