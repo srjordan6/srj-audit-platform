@@ -61,7 +61,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from questionnaire.question_bank import Question
 
@@ -82,6 +82,11 @@ REASON_CONDITION_MET = "condition_met"
 REASON_CONDITION_NOT_MET = "condition_not_met"
 REASON_UNKNOWN_OPERATOR = "unknown_operator"
 REASON_MALFORMED_SKIP_LOGIC = "malformed_skip_logic"
+# New-format ({combine, conditions}) reasons. In the new format the
+# conditions describe when to SKIP, so "met" hides and "not met" shows —
+# distinct codes keep audit trails unambiguous versus the legacy polarity.
+REASON_SKIP_CONDITION_MET = "skip_condition_met"
+REASON_SKIP_CONDITION_NOT_MET = "skip_condition_not_met"
 
 
 # ----------------------------------------------------------------------------
@@ -172,6 +177,118 @@ OPERATORS = {
 
 
 # ----------------------------------------------------------------------------
+# New-format evaluator: {"combine": "any"|"all", "conditions": [...]}
+# ----------------------------------------------------------------------------
+# SEMANTICS (verified against all 15 uses in the bank, 2026-07-19):
+# conditions describe when to SKIP the question — the opposite polarity of
+# the legacy format. Example: T1-B-002 "What does that inventory include?"
+# has condition {type: answer_equals, question_id: T1-B-001,
+# answer_value: ["No", "Don't know"]} — if the respondent said no inventory
+# exists, asking what it includes is nonsense, so the question is skipped.
+#
+# Condition types (answer_value is a list in all current data; scalars
+# tolerated):
+#   answer_equals           — response matches ANY of the listed values
+#                             (multi-select response: any intersection)
+#   answer_does_not_include — response contains NONE of the listed values
+#   answer_only_includes    — response is non-empty and every selected item
+#                             is within the listed values
+#
+# combine: "any" — skip if ANY condition is true (the only value in current
+# data); "all" — skip only if ALL conditions are true.
+#
+# Unanswered dependency: permissive-show, matching the legacy contract. If
+# a referenced question was itself skipped (cascade), its absence from
+# `responses` yields the same permissive-show — acceptable because every
+# current dependency target has no skip_logic of its own.
+
+
+def _extract_answer(raw: Any) -> Any:
+    """Normalize a stored answer_value into a scalar or list for comparison.
+
+    Stored shapes: {"selected": "No"}, {"selected": [..], "other": ".."},
+    {"ranked": [..]}, {"text": ".."}, or bare scalars from legacy tests.
+    """
+    if isinstance(raw, dict):
+        if "selected" in raw:
+            return raw["selected"]
+        if "ranked" in raw:
+            return raw["ranked"]
+        if "text" in raw:
+            return raw["text"]
+    return raw
+
+
+def _as_list(value: Any) -> list:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
+
+
+def _eval_condition(cond: dict, responses: dict[str, Any]) -> Optional[bool]:
+    """Evaluate one new-format condition.
+
+    Returns True/False, or None when the referenced question has no
+    answer yet (caller treats None as not-evaluable → permissive show).
+    """
+    dep_id = cond.get("question_id")
+    ctype = cond.get("type")
+    values = _as_list(cond.get("answer_value"))
+
+    if not dep_id or not ctype:
+        logger.warning("Malformed skip-logic condition: %r", cond)
+        return None
+    if dep_id not in responses:
+        return None
+
+    answer = _extract_answer(responses[dep_id])
+    answer_items = _as_list(answer)
+
+    if ctype == "answer_equals":
+        # Any overlap between the respondent's answer and the value list.
+        return any(item in values for item in answer_items)
+    if ctype == "answer_does_not_include":
+        return not any(item in values for item in answer_items)
+    if ctype == "answer_only_includes":
+        return len(answer_items) > 0 and all(
+            item in values for item in answer_items
+        )
+
+    logger.warning("Unknown skip-logic condition type %r", ctype)
+    return None
+
+
+def evaluate_new_format(
+    sl: dict,
+    responses: dict[str, Any],
+) -> SkipDecision:
+    """Evaluate a {combine, conditions} skip_logic block.
+
+    Conditions describe when to SKIP. Non-evaluable conditions (missing
+    answers, malformed) are dropped; if none remain, permissive-show.
+    """
+    conditions = sl.get("conditions") or []
+    combine = (sl.get("combine") or "any").lower()
+
+    results = [_eval_condition(c, responses) for c in conditions]
+    evaluable = [r for r in results if r is not None]
+
+    if not evaluable:
+        return SkipDecision.show_(REASON_DEPENDENCY_UNANSWERED)
+
+    should_skip = (
+        all(evaluable) if combine == "all" else any(evaluable)
+    )
+    return (
+        SkipDecision.hide(REASON_SKIP_CONDITION_MET)
+        if should_skip
+        else SkipDecision.show_(REASON_SKIP_CONDITION_NOT_MET)
+    )
+
+
+# ----------------------------------------------------------------------------
 # Per-question evaluation
 # ----------------------------------------------------------------------------
 
@@ -199,14 +316,10 @@ def evaluate_skip_logic(
     depends_on = sl.get("depends_on")
     operator = sl.get("operator")
 
-    # New-format skip_logic uses {combine, conditions[]} instead of the
-    # legacy {depends_on, operator, value}. Full evaluator for the new
-    # shape is a separate work-item; for now treat it as PERMISSIVE (show)
-    # and skip the warning so logs don't flood. This preserves current
-    # behavior — questions with new-format skip_logic have always been
-    # shown since the evaluator never understood them.
-    if "conditions" in sl and "combine" in sl:
-        return SkipDecision.show_(REASON_NO_SKIP_LOGIC)
+    # New-format skip_logic: {combine, conditions[]} — conditions describe
+    # when to SKIP. Fully evaluated as of 2026-07-19 (was permissive-show).
+    if "conditions" in sl:
+        return evaluate_new_format(sl, responses)
 
     if not depends_on or not operator:
         logger.warning("Question %s has malformed skip_logic: %r", question.id, sl)
@@ -319,9 +432,46 @@ def validate_all_skip_logic_references(questions: list[Question]) -> list[str]:
     by_id = {q.id: q for q in questions}
     order_index = {q.id: i for i, q in enumerate(questions)}
 
+    _NEW_CONDITION_TYPES = {
+        "answer_equals", "answer_does_not_include", "answer_only_includes",
+    }
+
     for q in questions:
         sl = q.skip_logic
         if not sl:
+            continue
+
+        # New-format {combine, conditions} validation.
+        if "conditions" in sl:
+            combine = (sl.get("combine") or "any").lower()
+            if combine not in ("any", "all"):
+                errors.append(f"{q.id}: unknown combine {combine!r}")
+            conditions = sl.get("conditions") or []
+            if not conditions:
+                errors.append(f"{q.id}: skip_logic has empty conditions")
+            for i, cond in enumerate(conditions):
+                dep_id = cond.get("question_id")
+                ctype = cond.get("type")
+                if not dep_id:
+                    errors.append(f"{q.id}: condition[{i}] missing question_id")
+                elif dep_id not in by_id:
+                    errors.append(
+                        f"{q.id}: condition[{i}] references unknown "
+                        f"question {dep_id!r}"
+                    )
+                elif order_index[dep_id] >= order_index[q.id]:
+                    errors.append(
+                        f"{q.id}: condition[{i}] forward/self reference "
+                        f"to {dep_id}"
+                    )
+                if ctype not in _NEW_CONDITION_TYPES:
+                    errors.append(
+                        f"{q.id}: condition[{i}] unknown type {ctype!r}"
+                    )
+                if "answer_value" not in cond:
+                    errors.append(
+                        f"{q.id}: condition[{i}] missing answer_value"
+                    )
             continue
 
         depends_on = sl.get("depends_on")

@@ -1475,53 +1475,6 @@ TIER_1_QUESTIONS = [
     # ===== Section C — Cost Mapping (13 questions) =====
 
     {
-        "id": 'T1-C-002',
-        "tier": 'tier_1',
-        "section": 'C',
-        "sequence_number": 2,
-        "question_text": 'What does that spend report include? (select all that apply)',
-        "question_type": 'MS',
-        "options": [
-            'Subscriptions',
-            'Per-seat licenses',
-            'API/usage charges',
-            'Professional services',
-            'Hardware',
-            'Training costs',
-            'Consulting',
-            'Vendor-enabled feature upgrades',
-            'Other (specify)',
-            'None of these'
-        ],
-        "matrix_rows": None,
-        "matrix_columns": None,
-        "skip_logic": {
-            'combine': 'any',
-            'conditions': [
-                {
-                    'type': 'answer_equals',
-                    'question_id': 'T1-C-006',
-                    'answer_value': ['No', "Don't know"]
-                }
-            ]
-        },
-        "role_visibility": ['CEO', 'CFO'],
-        "required": True,
-        "scoring_weight": Decimal('1.00'),
-        "framework_mappings": [
-            {
-                'weight': 1.0,
-                'dimension': 'cost_mapping',
-                'framework': 'v1_audit',
-                'sub_component': 'spend_report_completeness'
-            }
-        ],
-        "notes": 'v1.2: T1-C-001 eliminated (overlapped with C-006); skip logic redirected to C-006 reference',
-        "is_active": True,
-        "scoring_overrides": None,
-        "extended_metadata": None,
-    },
-    {
         "id": 'T1-C-003',
         "tier": 'tier_1',
         "section": 'C',
@@ -1640,6 +1593,53 @@ TIER_1_QUESTIONS = [
             }
         ],
         "notes": None,
+        "is_active": True,
+        "scoring_overrides": None,
+        "extended_metadata": None,
+    },
+    {
+        "id": 'T1-C-002',
+        "tier": 'tier_1',
+        "section": 'C',
+        "sequence_number": 2,
+        "question_text": 'What does that spend report include? (select all that apply)',
+        "question_type": 'MS',
+        "options": [
+            'Subscriptions',
+            'Per-seat licenses',
+            'API/usage charges',
+            'Professional services',
+            'Hardware',
+            'Training costs',
+            'Consulting',
+            'Vendor-enabled feature upgrades',
+            'Other (specify)',
+            'None of these'
+        ],
+        "matrix_rows": None,
+        "matrix_columns": None,
+        "skip_logic": {
+            'combine': 'any',
+            'conditions': [
+                {
+                    'type': 'answer_equals',
+                    'question_id': 'T1-C-006',
+                    'answer_value': ['No', "Don't know"]
+                }
+            ]
+        },
+        "role_visibility": ['CEO', 'CFO'],
+        "required": True,
+        "scoring_weight": Decimal('1.00'),
+        "framework_mappings": [
+            {
+                'weight': 1.0,
+                'dimension': 'cost_mapping',
+                'framework': 'v1_audit',
+                'sub_component': 'spend_report_completeness'
+            }
+        ],
+        "notes": 'v1.2: T1-C-001 eliminated (overlapped with C-006); skip logic redirected to C-006. 2026-07-19: physically moved after C-006 in document order so the dependency precedes it (was a forward reference the permissive evaluator masked).',
         "is_active": True,
         "scoring_overrides": None,
         "extended_metadata": None,
