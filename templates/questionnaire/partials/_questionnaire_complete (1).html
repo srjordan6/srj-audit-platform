@@ -1,0 +1,68 @@
+{% comment %}
+Rendered inside #question-shell when the respondent has finished every
+visible question. Branches on payment_status:
+  - 'comped' or 'paid' → confirm the report is on its way (auto-delivery
+    fired via reports.auto_delivery.on_respondent_complete when the
+    final answer was submitted).
+  - anything else ('free' / 'unpaid') → the paywall CTA to Stripe
+    Checkout via POST /billing/checkout/.
+{% endcomment %}
+<div class="text-center py-5">
+    <h2 class="mb-3" style="color: var(--srj-navy);">Assessment complete.</h2>
+
+    {% if payment_status == 'comped' or payment_status == 'paid' %}
+        <p class="lead text-muted mb-4">
+            Thanks for completing your AI Audit Snapshot.
+            Your locked PDF report is being generated right now and will
+            arrive by email within a minute or two — no payment required.
+        </p>
+        <div class="alert alert-success d-inline-block px-4 py-3 mb-4">
+            <strong>&#128231; Check your inbox shortly.</strong>
+            <div class="small text-muted mt-1">
+                Report + Basis of Opinion + 90-day plan, attached as a
+                locked PDF. You have a 7-day window to review and update
+                answers before the report locks.
+            </div>
+        </div>
+        <div class="mt-3">
+            <a href="{% url 'reports:download_my_report' %}"
+               class="btn btn-lg px-4 me-2"
+               style="background-color: var(--srj-orange); border-color: var(--srj-orange); color:#fff;">
+                &#8681; Download my report (PDF)
+            </a>
+            <a href="{% url 'questionnaire:review' %}"
+               class="btn btn-outline-primary btn-lg px-4">
+                &#9998; Review &amp; edit my answers
+            </a>
+        </div>
+        <p class="small text-muted mt-2 mb-0">
+            If the download says it is still generating, give it a minute and
+            refresh &mdash; it is also on its way to your inbox.
+        </p>
+        <p class="small text-muted mt-3 mb-0">
+            Editing an answer regenerates the report. You have a 7-day
+            edit window from the first report generation. The resume link
+            in your email keeps working for 30 days.
+        </p>
+    {% else %}
+        <p class="lead text-muted mb-4">
+            Thanks for completing your AI Audit Snapshot. Your report is
+            ready to purchase and download.
+        </p>
+
+        <form method="post" action="/billing/checkout/" class="d-inline-block">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-lg px-5 py-3"
+                    style="background-color: var(--srj-orange); border-color: var(--srj-orange); font-size: 1.1rem;">
+                Purchase Snapshot Report &mdash; $399
+            </button>
+        </form>
+
+        <p class="small text-muted mt-4 mb-0">
+            Secure payment via Stripe. You will be redirected to complete checkout.
+        </p>
+        <p class="small text-muted mt-2 mb-0">
+            Your responses are saved. You can return via the link in your email.
+        </p>
+    {% endif %}
+</div>

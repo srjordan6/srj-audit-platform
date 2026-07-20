@@ -36,68 +36,50 @@ swap_target     HTMX hx-target CSS selector.
       <span class="srj-question__text">{{ question.question_text }}</span>
     </legend>
 
-    <p class="text-muted small mb-3">
-      Check every AI-relevant law, regulation, or framework your company
-      is governed by, complies with, or must respond to. Sections are
-      collapsible. Anything not listed goes in the "Other" box at the
-      bottom. If none apply, leave everything unchecked.
-    </p>
-
     {% if question.recommended_laws %}
       <div class="alert alert-warning border-warning mb-3" role="status">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-          <div>
-            <strong>&#127919;
-              {% if question.ai_recommendation.ok %}AI recommends{% else %}Recommended for you{% endif %}</strong>
-            <span class="text-muted small">
-              &middot; {{ question.recommended_laws|length }} laws based on your
-              industry, footprint, and size{% if question.ai_recommendation.ok %} (Claude Sonnet){% endif %}
-            </span>
-          </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <button type="button"
-                    class="btn btn-sm btn-outline-primary"
-                    onclick="document.querySelectorAll('input[name=answer][data-recommended=\'1\']').forEach(function(el){el.checked=true;});">
-              Check all recommended
-            </button>
-            <button type="button"
-                    class="btn btn-sm btn-primary"
-                    hx-post="{% url 'questionnaire:ai_recommend_laws' %}"
-                    hx-target="#question-shell"
-                    hx-swap="innerHTML"
-                    hx-vals='{"force": "{% if question.ai_recommendation.ok %}1{% else %}0{% endif %}"}'
-                    hx-indicator="#srj-ai-spinner"
-                    hx-disabled-elt="this">
-              {% if question.ai_recommendation.ok %}
-                &#128260; Re-run AI
-              {% else %}
-                &#129302; Ask AI for a smarter recommendation
-              {% endif %}
-              <span id="srj-ai-spinner" class="spinner-border spinner-border-sm ms-1 htmx-indicator" role="status"></span>
-            </button>
-          </div>
+        <div>
+          <strong>&#9989;
+            {% if question.ai_recommendation.ok %}
+              We pre-selected {{ question.recommended_laws|length }} for you
+            {% else %}
+              Pre-selected {{ question.recommended_laws|length }} for you
+            {% endif %}
+          </strong>
+          <span class="text-muted small">
+            &middot; based on your industry, geographic footprint, and company
+            size{% if question.ai_recommendation.ok %}, analyzed by Claude{% endif %}
+          </span>
         </div>
         {% if question.ai_recommendation.summary %}
           <div class="mt-2 small fst-italic">
             {{ question.ai_recommendation.summary }}
           </div>
         {% endif %}
-        <div class="mt-2 small">
-          {% for name in question.recommended_laws %}
-            <span class="badge bg-warning text-dark me-1 mb-1">{{ name }}</span>
-          {% endfor %}
+        <div class="mt-2 small fw-semibold">
+          These are a starting point, not a legal determination.
+          <span class="fw-normal">
+            Review them below &mdash; uncheck anything that doesn't apply, and
+            check any we missed. You know your business better than we do.
+          </span>
         </div>
         {% if question.ai_recommendation.error %}
-          <div class="mt-2 small text-danger">
-            AI call failed: {{ question.ai_recommendation.error }}.
-            Falling back to rule-based recommendations.
+          <div class="mt-2 small text-muted">
+            (Used rule-based matching for this list.)
           </div>
         {% endif %}
       </div>
     {% endif %}
 
+    <p class="text-muted small mb-3">
+      Every AI-relevant law, regulation, or framework your company is
+      governed by, complies with, or must respond to. Sections are
+      collapsible &mdash; <strong>open each one to review and add more</strong>.
+      Anything not listed goes in the "Other" box at the bottom.
+    </p>
+
     {% for category_name, laws in question.law_categories %}
-      <details class="mb-3" {% if forloop.first %}open{% endif %}>
+      <details class="mb-3" open>
         <summary class="fw-semibold" style="cursor:pointer;">
           {{ category_name }}
           <span class="text-muted small">({{ laws|length }})</span>
@@ -113,7 +95,7 @@ swap_target     HTMX hx-target CSS selector.
                        id="{{ input_id }}"
                        value="{{ law_name }}"
                        data-recommended="{% if law_name in question.recommended_set %}1{% else %}0{% endif %}"
-                       {% if prior_answer and law_name in prior_answer.selected %}checked{% endif %}>
+                       {% if prior_answer %}{% if law_name in prior_answer.selected %}checked{% endif %}{% elif question.autocheck_recommended and law_name in question.recommended_set %}checked{% endif %}>
                 <label class="form-check-label" for="{{ input_id }}">
                   {{ law_name }}<a href="{{ law_url }}" target="_blank" rel="noopener"
                      class="glossary-info ms-1" aria-label="Learn about {{ law_name }}"
@@ -153,7 +135,7 @@ swap_target     HTMX hx-target CSS selector.
       Save &amp; continue
     </button>
     <span class="srj-question__hint text-muted small">
-      None apply? Leave everything unchecked and continue.
+      Add anything we missed &mdash; you can also uncheck everything if none apply.
     </span>
   </div>
 </form>

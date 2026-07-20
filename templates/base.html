@@ -409,6 +409,66 @@
       }
     });
 
+    // ------------------------------------------------------------------
+    // "Other (specify)" write-in reveal for MULTI-SELECT questions.
+    // The text input is hidden until an option whose value starts with
+    // "Other" is ticked. Delegated so it survives HTMX swaps.
+    // ------------------------------------------------------------------
+    function srjIsOther(value) {
+      return String(value || '').toLowerCase().trim().indexOf('other') === 0;
+    }
+
+    function srjSyncOtherBox(form) {
+      if (!form) return;
+      var wrap = form.querySelector('[data-srj-other-wrap]');
+      if (!wrap) return;
+      var anyOther = false;
+      form.querySelectorAll('input[type=checkbox][name=answer]').forEach(
+        function (b) { if (b.checked && srjIsOther(b.value)) anyOther = true; }
+      );
+      wrap.style.display = anyOther ? '' : 'none';
+      if (!anyOther) {
+        var inp = wrap.querySelector('input[name=other_specify]');
+        if (inp) inp.value = '';
+      }
+    }
+
+    document.body.addEventListener('change', function (evt) {
+      var el = evt.target;
+      if (!el || el.type !== 'checkbox' || el.name !== 'answer') return;
+      srjSyncOtherBox(el.closest && el.closest('form.srj-question--multi-select'));
+    });
+
+    // ------------------------------------------------------------------
+    // Bulk select / clear on MULTI-SELECT questions. "Select all" ticks
+    // every substantive option, skipping "Other" (needs a written value)
+    // and every opt-out ("None of these", "Don't know", ...) since those
+    // contradict a full selection.
+    // ------------------------------------------------------------------
+    document.body.addEventListener('click', function (evt) {
+      var btn = evt.target.closest &&
+                evt.target.closest('[data-srj-select-all], [data-srj-clear-all]');
+      if (!btn) return;
+      var form = btn.closest('form.srj-question--multi-select');
+      if (!form) return;
+      var selectAll = btn.hasAttribute('data-srj-select-all');
+      form.querySelectorAll('input[type=checkbox][name=answer]').forEach(
+        function (b) {
+          if (!selectAll) { b.checked = false; return; }
+          b.checked = !(srjIsOptOut(b.value) || srjIsOther(b.value));
+        }
+      );
+      srjSyncOtherBox(form);
+    });
+
+    // Re-sync the write-in box after every HTMX swap (covers prior answers
+    // restored via Previous / the progress slider / review-page edits).
+    document.body.addEventListener('htmx:afterSwap', function () {
+      document.querySelectorAll('form.srj-question--multi-select').forEach(
+        srjSyncOtherBox
+      );
+    });
+
     document.body.addEventListener('keydown', function (evt) {
       if (evt.key !== 'Enter' || evt.shiftKey || evt.ctrlKey || evt.metaKey) return;
       var target = evt.target;

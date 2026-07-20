@@ -7,9 +7,36 @@ NOT NULL — services pull company_id from context and include in INSERTs.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Optional
 
 from questionnaire import flow
+
+logger = logging.getLogger(__name__)
+
+
+def build_law_profile(ctx: dict, answered: dict) -> dict:
+    """Assemble the company profile sent to the Claude law recommender.
+
+    Prefers signup-captured fields; falls back to the legacy T1-A-005
+    (geography) and T1-A-007 (revenue) answers for engagements created
+    before those moved to the signup form. Shared by the automatic
+    recommendation in _decorate_question and the manual re-run endpoint
+    so both send Claude an identical profile (and therefore hit the same
+    cache key).
+    """
+    def _sel(qid):
+        v = answered.get(qid)
+        return v.get("selected") if isinstance(v, dict) else None
+
+    return {
+        "industry": ctx.get("company_industry"),
+        "size_bracket": ctx.get("company_size_bracket"),
+        "role_of_respondent": ctx.get("respondent_role"),
+        "geographic_footprint": ctx.get("geographic_footprint") or _sel("T1-A-005"),
+        "annual_revenue": ctx.get("annual_revenue") or _sel("T1-A-007"),
+        "regulations_the_user_already_checked": _sel("T1-A-006"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +329,9 @@ def _load_respondent_context(cursor, respondent_id: str) -> dict:
             "respondent_email": row[3],
             "annual_revenue": row[4],
             "geographic_footprint": row[5],
+            # Needed by the LAW_INVENTORY auto-AI path in
+            # _decorate_question (cache key + event attribution).
+            "respondent_id": respondent_id,
         }
     except Exception:  # noqa: BLE001
         return {}
@@ -349,6 +379,8 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
             ctx.get("geographic_footprint")
             or answered.get("T1-A-005")
         )
+        # Rule-based baseline — always computed, and the fallback if the
+        # AI call is unavailable or errors.
         q.recommended_laws = recommend_laws(
             industry=ctx.get("company_industry"),
             size_bracket=ctx.get("company_size_bracket"),
@@ -363,6 +395,34 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
                 if isinstance(answered.get("T1-A-005"), dict) else None
             ),
         }
+
+        # Run the AI recommender automatically (operator direction
+        # 2026-07-20: no button click). The result is cached in
+        # events.law_ai_recommendation keyed by profile hash, so only the
+        # first render of this question pays the Claude latency; every
+        # re-render, Previous/Next revisit, and edit is free. Any failure
+        # degrades silently to the rule-based list above.
+        rid = ctx.get("respondent_id")
+        if rid:
+            try:
+                from questionnaire.law_ai_recommender import ai_recommend_laws
+                ai = ai_recommend_laws(
+                    str(rid), build_law_profile(ctx, answered)
+                )
+                if ai.get("ok") and ai.get("selected"):
+                    q.recommended_laws = ai["selected"]
+                    q.recommended_set = set(ai["selected"])
+                q.ai_recommendation = ai
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "law AI auto-recommend failed for %s: %s", rid, exc
+                )
+                q.ai_recommendation = {"ok": False, "error": str(exc)}
+        # Pre-check state: on first view the recommendations come back
+        # already ticked. Once the respondent has saved an answer their
+        # choices win — we never re-tick something they deliberately
+        # unchecked.
+        q.autocheck_recommended = q.id not in answered
         return
 
     # T1-A-011 / T1-A-013 / T1-E-029: filter option list to only the
