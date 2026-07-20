@@ -20,8 +20,16 @@ rq==1.16.2
 requests>=2.32.0
 
 # PDF generation
-WeasyPrint==68.0
-pydyf==0.12.1
+# WeasyPrint pinned to 62.3 deliberately. 68.0 was deployed 2026-07-19 and
+# hard-crashed the report worker on Render (process died with no Python
+# traceback = native segfault; WeasyPrint 61+ wants newer pango/cairo than
+# Render's image ships). Its two CVEs are SSRF-class issues in external
+# URL fetching — neutralized instead by the deny-all url_fetcher in
+# reports/generator.py, which is a stronger control than the version bump
+# since our HTML never legitimately fetches anything remote.
+# Re-test 68.x only against Render's actual image, never a local sandbox.
+WeasyPrint==62.3
+pydyf==0.10.0
 pypdf==6.13.3
 cryptography>=42.0
 
