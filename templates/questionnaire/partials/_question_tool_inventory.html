@@ -47,8 +47,58 @@ swap_target     HTMX hx-target CSS selector.
       add it in the "Other tools" box at the bottom.
     </p>
 
+    {% comment %}
+    Search + counter. The catalog is large (300+ tools across 20+
+    categories), so scrolling it is impractical — typing is the primary
+    way in. Handlers are inline for the same reason as the multi-select
+    partial: base.html's script only runs on full page load, and this
+    markup arrives via an HTMX swap.
+    {% endcomment %}
+    <div class="mb-3 sticky-top py-2" style="background: var(--srj-bg, #FBF9F5); z-index: 5;">
+      <div class="input-group">
+        <span class="input-group-text">&#128269;</span>
+        <input type="text"
+               class="form-control"
+               id="tool-search-{{ question.id }}"
+               placeholder="Type to find a tool — e.g. copilot, midjourney, zoom"
+               autocomplete="off"
+               oninput="(function(box){
+                 var f=box.closest('form');
+                 var q=box.value.toLowerCase().trim();
+                 var shown=0;
+                 f.querySelectorAll('[data-tool-row]').forEach(function(row){
+                   var hit=!q||row.getAttribute('data-tool-name').indexOf(q)!==-1;
+                   row.style.display=hit?'':'none';
+                   if(hit)shown++;
+                 });
+                 f.querySelectorAll('details[data-tool-cat]').forEach(function(d){
+                   var any=d.querySelector('[data-tool-row]:not([style*=&quot;none&quot;])');
+                   d.style.display=any?'':'none';
+                   if(q&&any)d.open=true;
+                   if(!q)d.open=false;
+                 });
+                 var n=f.querySelector('[data-search-count]');
+                 if(n)n.textContent=q?(shown+' match'+(shown===1?'':'es')):'';
+               })(this)">
+        <button type="button" class="btn btn-outline-secondary"
+                onclick="(function(b){
+                  var f=b.closest('form');
+                  var box=f.querySelector('input[id^=tool-search-]');
+                  box.value='';
+                  box.dispatchEvent(new Event('input',{bubbles:true}));
+                  box.focus();
+                })(this)">Clear</button>
+      </div>
+      <div class="d-flex justify-content-between mt-1">
+        <span class="form-text mb-0" data-search-count></span>
+        <span class="form-text mb-0">
+          <strong data-selected-count>0</strong> selected
+        </span>
+      </div>
+    </div>
+
     {% for category_name, tools in question.tool_categories %}
-      <details class="mb-3" {% if forloop.first %}open{% endif %}>
+      <details class="mb-3" data-tool-cat>
         <summary class="fw-semibold" style="cursor:pointer;">
           {{ category_name }}
           <span class="text-muted small">({{ tools|length }})</span>
@@ -56,13 +106,21 @@ swap_target     HTMX hx-target CSS selector.
         <div class="row g-2 mt-2 ms-3">
           {% for tool in tools %}
             {% with input_id="tool-"|add:question.id|add:"-"|add:forloop.parentloop.counter|stringformat:"s"|add:"-"|add:forloop.counter|stringformat:"s" %}
-            <div class="col-md-6 col-lg-4">
+            <div class="col-md-6 col-lg-4"
+                 data-tool-row
+                 data-tool-name="{{ tool|lower }}">
               <div class="form-check">
                 <input class="form-check-input"
                        type="checkbox"
                        name="answer"
                        id="{{ input_id }}"
                        value="{{ tool }}"
+                       onclick="(function(c){
+                         var f=c.closest('form');
+                         var n=f.querySelectorAll('input[type=checkbox][name=answer]:checked').length;
+                         var t=f.querySelector('[data-selected-count]');
+                         if(t)t.textContent=n;
+                       })(this)"
                        {% if prior_answer and tool in prior_answer.selected %}checked{% endif %}>
                 <label class="form-check-label" for="{{ input_id }}">
                   {{ tool|glossary_annotate|safe }}
@@ -101,5 +159,23 @@ swap_target     HTMX hx-target CSS selector.
     </span>
   </div>
 </form>
+
+{% comment %}
+Seed the "N selected" counter on load so a resumed session shows the
+right number before the respondent touches anything. Inline and
+self-executing — HTMX evaluates scripts in swapped content.
+{% endcomment %}
+<script>
+  (function () {
+    var f = document.querySelector('form.srj-question--tool-inventory');
+    if (!f) return;
+    var t = f.querySelector('[data-selected-count]');
+    if (t) {
+      t.textContent = f.querySelectorAll(
+        'input[type=checkbox][name=answer]:checked'
+      ).length;
+    }
+  })();
+</script>
 
 {% include "questionnaire/partials/_progress_oob.html" %}
