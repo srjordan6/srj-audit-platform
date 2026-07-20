@@ -55,13 +55,42 @@ engine treats {"selected": ["None of these"]} correctly regardless.
     real answers is contradictory, and the mutex handler in base.html
     would clear them anyway.
     {% endcomment %}
+    {% comment %}
+    Handlers are INLINE, not delegated from base.html. base.html's script
+    runs once per full page load; HTMX only swaps #question-shell, so a
+    respondent whose tab was opened before a deploy would get new markup
+    driven by old JS and the buttons would silently do nothing. Inline
+    onclick is version-locked to the markup it ships with.
+    {% endcomment %}
     <div class="mb-3 d-flex gap-2 flex-wrap">
       <button type="button" class="btn btn-sm btn-outline-primary"
-              data-srj-select-all>
+              data-srj-select-all
+              onclick="(function(b){
+                var f=b.closest('form');
+                var isOut=function(v){v=String(v||'').toLowerCase().trim();
+                  return v==='none'||v.indexOf('none of ')===0||v.indexOf(&quot;don't know&quot;)===0
+                    ||v.indexOf('dont know')===0||v.indexOf('n/a')===0
+                    ||v.indexOf('not applicable')===0||v.indexOf('decline to answer')===0
+                    ||v==='unsure'||v===&quot;i'm not sure&quot;||v==='not sure';};
+                var isOth=function(v){return String(v||'').toLowerCase().trim().indexOf('other')===0;};
+                f.querySelectorAll('input[type=checkbox][name=answer]').forEach(function(c){
+                  c.checked=!(isOut(c.value)||isOth(c.value));
+                });
+                var w=f.querySelector('[data-srj-other-wrap]');
+                if(w){w.style.display='none';
+                  var i=w.querySelector('input[name=other_specify]'); if(i)i.value='';}
+              })(this)">
         Select all that apply (except Other)
       </button>
       <button type="button" class="btn btn-sm btn-outline-secondary"
-              data-srj-clear-all>
+              data-srj-clear-all
+              onclick="(function(b){
+                var f=b.closest('form');
+                f.querySelectorAll('input[type=checkbox][name=answer]').forEach(function(c){c.checked=false;});
+                var w=f.querySelector('[data-srj-other-wrap]');
+                if(w){w.style.display='none';
+                  var i=w.querySelector('input[name=other_specify]'); if(i)i.value='';}
+              })(this)">
         Clear all
       </button>
     </div>
@@ -75,6 +104,17 @@ engine treats {"selected": ["None of these"]} correctly regardless.
                  name="answer"
                  id="{{ input_id }}"
                  value="{{ option }}"
+                 onclick="(function(c){
+                   var f=c.closest('form');
+                   var w=f.querySelector('[data-srj-other-wrap]');
+                   if(!w)return;
+                   var on=false;
+                   f.querySelectorAll('input[type=checkbox][name=answer]').forEach(function(b){
+                     if(b.checked&&String(b.value||'').toLowerCase().trim().indexOf('other')===0)on=true;
+                   });
+                   w.style.display=on?'':'none';
+                   if(!on){var i=w.querySelector('input[name=other_specify]'); if(i)i.value='';}
+                 })(this)"
                  {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">
             {{ option|glossary_annotate|safe }}
