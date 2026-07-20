@@ -78,8 +78,8 @@ TIER_1_QUESTIONS = [
                 'framework': 'context'
             }
         ],
-        "notes": None,
-        "is_active": True,
+        "notes": '2026-07-20 DEACTIVATED: role is captured on the signup form and stored in respondents.role. Asking again was pure duplication. Scoring impact zero (framework weight 0, context only), and role_visibility filtering reads respondents.role via services.get_respondent_role(), not this answer.',
+        "is_active": False,
         "scoring_overrides": None,
         "extended_metadata": None,
     },
