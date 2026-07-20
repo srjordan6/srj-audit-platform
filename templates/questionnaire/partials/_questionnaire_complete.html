@@ -11,17 +11,27 @@ visible question. Branches on payment_status:
     <h2 class="mb-3" style="color: var(--srj-navy);">Assessment complete.</h2>
 
     {% if payment_status == 'comped' or payment_status == 'paid' %}
+        {% comment %}
+        Timing copy corrected 2026-07-20. Generation includes a Claude
+        call that writes five narrative sections; measured end-to-end
+        time is ~3 minutes, not "a minute or two". Under-promising here
+        prevents respondents concluding it failed and re-submitting.
+        {% endcomment %}
         <p class="lead text-muted mb-4">
             Thanks for completing your AI Audit Snapshot.
-            Your locked PDF report is being generated right now and will
-            arrive by email within a minute or two — no payment required.
+            Your locked PDF report is being written now — no payment required.
+            <strong>It usually takes about 3 minutes</strong> because an AI
+            analyst is drafting your findings section by section.
         </p>
         <div class="alert alert-success d-inline-block px-4 py-3 mb-4">
-            <strong>&#128231; Check your inbox shortly.</strong>
+            <strong>&#128231; Give it about 3 minutes, then check your inbox.</strong>
             <div class="small text-muted mt-1">
                 Report + Basis of Opinion + 90-day plan, attached as a
                 locked PDF. You have a 7-day window to review and update
                 answers before the report locks.
+                <br>
+                It is safe to close this page — the report is generated on
+                our servers and emailed to you either way.
             </div>
         </div>
         <div class="mt-3">
@@ -36,8 +46,8 @@ visible question. Branches on payment_status:
             </a>
         </div>
         <p class="small text-muted mt-2 mb-0">
-            If the download says it is still generating, give it a minute and
-            refresh &mdash; it is also on its way to your inbox.
+            If the download says it is still generating, wait about 3 minutes
+            and refresh &mdash; it is also on its way to your inbox.
         </p>
         <p class="small text-muted mt-3 mb-0">
             Editing an answer regenerates the report. You have a 7-day

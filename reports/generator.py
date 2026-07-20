@@ -61,14 +61,13 @@ def build_watermarked_html(
 def _deny_remote_fetch(url: str):
     """url_fetcher that refuses every non-inline resource.
 
-    Closes the SSRF surface behind WeasyPrint's two open CVEs
-    (PYSEC-2026-2034 / PYSEC-2026-3412) without needing the 68.x upgrade,
-    which segfaults on Render's image. Our report HTML is generated from
-    our own template and legitimately references nothing remote — only
-    inline `data:` URIs — so a deny-all fetcher is a tighter control than
-    the version bump: even if respondent-supplied text (company name,
-    "Other" free-text) ever reached an href/src, it cannot cause an
-    outbound request.
+    Defence in depth alongside the WeasyPrint 68.0 pin. 68.0 patches
+    PYSEC-2026-2034; PYSEC-2026-3412 has no upstream fix, and this
+    fetcher closes it. Our report HTML is generated from our own template
+    and legitimately references nothing remote — only inline `data:`
+    URIs — so denying everything else costs nothing and means even
+    respondent-supplied text (company name, "Other" free-text) reaching
+    an href/src cannot cause an outbound request.
     """
     if url.startswith("data:"):
         from weasyprint.urls import default_url_fetcher
@@ -81,8 +80,7 @@ def _deny_remote_fetch(url: str):
 def html_to_pdf_bytes(html: str) -> bytes:
     """Convert HTML string to PDF bytes via WeasyPrint (lazy import).
 
-    Pinned to WeasyPrint 62.3 — see the note in requirements.txt. All
-    external fetching is blocked via _deny_remote_fetch.
+    All external resource fetching is blocked via _deny_remote_fetch.
     """
     from weasyprint import HTML
     return HTML(string=html, url_fetcher=_deny_remote_fetch).write_pdf()
