@@ -363,14 +363,16 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
         # so users can only jump within already-visited territory.
         q.last_answered_position = _last_answered_index(visible, answered)
     if q.question_type == "TOOL_INVENTORY":
-        from questionnaire.tool_catalog import CATEGORIES
-        q.tool_categories = CATEGORIES
+        # DB-first (WordPress-synced), falling back to the shipped catalog.
+        from questionnaire.synced_content import tool_categories
+        q.tool_categories = tool_categories()
         return
 
     if q.question_type == "LAW_INVENTORY":
-        from questionnaire.law_catalog import CATEGORIES
+        # DB-first (WordPress-synced), falling back to the shipped catalog.
+        from questionnaire.synced_content import law_categories
         from questionnaire.law_recommender import recommend_laws
-        q.law_categories = CATEGORIES
+        q.law_categories = law_categories()
         ctx = respondent_ctx or {}
         # Prefer signup-captured profile fields. Fall back to legacy
         # T1-A-005 / T1-A-007 answers for engagements that pre-date the

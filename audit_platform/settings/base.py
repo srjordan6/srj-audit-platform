@@ -168,6 +168,11 @@ PLATFORM_BASE_URL = env('PLATFORM_BASE_URL', default='http://localhost:8000')
 TURNSTILE_SITE_KEY = env('TURNSTILE_SITE_KEY', default='')
 TURNSTILE_SECRET_KEY = env('TURNSTILE_SECRET_KEY', default='')
 
+# WordPress content sync (srj-audit-sync plugin on srjconsultingservices.com
+# pushes glossary/tools/laws here weekly). Empty = endpoint disabled.
+# Must match the "Shared secret" saved in wp-admin > Settings > SRJ Audit Sync.
+CONTENT_SYNC_SECRET = env('CONTENT_SYNC_SECRET', default='')
+
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = env('DEFAULT_TIMEZONE', default='America/Chicago')

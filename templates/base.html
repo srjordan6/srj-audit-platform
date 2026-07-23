@@ -120,6 +120,20 @@
       color: var(--srj-orange-dark);
       text-decoration: none;
     }
+    /* Glossary VOCABULARY links (WordPress-synced AI Glossary terms).
+       Underlined dotted so they read as "definition available" rather
+       than navigation; hover shows the definition via title attr. */
+    .glossary-vocab {
+      color: inherit;
+      text-decoration: underline dotted var(--srj-orange);
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+    .glossary-vocab:hover,
+    .glossary-vocab:focus {
+      color: var(--srj-orange-dark);
+      text-decoration: underline solid var(--srj-orange-dark);
+    }
     a:hover { color: var(--srj-orange); }
 
     /* Header with logo */

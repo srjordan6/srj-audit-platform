@@ -15,6 +15,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import include, path
 
+from core.content_sync import content_sync_view
 from questionnaire import views as q_views
 
 
@@ -35,6 +36,9 @@ urlpatterns = [
     path('startaiaudit/', q_views.start, name='start_alias'),
     path('admin/', admin.site.urls),
     path('healthz/', healthz, name='healthz'),
+    # WordPress content sync (srj-audit-sync plugin pushes here weekly).
+    # HMAC-authenticated via CONTENT_SYNC_SECRET; see core/content_sync.py.
+    path('api/content-sync/', content_sync_view, name='content_sync'),
     path('django-rq/', include('django_rq.urls')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
     # The following includes will be enabled as each app is built.

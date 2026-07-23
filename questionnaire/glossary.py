@@ -206,14 +206,68 @@ def _wrap(match_text: str, url: str) -> str:
     )
 
 
+def _wrap_vocab(match_text: str, definition: str) -> str:
+    """Underlined glossary-vocabulary link (distinct from framework ⓘ).
+
+    Links to the AI Glossary page; the definition rides along as the
+    hover title so respondents get the meaning without leaving the form.
+    """
+    esc_term = html_escape(match_text, quote=True)
+    tip = definition[:180] if definition else f"See the AI Glossary: {match_text}"
+    esc_tip = html_escape(tip, quote=True)
+    esc_url = html_escape(_GLOSSARY_URL, quote=True)
+    return (
+        f'{_SENTINEL_OPEN}<a class="glossary-vocab" href="{esc_url}" '
+        f'target="_blank" rel="noopener" title="{esc_tip}" '
+        f'aria-label="Glossary: {esc_term}">{esc_term}</a>{_SENTINEL_CLOSE}'
+    )
+
+
+_GLOSSARY_URL = "https://srjconsultingservices.com/resources/ai-glossary/"
+
+# Vocabulary patterns are compiled lazily on first annotate() call and
+# re-checked every CACHE_SECONDS via synced_content's own cache, so a
+# WordPress glossary edit reaches the questionnaire without a deploy.
+_vocab_compiled: list[tuple[str, str, "re.Pattern"]] | None = None
+_vocab_loaded_at: float = 0.0
+
+
+def _vocab_terms() -> list[tuple[str, str, "re.Pattern"]]:
+    global _vocab_compiled, _vocab_loaded_at
+    import time
+    if _vocab_compiled is not None and time.time() - _vocab_loaded_at < 300:
+        return _vocab_compiled
+    compiled: list[tuple[str, str, re.Pattern]] = []
+    try:
+        from questionnaire.synced_content import glossary_terms
+        terms = glossary_terms()
+        # Skip anything already covered by the framework TERMS map — the
+        # ⓘ link to the specific reference page beats a generic glossary
+        # link for those.
+        framework_lower = {t.lower() for t in TERMS}
+        for term, definition in sorted(
+            terms.items(), key=lambda kv: (-len(kv[0]), kv[0])
+        ):
+            if term.lower() in framework_lower:
+                continue
+            compiled.append((term, definition, _term_pattern(term)))
+    except Exception:  # noqa: BLE001
+        compiled = []
+    _vocab_compiled = compiled
+    _vocab_loaded_at = time.time()
+    return compiled
+
+
 def annotate(text: str) -> str:
-    """Return HTML with each glossary term wrapped in an info-icon span.
+    """Return HTML with framework terms (ⓘ icon link) and glossary
+    vocabulary (underlined link) annotated.
 
     Input `text` is treated as PLAIN TEXT (HTML-escaped before scanning)
     so callers don't need to worry about markup injection from question
     data. Longest / most-specific terms match first; already-linked
     spans are protected from re-annotation via sentinel markers, which
-    are stripped before returning.
+    are stripped before returning. Framework terms run FIRST so the
+    specific reference-page link wins over the generic glossary link.
     """
     if not text:
         return ""
@@ -223,21 +277,27 @@ def annotate(text: str) -> str:
     # text still matches the compiled patterns.
     out = html_escape(str(text), quote=False)
 
-    for term, url, pattern in _COMPILED:
-        def _sub(match: re.Match, u=url) -> str:
-            # If this match sits inside an already-wrapped sentinel span,
-            # skip it. We check the surrounding text via string slicing:
+    def _protected_sub(pattern: "re.Pattern", wrap_fn):
+        nonlocal out
+
+        def _sub(match: re.Match) -> str:
             start = match.start()
-            # Look backward for the nearest sentinel of either kind.
             preceding = out[:start]
             last_open = preceding.rfind(_SENTINEL_OPEN)
             last_close = preceding.rfind(_SENTINEL_CLOSE)
             if last_open > last_close:
-                # We're inside an already-linked span; leave untouched.
-                return match.group(0)
-            return _wrap(match.group(0), u)
+                return match.group(0)   # inside an existing link
+            return wrap_fn(match.group(0))
 
         out = pattern.sub(_sub, out)
+
+    # Pass 1: framework/legal terms -> specific reference pages (ⓘ).
+    for term, url, pattern in _COMPILED:
+        _protected_sub(pattern, lambda m, u=url: _wrap(m, u))
+
+    # Pass 2: WordPress-synced glossary vocabulary -> underlined links.
+    for term, definition, pattern in _vocab_terms():
+        _protected_sub(pattern, lambda m, d=definition: _wrap_vocab(m, d))
 
     # Strip sentinels; keep the wrapped HTML.
     out = out.replace(_SENTINEL_OPEN, "").replace(_SENTINEL_CLOSE, "")
