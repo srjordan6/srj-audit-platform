@@ -47,6 +47,29 @@ def _rows(sql: str, params=()) -> list[tuple]:
 #   [(category_name, [tool_name, ...]), ...]
 # ---------------------------------------------------------------------------
 
+def _tool_short_name(raw: str) -> str:
+    """Extract the display name from the WP page's verbose entry format.
+
+    The tools page renders entries as
+        "AI21 Labs API (AI21 Labs, Israel) — Jurassic models; enterprise..."
+    and the plugin captures the whole line. Checkbox labels (and stored
+    answer values, which must stay match-able across syncs) want just
+    "AI21 Labs API". Split on the em/en dash first, then strip a
+    trailing "(Vendor, HQ)" parenthetical — but ONLY a trailing one, so
+    names like "v0 (Vercel)" from the shipped catalog stay intact when
+    they arrive without a description.
+    """
+    name = raw.split(" — ")[0].split(" – ")[0].strip()
+    # Strip a "(Vendor, HQ)" parenthetical only when a comma marks it as
+    # a vendor/location pair; "v0 (Vercel)" and "DALL-E (OpenAI)" keep
+    # their parens because they're part of the recognized product name.
+    import re as _re
+    m = _re.match(r"^(.*\S)\s+\(([^()]*,[^()]*)\)$", name)
+    if m:
+        name = m.group(1).strip()
+    return name[:200]
+
+
 def tool_categories() -> list[tuple[str, list[str]]]:
     def load():
         try:
@@ -61,7 +84,12 @@ def tool_categories() -> list[tuple[str, list[str]]]:
             from questionnaire.tool_catalog import CATEGORIES
             return CATEGORIES
         by: "OrderedDict[str, list[str]]" = OrderedDict()
-        for cat, name in rows:
+        seen: set[str] = set()
+        for cat, raw in rows:
+            name = _tool_short_name(raw or "")
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
             by.setdefault(cat or "Other", []).append(name)
         return list(by.items())
     return _cached("tools", load)
@@ -70,25 +98,80 @@ def tool_categories() -> list[tuple[str, list[str]]]:
 # ---------------------------------------------------------------------------
 # Laws — categories shape identical to law_catalog.CATEGORIES:
 #   [(category_name, [(law_name, url), ...]), ...]
+#
+# The WP hub-page harvest is anchor-based and inevitably noisy: it picks
+# up in-copy links ("Read what changed", "four matter"), utility pages
+# (AI Tools, Sources & References), and short-name duplicates ("NIS2"
+# next to "NIS2 Directive"). Cleaning here rather than in the plugin
+# means a plugin parser regression can never dirty the questionnaire.
+# Categories come from the shipped catalog (the WP hub page carries no
+# category markup per anchor); genuinely new laws land in a trailing
+# "Recently Added" bucket until the catalog is regenerated.
 # ---------------------------------------------------------------------------
+
+_LAW_JUNK_EXACT = {
+    "ai tools", "ai tools catalog", "sources & references", "sources",
+    "four matter", "home", "read more", "learn more",
+}
+_LAW_JUNK_PREFIXES = ("read ", "see ", "learn ", "explore ")
+
+# Pages that are navigation/utility rather than laws.
+_LAW_JUNK_URL_PARTS = ("/ai-tools", "/sources")
+
+
+def _law_is_junk(name: str, url: str) -> bool:
+    low = name.lower().strip()
+    if low in _LAW_JUNK_EXACT:
+        return True
+    if low.startswith(_LAW_JUNK_PREFIXES):
+        return True
+    return any(p in (url or "") for p in _LAW_JUNK_URL_PARTS)
+
 
 def law_categories() -> list[tuple[str, list[tuple[str, str]]]]:
     def load():
         try:
             rows = _rows(
-                "SELECT category, law_name, url FROM synced_laws "
-                "WHERE is_active = TRUE ORDER BY category, sort_order, law_name"
+                "SELECT law_name, url FROM synced_laws "
+                "WHERE is_active = TRUE ORDER BY sort_order, law_name"
             )
         except Exception:  # noqa: BLE001
             logger.exception("synced_laws read failed; using catalog")
             rows = []
-        if len(rows) < 20:
-            from questionnaire.law_catalog import CATEGORIES
-            return CATEGORIES
-        by: "OrderedDict[str, list[tuple[str, str]]]" = OrderedDict()
-        for cat, name, url in rows:
-            by.setdefault(cat or "Other", []).append((name, url))
-        return list(by.items())
+
+        from questionnaire.law_catalog import CATEGORIES as CATALOG
+
+        # Clean + dedupe: drop junk anchors, then keep the LONGEST name
+        # per URL so "NIS2 Directive" beats "NIS2".
+        by_url: dict[str, str] = {}
+        for name, url in rows:
+            name = (name or "").strip()
+            if not name or _law_is_junk(name, url):
+                continue
+            key = (url or name).rstrip("/")
+            if key not in by_url or len(name) > len(by_url[key]):
+                by_url[key] = name
+        synced = {v: k for k, v in by_url.items()}   # name -> url
+
+        if len(synced) < 20:
+            return CATALOG
+
+        # Rebuild in catalog category order; anything the WP page has
+        # that the catalog doesn't know goes into "Recently Added".
+        out: list[tuple[str, list[tuple[str, str]]]] = []
+        seen: set[str] = set()
+        for cat_name, items in CATALOG:
+            keep = []
+            for law_name, cat_url in items:
+                if law_name in synced:
+                    keep.append((law_name, synced[law_name] or cat_url))
+                    seen.add(law_name)
+            if keep:
+                out.append((cat_name, keep))
+        extras = [(n, u) for n, u in sorted(synced.items()) if n not in seen]
+        if extras:
+            out.append(("Recently Added", extras))
+        return out
     return _cached("laws", load)
 
 
