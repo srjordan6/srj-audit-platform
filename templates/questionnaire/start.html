@@ -14,9 +14,24 @@
 <div class="container py-5" style="max-width: 640px;">
     <h1 class="mb-3">AI Audit Snapshot</h1>
     <p class="text-muted mb-4">
-        Free 30-minute assessment across five dimensions. Get your top-line
-        scores immediately.
+        A 30-minute assessment across five dimensions. Get your top-line
+        scores immediately, plus a board-ready report.
     </p>
+
+    {% if code_free %}
+        <div class="alert alert-success d-flex align-items-center" role="alert"
+             style="border-left: 4px solid #198754;">
+            <span style="font-size:1.4rem; line-height:1; margin-right:.6rem;">✓</span>
+            <div>
+                <strong>Beta access applied — your audit is free.</strong><br>
+                <span class="small">No payment required (normally $399).{% if code_label %} {{ code_label }}.{% endif %}</span>
+            </div>
+        </div>
+    {% elif code_valid %}
+        <div class="alert alert-success" role="alert">
+            <strong>Discount code applied.</strong> It will be honored at checkout.
+        </div>
+    {% endif %}
 
     {% if access_code_error %}
         <div class="alert alert-danger" role="alert">
@@ -26,6 +41,13 @@
 
     <form method="post" action="{% url 'questionnaire:start' %}">
         {% csrf_token %}
+
+        {% comment %}Marketing attribution — carried from the landing query string.{% endcomment %}
+        <input type="hidden" name="utm_source" value="{{ utm.utm_source|default:'' }}">
+        <input type="hidden" name="utm_medium" value="{{ utm.utm_medium|default:'' }}">
+        <input type="hidden" name="utm_campaign" value="{{ utm.utm_campaign|default:'' }}">
+        <input type="hidden" name="utm_content" value="{{ utm.utm_content|default:'' }}">
+        <input type="hidden" name="utm_term" value="{{ utm.utm_term|default:'' }}">
 
         {% comment %}
         Honeypot: real users never see or fill this. Bots that blindly fill
@@ -180,10 +202,14 @@
             </label>
             <input type="text" id="access_code" name="access_code"
                    value="{{ prefill_code|default:'' }}"
-                   class="form-control" autocomplete="off"
+                   class="form-control{% if code_free %} is-valid{% endif %}" autocomplete="off"
                    placeholder="Have a code? Enter it here.">
             <div class="form-text">
-                If you were invited to test the audit, enter your code to skip payment.
+                {% if code_free %}
+                    ✓ Free beta access applied — you won't be charged.
+                {% else %}
+                    Have a beta or promo code? Enter it here to unlock free access.
+                {% endif %}
             </div>
         </div>
 

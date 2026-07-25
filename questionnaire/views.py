@@ -250,10 +250,30 @@ def ai_recommend_laws_view(request):
     with connection.cursor() as cursor:
         rctx = services._load_respondent_context(cursor, rid)
         answered = services.load_answered_by_id(cursor, rid)
-        # Shared profile builder — identical shape to the automatic
-        # recommendation in services._decorate_question, so both paths
-        # hit the same events.law_ai_recommendation cache key.
-        profile = services.build_law_profile(rctx, answered)
+        # Assemble the profile we send to Claude. Include revenue if the
+        # respondent has already answered T1-A-007; otherwise omit it.
+        # Prefer signup-captured company profile (industry / size /
+        # revenue / geographic). Fall back to T1-A-005 and T1-A-007 for
+        # any engagement created before those moved to signup.
+        legacy_geo = (
+            (answered.get("T1-A-005") or {}).get("selected")
+            if isinstance(answered.get("T1-A-005"), dict) else None
+        )
+        legacy_rev = (
+            (answered.get("T1-A-007") or {}).get("selected")
+            if isinstance(answered.get("T1-A-007"), dict) else None
+        )
+        profile = {
+            "industry": rctx.get("company_industry"),
+            "size_bracket": rctx.get("company_size_bracket"),
+            "role_of_respondent": rctx.get("respondent_role"),
+            "geographic_footprint": rctx.get("geographic_footprint") or legacy_geo,
+            "annual_revenue": rctx.get("annual_revenue") or legacy_rev,
+            "regulations_the_user_already_checked": (
+                (answered.get("T1-A-006") or {}).get("selected")
+                if isinstance(answered.get("T1-A-006"), dict) else None
+            ),
+        }
 
         from questionnaire.law_ai_recommender import ai_recommend_laws
         ai_result = ai_recommend_laws(rid, profile, force_refresh=force)
@@ -477,16 +497,47 @@ def submit_response(request):
 def start(request):
     from questionnaire import bot_protection as bp
 
+    # Marketing attribution: capture utm_* from the query string so we can
+    # measure which channel drove each start. Carried through the form as
+    # hidden inputs (below) and logged to events when the engagement is
+    # created. Truncated to keep payloads sane.
+    utm = {
+        k: request.GET.get(k, "").strip()[:255]
+        for k in ("utm_source", "utm_medium", "utm_campaign",
+                  "utm_content", "utm_term")
+    }
+
     if request.method == "GET":
         # Pre-fill the access-code input from ?code=<CODE> so LinkedIn/
         # marketing URLs can include the promo in the query string.
         prefill_code = request.GET.get("code", "").strip()
+        # Validate the prefilled code NOW so the page can reassure the
+        # visitor the audit is free. Without this, a visitor who clicked a
+        # "FREE" ad still saw "enter your code to skip payment" and bounced.
+        code_valid = False
+        code_free = False
+        code_label = ""
+        if prefill_code:
+            from questionnaire.access_codes import validate_code
+            with connection.cursor() as cursor:
+                _row = validate_code(cursor, prefill_code)
+            if _row is not None:
+                code_valid = True
+                code_label = _row.label or ""
+                code_free = (
+                    "full_comp" in (_row.kind or "")
+                    or float(_row.percentage or 0) >= 100
+                )
         from questionnaire.naics_catalog import SECTORS as NAICS_SECTORS
         return render(
             request,
             "questionnaire/start.html",
             {
                 "prefill_code": prefill_code,
+                "code_valid": code_valid,
+                "code_free": code_free,
+                "code_label": code_label,
+                "utm": utm,
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
             },
@@ -625,6 +676,27 @@ def start(request):
         raise
 
     request.session["respondent_id"] = rid
+
+    # Marketing attribution: log utm_* (from hidden form fields carried
+    # over from the landing query string) against this new respondent so
+    # we can measure which channel drove the start. Non-fatal.
+    try:
+        _utm = {
+            k: request.POST.get(k, "").strip()[:255]
+            for k in ("utm_source", "utm_medium", "utm_campaign",
+                      "utm_content", "utm_term")
+        }
+        if any(_utm.values()):
+            import json as _json
+            with connection.cursor() as _c:
+                _c.execute(
+                    "INSERT INTO events (id, event_type, payload) "
+                    "VALUES (gen_random_uuid(), %s, %s::jsonb)",
+                    ["marketing_attribution",
+                     _json.dumps({"respondent_id": str(rid), **_utm})],
+                )
+    except Exception:  # noqa: BLE001
+        pass
 
     # Fire-and-forget resume-link email. The user gets a 30-day-valid
     # personal link so they can pick up from any device, any time. Non-
