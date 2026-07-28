@@ -1,0 +1,50 @@
+{% comment %}
+Analytics tags — single source of truth for every third-party tracker.
+
+Included from base.html <head>. Add or change tags HERE only; never paste
+snippets into individual templates.
+
+Host gate: tags render only on the production hostnames. Local dev
+(127.0.0.1 / localhost) and any preview host stay clean, so dev traffic
+never pollutes the analytics properties.
+
+Installed:
+  - Google Analytics 4   G-6LM3EMLLZN
+  - Microsoft Clarity    xta7r2l6l3
+  - StatCounter          13338525
+{% endcomment %}
+{% if request.get_host == "aiauditforcompanies.com" or request.get_host == "www.aiauditforcompanies.com" or request.get_host == "srj-audit-web-gor5.onrender.com" %}
+  {# Google tag (gtag.js) — GA4 #}
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-6LM3EMLLZN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-6LM3EMLLZN');
+  </script>
+
+  {# Microsoft Clarity — session recordings + heatmaps #}
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xta7r2l6l3");
+  </script>
+
+  {# StatCounter — invisible pageview counter #}
+  <script type="text/javascript">
+    var sc_project=13338525;
+    var sc_invisible=1;
+    var sc_security="d5ff6432";
+  </script>
+  <script type="text/javascript"
+          src="https://www.statcounter.com/counter/counter.js"
+          async></script>
+  <noscript><div class="statcounter"><a title="Web Analytics"
+     href="https://statcounter.com/" target="_blank"><img
+     class="statcounter"
+     src="https://c.statcounter.com/13338525/0/d5ff6432/1/"
+     alt="Web Analytics"
+     referrerPolicy="no-referrer-when-downgrade"></a></div></noscript>
+{% endif %}
