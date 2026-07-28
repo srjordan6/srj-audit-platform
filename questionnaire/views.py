@@ -528,6 +528,29 @@ def start(request):
                     "full_comp" in (_row.kind or "")
                     or float(_row.percentage or 0) >= 100
                 )
+        # Click-level attribution: log the LANDING (GET) as its own event
+        # so a visit that never submits the form is still measurable.
+        # Deduped per session per campaign so refreshes don't inflate.
+        try:
+            if any(utm.values()):
+                _seen = request.session.get("utm_view_logged") or []
+                _key = "|".join([
+                    utm["utm_source"], utm["utm_campaign"], utm["utm_content"]
+                ])
+                if _key not in _seen:
+                    import json as _json
+                    with connection.cursor() as _c:
+                        _c.execute(
+                            "INSERT INTO events (id, event_type, payload) "
+                            "VALUES (gen_random_uuid(), %s, %s::jsonb)",
+                            ["marketing_attribution_view",
+                             _json.dumps({"code": prefill_code, **utm})],
+                        )
+                    request.session["utm_view_logged"] = _seen + [_key]
+                    request.session.modified = True
+        except Exception:  # noqa: BLE001
+            pass
+
         from questionnaire.naics_catalog import SECTORS as NAICS_SECTORS
         return render(
             request,
