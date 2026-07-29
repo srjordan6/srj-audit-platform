@@ -157,6 +157,17 @@
 
   var el = function (id) { return document.getElementById(id); };
 
+  // Production sets CSRF_COOKIE_HTTPONLY = True, so JS CANNOT read the
+  // csrftoken cookie — every fetch below would 403 and the .catch() would
+  // swallow it silently, leaving the funnel live but unmeasurable.
+  // base.html renders <meta name="csrf-token"> for exactly this reason;
+  // it is the same source the HTMX wiring uses. Cookie is a dev fallback.
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) { return meta.content; }
+    return (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  }
+
   function show(which) {
     el('xs-intro').hidden = which !== 'intro';
     el('xs-quiz').hidden = which !== 'quiz';
@@ -264,7 +275,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''
+          'X-CSRFToken': csrfToken()
         },
         body: JSON.stringify(body)
       }).catch(function () {});
