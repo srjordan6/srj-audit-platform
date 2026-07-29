@@ -1,6 +1,8 @@
 """AI-governance law/framework catalog for T1-A-006 LAW_INVENTORY.
 
-Source: ai-governance-coverage.csv (Stephen, 2026-07-15). 59 rows.
+Source: ai-governance-coverage.csv (Stephen, 2026-07-15). LAWS_FLAT is 61
+entries as of 2026-07-29 (an earlier docstring said 59; recount confirms 61).
+This count is quoted in public marketing copy — update both together.
 Every URL points to the srjconsultingservices.com reference page for
 that framework/law. Categories are derived from URL path.
 """
