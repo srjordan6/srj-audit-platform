@@ -1,0 +1,44 @@
+{% comment %}
+LinkedIn Insight Tag — partner ID 9681908.
+
+DELIBERATELY NOT IN _analytics.html.
+
+_analytics.html is included from base.html, which means every page — including
+/q/start/, where a respondent enters their name, email, company, revenue band
+and size bracket. LinkedIn's own guidance is to place the tag in the global
+footer "unless your site includes pages that collect or otherwise handle
+health, financial, or other sensitive data of individual users," and never to
+add the code to such pages.
+
+So this partial is included ONLY from the exposure screener (/q/score/ and its
+/aiscore alias), which collects nothing identifying at all — five multiple
+choice answers and no form. That is also the only Django page paid traffic
+lands on, so it is where the retargeting pool actually comes from. Nothing is
+lost by keeping it off the questionnaire.
+
+If you ever need the tag on another Django page, include this partial from
+that template's extra_head block. Do not move it into _analytics.html.
+
+Host gate matches _analytics.html so local dev never pollutes the ad account.
+{% endcomment %}
+{% if request.get_host == "aiauditforcompanies.com" or request.get_host == "www.aiauditforcompanies.com" or request.get_host == "srj-audit-web-gor5.onrender.com" %}
+  <script type="text/javascript">
+    _linkedin_partner_id = "9681908";
+    window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+    window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+  </script>
+  <script type="text/javascript">
+    (function(l) {
+      if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+      window.lintrk.q=[]}
+      var s = document.getElementsByTagName("script")[0];
+      var b = document.createElement("script");
+      b.type = "text/javascript";b.async = true;
+      b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+      s.parentNode.insertBefore(b, s);})(window.lintrk);
+  </script>
+  <noscript>
+    <img height="1" width="1" style="display:none;" alt=""
+         src="https://px.ads.linkedin.com/collect/?pid=9681908&amp;fmt=gif" />
+  </noscript>
+{% endif %}

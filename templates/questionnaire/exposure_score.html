@@ -3,6 +3,15 @@
 
 {% block title %}What's your AI exposure? — 60-second score{% endblock %}
 
+{% comment %}
+LinkedIn Insight Tag is included here rather than in _analytics.html so it
+loads on this page only. See templates/partials/_linkedin_insight.html for
+why — short version: /q/start/ collects personal and company financial data
+and LinkedIn's placement guidance says keep the tag off such pages. This
+screener collects nothing identifying, and it is where paid traffic lands.
+{% endcomment %}
+{% block extra_head %}{% include "partials/_linkedin_insight.html" %}{% endblock %}
+
 {% block content %}
 <div class="xs-wrap">
 
