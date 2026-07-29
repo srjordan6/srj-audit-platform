@@ -2,6 +2,7 @@
 
 Top-level routing. App URLs are included by prefix:
 - /                  → marketing landing + engagement creation (engagements app)
+- /aiscore/          → AI Exposure Score screener, alias of /q/score/ (paid entry)
 - /q/<token>/        → respondent questionnaire flow (questionnaire app)
 - /r/<token>/        → Tier 2/3 respondent magic-link entry (questionnaire app)
 - /billing/          → Stripe webhooks + checkout (billing app)
@@ -34,6 +35,10 @@ urlpatterns = [
     # Public branded start URL — aiauditforcompanies.com/startaiaudit → questionnaire.views.start.
     # Alias of /q/start/; both routes render the same view. Marketing CTAs link here.
     path('startaiaudit/', q_views.start, name='start_alias'),
+    # Public branded funnel entry — aiauditforcompanies.com/aiscore → the
+    # 5-question AI Exposure Score screener. Alias of /q/score/; both routes
+    # render the same view. Paid social points here, not at /startaiaudit.
+    path('aiscore/', q_views.exposure_score, name='aiscore_alias'),
     path('admin/', admin.site.urls),
     path('healthz/', healthz, name='healthz'),
     # WordPress content sync (srj-audit-sync plugin pushes here weekly).
