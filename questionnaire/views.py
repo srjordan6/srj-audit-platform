@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from django.db import connection, transaction
 from django.http import HttpResponseBadRequest, HttpResponseNotFound
 from django.shortcuts import redirect, render
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
 from engagements import lifecycle
@@ -530,7 +530,15 @@ def start(request):
                 )
         # Click-level attribution: log the LANDING (GET) as its own event
         # so a visit that never submits the form is still measurable.
-        # Deduped per session per campaign so refreshes don't inflate.
+        #
+        # Dedupe is BELT AND BRACES, deliberately:
+        #  1. Session key — cheap, catches refreshes within a session.
+        #  2. Fingerprint + time window enforced INSIDE the INSERT — catches
+        #     the case the session key cannot: two near-simultaneous requests
+        #     (redirect chains, link prefetch, the Cloudflare worker proxy)
+        #     that both run before either response has set a session cookie.
+        #     Session-only dedupe let one real click log twice, 244ms apart,
+        #     on 2026-07-29. Do not remove the SQL guard.
         try:
             if any(utm.values()):
                 _seen = request.session.get("utm_view_logged") or []
@@ -538,13 +546,27 @@ def start(request):
                     utm["utm_source"], utm["utm_campaign"], utm["utm_content"]
                 ])
                 if _key not in _seen:
+                    import hashlib as _hashlib
                     import json as _json
+                    _fp = _hashlib.sha256("|".join([
+                        bp._client_ip(request),
+                        request.META.get("HTTP_USER_AGENT", "")[:255],
+                        _key,
+                    ]).encode("utf-8")).hexdigest()[:32]
+                    _payload = _json.dumps(
+                        {"code": prefill_code, "dedupe": _fp, **utm}
+                    )
                     with connection.cursor() as _c:
                         _c.execute(
                             "INSERT INTO events (id, event_type, payload) "
-                            "VALUES (gen_random_uuid(), %s, %s::jsonb)",
-                            ["marketing_attribution_view",
-                             _json.dumps({"code": prefill_code, **utm})],
+                            "SELECT gen_random_uuid(), %s, %s::jsonb "
+                            "WHERE NOT EXISTS ("
+                            "  SELECT 1 FROM events"
+                            "   WHERE event_type = %s"
+                            "     AND created_at > now() - interval '30 minutes'"
+                            "     AND payload->>'dedupe' = %s)",
+                            ["marketing_attribution_view", _payload,
+                             "marketing_attribution_view", _fp],
                         )
                     request.session["utm_view_logged"] = _seen + [_key]
                     request.session.modified = True
@@ -772,3 +794,140 @@ def resume(request, token: str):
         return HttpResponseNotFound("resume link invalid or expired")
     request.session["respondent_id"] = rid
     return redirect("questionnaire:next_question")
+
+# ---------------------------------------------------------------------------
+# AI Exposure Score — short entry funnel
+#
+# Why: the full audit asks for eight identifying fields before question one,
+# and cold paid traffic will not pay that. Campaigns v1 and v2 both delivered
+# clicks that converted to ~zero starts. This funnel asks for nothing, scores
+# instantly in the browser, shows a real result, and only then offers the
+# full audit. Every step logs to events so the drop-off is measurable.
+# ---------------------------------------------------------------------------
+
+_XS_EVENT_TYPES = {
+    "exposure_score_started",
+    "exposure_score_completed",
+    "exposure_score_email",
+}
+
+
+@require_http_methods(["GET"])
+@ensure_csrf_cookie
+def exposure_score(request):
+    """Render the 5-question AI Exposure Score screener.
+
+    Deliberately has no form, no email gate and no access code. The questions
+    and scoring weights are rendered into the page so the browser can score
+    with no round trip; the server re-scores on log for a trustworthy number.
+    """
+    from questionnaire import exposure_score as xs
+
+    utm = {
+        k: request.GET.get(k, "").strip()[:255]
+        for k in ("utm_source", "utm_medium", "utm_campaign",
+                  "utm_content", "utm_term")
+    }
+
+    questions_json = [
+        {
+            "id": q["id"],
+            "prompt": q["prompt"],
+            "help": q.get("help", ""),
+            "options": [
+                {"value": v, "label": lbl, "points": pts}
+                for v, lbl, pts in q["options"]
+            ],
+        }
+        for q in xs.QUESTIONS
+    ]
+    bands_json = [
+        {"low": low, "high": high, "name": name, "message": msg}
+        for low, high, name, msg in xs.BANDS
+    ]
+    flags_json = [
+        {"question": qid, "value": val, "message": msg}
+        for qid, val, msg in xs.FLAGS
+    ]
+
+    return render(
+        request,
+        "questionnaire/exposure_score.html",
+        {
+            "questions_json": questions_json,
+            "bands_json": bands_json,
+            "flags_json": flags_json,
+            "utm_json": utm,
+        },
+    )
+
+
+@require_http_methods(["POST"])
+@csrf_protect
+def exposure_score_log(request):
+    """Log an exposure-score funnel step. Fire-and-forget from the browser.
+
+    Never raises at the caller: the front end must not break because logging
+    failed, and this endpoint is public so it must not 500 on junk input.
+    """
+    from django.http import JsonResponse
+
+    from questionnaire import exposure_score as xs
+
+    try:
+        body = json.loads((request.body or b"{}").decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False}, status=400)
+
+    if not isinstance(body, dict):
+        return JsonResponse({"ok": False}, status=400)
+
+    event_name = body.get("event")
+    if event_name not in _XS_EVENT_TYPES:
+        return JsonResponse({"ok": False}, status=400)
+
+    raw_answers = body.get("answers")
+    answers = {}
+    if isinstance(raw_answers, dict):
+        answers = {
+            str(k)[:64]: str(v)[:64]
+            for k, v in list(raw_answers.items())[:20]
+        }
+
+    raw_utm = body.get("utm")
+    utm = {}
+    if isinstance(raw_utm, dict):
+        utm = {
+            str(k)[:64]: str(v)[:255]
+            for k, v in list(raw_utm.items())[:10]
+        }
+
+    # Re-score server-side. Never trust the browser's number.
+    scored = xs.score_answers(answers)
+
+    payload = {
+        "answers": answers,
+        "utm": utm,
+        "score": scored["score"],
+        "band": scored["band"],
+        "complete": scored["complete"],
+        "answered": scored["answered"],
+    }
+
+    email = body.get("email")
+    if event_name == "exposure_score_email" and isinstance(email, str):
+        email = email.strip()[:255]
+        if "@" in email:
+            payload["email"] = email
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO events (id, event_type, payload) "
+                "VALUES (gen_random_uuid(), %s, %s::jsonb)",
+                [event_name, json.dumps(payload)],
+            )
+    except Exception:  # noqa: BLE001
+        return JsonResponse({"ok": False}, status=200)
+
+    return JsonResponse({"ok": True, "score": scored["score"]})

@@ -10,6 +10,9 @@ app_name = "questionnaire"
 
 urlpatterns = [
     path("start/", views.start, name="start"),
+    # Short entry funnel: 5 questions, no form wall, instant score.
+    path("score/", views.exposure_score, name="exposure_score"),
+    path("score/log/", views.exposure_score_log, name="exposure_score_log"),
     path("attest/", views.attest, name="attest"),
     path("resume/<str:token>/", views.resume, name="resume"),
     path("next/", views.next_question, name="next_question"),

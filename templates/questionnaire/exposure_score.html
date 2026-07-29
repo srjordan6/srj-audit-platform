@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}What's your AI exposure? — 60-second score{% endblock %}
+
+{% block content %}
+<div class="xs-wrap">
+
+  <div id="xs-intro" class="xs-card">
+    <p class="xs-eyebrow">Free · 60 seconds · no signup</p>
+    <h1 class="xs-h1">What's your AI exposure?</h1>
+    <p class="xs-lede">
+      Five questions. No email, no forms, no signup. You'll see your score
+      the moment you answer the last one.
+    </p>
+    <button type="button" class="xs-btn xs-btn-primary" id="xs-begin">
+      Start &rarr;
+    </button>
+  </div>
+
+  <div id="xs-quiz" class="xs-card" hidden>
+    <div class="xs-progress"><div class="xs-progress-bar" id="xs-bar"></div></div>
+    <p class="xs-step" id="xs-step"></p>
+    <h2 class="xs-q" id="xs-prompt"></h2>
+    <p class="xs-help" id="xs-help"></p>
+    <div id="xs-options"></div>
+    <button type="button" class="xs-back" id="xs-back" hidden>&larr; Back</button>
+  </div>
+
+  <div id="xs-result" class="xs-card" hidden>
+    <p class="xs-eyebrow">Your AI Exposure Score</p>
+    <div class="xs-score-row">
+      <div class="xs-score" id="xs-score">0</div>
+      <div class="xs-score-meta">
+        <div class="xs-band" id="xs-band"></div>
+        <div class="xs-outof">out of 100</div>
+      </div>
+    </div>
+    <div class="xs-meter"><div class="xs-meter-fill" id="xs-meter"></div></div>
+    <p class="xs-band-msg" id="xs-band-msg"></p>
+
+    <div id="xs-flags-wrap" hidden>
+      <h3 class="xs-h3">What stands out</h3>
+      <ul class="xs-flags" id="xs-flags"></ul>
+    </div>
+
+    <div class="xs-cta">
+      <h3 class="xs-h3">This is the 60-second version.</h3>
+      <p class="xs-cta-copy">
+        The full AI Business Enablement Audit scores you across five
+        dimensions against 61 AI laws and hands you a board-ready report.
+        Normally $399 &mdash; free while the beta is open.
+      </p>
+      <a class="xs-btn xs-btn-primary" id="xs-full" href="#">
+        Get the full audit free &rarr;
+      </a>
+    </div>
+
+    <div class="xs-email">
+      <p class="xs-email-copy">Want this score emailed to you? Optional.</p>
+      <div class="xs-email-row">
+        <input type="email" id="xs-email-input" placeholder="you@company.com"
+               autocomplete="email" />
+        <button type="button" class="xs-btn xs-btn-ghost" id="xs-email-send">
+          Send it
+        </button>
+      </div>
+      <p class="xs-email-done" id="xs-email-done" hidden>
+        Sent. Check your inbox.
+      </p>
+    </div>
+
+    <button type="button" class="xs-back" id="xs-restart">&larr; Start over</button>
+  </div>
+
+</div>
+
+{{ questions_json|json_script:"xs-questions" }}
+{{ utm_json|json_script:"xs-utm" }}
+{{ bands_json|json_script:"xs-bands-data" }}
+{{ flags_json|json_script:"xs-flags-data" }}
+
+<style>
+  .xs-wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
+  .xs-card { background: #fff; border: 1px solid #e4e7ee; border-radius: 14px;
+             padding: 32px; box-shadow: 0 1px 3px rgba(32,24,104,.06); }
+  .xs-eyebrow { color: #F07800; font-weight: 700; font-size: 13px;
+                letter-spacing: .06em; text-transform: uppercase; margin: 0 0 10px; }
+  .xs-h1 { color: #201868; font-size: 30px; line-height: 1.2; margin: 0 0 12px; }
+  .xs-h3 { color: #201868; font-size: 17px; margin: 0 0 8px; }
+  .xs-lede { color: #4a5568; font-size: 16px; line-height: 1.55; margin: 0 0 24px; }
+  .xs-btn { display: inline-block; border: 0; border-radius: 8px; cursor: pointer;
+            font-size: 16px; font-weight: 700; padding: 14px 26px;
+            text-decoration: none; text-align: center; }
+  .xs-btn-primary { background: #F07800; color: #fff; }
+  .xs-btn-primary:hover { background: #d86c00; color: #fff; }
+  .xs-btn-ghost { background: #fff; color: #201868; border: 2px solid #201868;
+                  padding: 12px 20px; }
+  .xs-progress { height: 4px; background: #eef0f5; border-radius: 99px;
+                 overflow: hidden; margin-bottom: 22px; }
+  .xs-progress-bar { height: 100%; background: #F07800; width: 0%;
+                     transition: width .25s ease; }
+  .xs-step { color: #7A8A9E; font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+  .xs-q { color: #201868; font-size: 22px; line-height: 1.3; margin: 0 0 6px; }
+  .xs-help { color: #7A8A9E; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+  .xs-opt { display: block; width: 100%; text-align: left; background: #fff;
+            border: 2px solid #e4e7ee; border-radius: 10px; color: #2d3748;
+            cursor: pointer; font-size: 16px; margin-bottom: 10px;
+            padding: 15px 18px; transition: border-color .15s, background .15s; }
+  .xs-opt:hover { border-color: #201868; background: #fafbff; }
+  .xs-back { background: none; border: 0; color: #7A8A9E; cursor: pointer;
+             font-size: 14px; margin-top: 10px; padding: 6px 0; }
+  .xs-back:hover { color: #201868; }
+  .xs-score-row { align-items: baseline; display: flex; gap: 16px; }
+  .xs-score { color: #201868; font-size: 64px; font-weight: 800; line-height: 1; }
+  .xs-band { color: #F07800; font-size: 20px; font-weight: 700; }
+  .xs-outof { color: #7A8A9E; font-size: 14px; }
+  .xs-meter { background: #eef0f5; border-radius: 99px; height: 10px;
+              margin: 18px 0 16px; overflow: hidden; }
+  .xs-meter-fill { background: linear-gradient(90deg, #201868, #F07800);
+                   height: 100%; width: 0%; transition: width .6s ease; }
+  .xs-band-msg { color: #4a5568; font-size: 16px; line-height: 1.55; margin: 0 0 24px; }
+  .xs-flags { margin: 0 0 26px; padding-left: 20px; }
+  .xs-flags li { color: #4a5568; font-size: 15px; line-height: 1.55;
+                 margin-bottom: 10px; }
+  .xs-cta { background: #f7f8fc; border-radius: 10px; margin-bottom: 22px;
+            padding: 22px; }
+  .xs-cta-copy { color: #4a5568; font-size: 15px; line-height: 1.55;
+                 margin: 0 0 16px; }
+  .xs-email-copy { color: #7A8A9E; font-size: 14px; margin: 0 0 8px; }
+  .xs-email-row { display: flex; gap: 8px; }
+  .xs-email-row input { border: 2px solid #e4e7ee; border-radius: 8px; flex: 1;
+                        font-size: 15px; padding: 12px 14px; }
+  .xs-email-row input:focus { border-color: #201868; outline: none; }
+  .xs-email-done { color: #1a7f5a; font-size: 14px; font-weight: 600;
+                   margin: 10px 0 0; }
+  @media (max-width: 520px) {
+    .xs-card { padding: 24px 20px; }
+    .xs-h1 { font-size: 25px; }
+    .xs-score { font-size: 52px; }
+    .xs-email-row { flex-direction: column; }
+  }
+</style>
+
+<script>
+(function () {
+  var QUESTIONS = JSON.parse(document.getElementById('xs-questions').textContent);
+  var UTM = JSON.parse(document.getElementById('xs-utm').textContent);
+  var BANDS = JSON.parse(document.getElementById('xs-bands-data').textContent);
+  var FLAGS = JSON.parse(document.getElementById('xs-flags-data').textContent);
+  var LOG_URL = "{% url 'questionnaire:exposure_score_log' %}";
+  var FULL_URL = "{% url 'questionnaire:start' %}";
+
+  var answers = {};
+  var order = [];
+  var idx = 0;
+
+  var el = function (id) { return document.getElementById(id); };
+
+  function show(which) {
+    el('xs-intro').hidden = which !== 'intro';
+    el('xs-quiz').hidden = which !== 'quiz';
+    el('xs-result').hidden = which !== 'result';
+  }
+
+  function renderQuestion() {
+    var q = QUESTIONS[idx];
+    el('xs-step').textContent = 'Question ' + (idx + 1) + ' of ' + QUESTIONS.length;
+    el('xs-prompt').textContent = q.prompt;
+    el('xs-help').textContent = q.help || '';
+    el('xs-bar').style.width = ((idx) / QUESTIONS.length * 100) + '%';
+    el('xs-back').hidden = idx === 0;
+
+    var box = el('xs-options');
+    box.innerHTML = '';
+    q.options.forEach(function (opt) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'xs-opt';
+      b.textContent = opt.label;
+      b.addEventListener('click', function () { choose(q.id, opt.value); });
+      box.appendChild(b);
+    });
+  }
+
+  function choose(questionId, value) {
+    answers[questionId] = value;
+    if (order.indexOf(questionId) === -1) { order.push(questionId); }
+    if (idx < QUESTIONS.length - 1) {
+      idx += 1;
+      renderQuestion();
+    } else {
+      finish();
+    }
+  }
+
+  function scoreLocally() {
+    var total = 0;
+    var flags = [];
+    QUESTIONS.forEach(function (q) {
+      q.options.forEach(function (opt) {
+        if (opt.value === answers[q.id]) { total += opt.points; }
+      });
+    });
+    FLAGS.forEach(function (f) {
+      var target = f.question === 'product' ? 'usage' : f.question;
+      if (answers[target] === f.value) { flags.push(f.message); }
+    });
+    return { score: total, flags: flags };
+  }
+
+  function bandFor(score) {
+    for (var i = 0; i < BANDS.length; i++) {
+      if (score >= BANDS[i].low && score <= BANDS[i].high) { return BANDS[i]; }
+    }
+    return BANDS[BANDS.length - 1] || { name: '', message: '' };
+  }
+
+  function finish() {
+    var result = scoreLocally();
+    var band = bandFor(result.score);
+
+    el('xs-score').textContent = result.score;
+    el('xs-band').textContent = band.name;
+    el('xs-band-msg').textContent = band.message;
+    el('xs-meter').style.width = result.score + '%';
+
+    if (result.flags.length) {
+      var ul = el('xs-flags');
+      ul.innerHTML = '';
+      result.flags.forEach(function (f) {
+        var li = document.createElement('li');
+        li.textContent = f;
+        ul.appendChild(li);
+      });
+      el('xs-flags-wrap').hidden = false;
+    } else {
+      el('xs-flags-wrap').hidden = true;
+    }
+
+    // Carry the score and the original campaign attribution into the full
+    // audit link so the funnel stays measurable end to end.
+    var params = new URLSearchParams();
+    params.set('code', 'AIAUDIT100');
+    params.set('xs', String(result.score));
+    Object.keys(UTM).forEach(function (k) {
+      if (UTM[k]) { params.set(k, UTM[k]); }
+    });
+    el('xs-full').href = FULL_URL + '?' + params.toString();
+
+    show('result');
+    log('exposure_score_completed', { score: result.score, band: band.name });
+  }
+
+  function log(eventName, extra) {
+    var body = {
+      event: eventName,
+      answers: answers,
+      utm: UTM
+    };
+    Object.keys(extra || {}).forEach(function (k) { body[k] = extra[k]; });
+    try {
+      fetch(LOG_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''
+        },
+        body: JSON.stringify(body)
+      }).catch(function () {});
+    } catch (e) { /* logging must never block the user */ }
+  }
+
+  el('xs-begin').addEventListener('click', function () {
+    show('quiz');
+    renderQuestion();
+    log('exposure_score_started', {});
+  });
+
+  el('xs-back').addEventListener('click', function () {
+    if (idx > 0) { idx -= 1; renderQuestion(); }
+  });
+
+  el('xs-restart').addEventListener('click', function () {
+    answers = {}; order = []; idx = 0;
+    show('intro');
+  });
+
+  el('xs-email-send').addEventListener('click', function () {
+    var value = (el('xs-email-input').value || '').trim();
+    if (!value || value.indexOf('@') === -1) {
+      el('xs-email-input').focus();
+      return;
+    }
+    log('exposure_score_email', { email: value });
+    el('xs-email-done').hidden = false;
+    el('xs-email-input').disabled = true;
+    el('xs-email-send').disabled = true;
+  });
+})();
+</script>
+{% endblock %}
