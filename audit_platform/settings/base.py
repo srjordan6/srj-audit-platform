@@ -185,6 +185,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
 CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
+# Hostnames on which third-party analytics may run. Single source of truth
+# for the host gate applied by analytics/context_processors.py and consumed
+# by the analytics partials as {% if analytics_enabled %}. Anything not in
+# this tuple — local dev, preview hosts, an unrecognised Host header —
+# renders no tags and no consent banner.
+ANALYTICS_HOSTS = (
+    'aiauditforcompanies.com',
+    'www.aiauditforcompanies.com',
+    'srj-audit-web-gor5.onrender.com',
+)
+
 # Templates
 TEMPLATES = [
     {
@@ -197,6 +208,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # GA4 custom dimensions (pillar / section), derived from the
+                # request path — see analytics/context_processors.py.
+                'analytics.context_processors.ga4_dimensions',
             ],
         },
     },

@@ -291,6 +291,13 @@ screener collects nothing identifying, and it is where paid traffic lands.
       utm: UTM
     };
     Object.keys(extra || {}).forEach(function (k) { body[k] = extra[k]; });
+    // Mirror the same funnel stage into GA4 so the client-side numbers can be
+    // reconciled against the server-side events table. srjTrack is defined in
+    // partials/_analytics.html and only exists on production hosts, so this is
+    // guarded rather than assumed.
+    if (window.srjTrack) {
+      window.srjTrack(eventName, extra || {});
+    }
     try {
       fetch(LOG_URL, {
         method: 'POST',

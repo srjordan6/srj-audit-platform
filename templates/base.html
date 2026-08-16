@@ -225,6 +225,10 @@
         <a href="https://aiauditforcompanies.com/terms.html" target="_blank" rel="noopener">Terms of Service</a>
         <a href="https://aiauditforcompanies.com/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
         <a href="https://aiauditforcompanies.com/disclaimer.html" target="_blank" rel="noopener">Disclaimer</a>
+        {# Re-opens the consent banner. Handled in partials/_consent_banner.html.
+           Same gate as the banner itself — without it this link renders on dev,
+           where there is no banner for it to open. #}
+        {% if analytics_enabled %}<a href="#" data-srj-consent-reset>Cookie settings</a>{% endif %}
       </div>
       <div>
         <a href="https://srjconsultingservices.com" target="_blank" rel="noopener">srjconsultingservices.com</a>
@@ -637,5 +641,9 @@
     document.addEventListener('DOMContentLoaded', srjDecorateAllRankLists);
     document.body.addEventListener('htmx:afterSwap', srjDecorateAllRankLists);
   </script>
+
+  {# Cookie consent banner — last, so it never delays paint. Host-gated to
+     match partials/_analytics.html. #}
+  {% include "partials/_consent_banner.html" %}
 </body>
 </html>

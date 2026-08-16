@@ -4,47 +4,293 @@ Analytics tags — single source of truth for every third-party tracker.
 Included from base.html <head>. Add or change tags HERE only; never paste
 snippets into individual templates.
 
-Host gate: tags render only on the production hostnames. Local dev
-(127.0.0.1 / localhost) and any preview host stay clean, so dev traffic
-never pollutes the analytics properties.
+TWO GATES, in this order:
+
+  1. Host gate. Tags render only on the production hostnames. Local dev
+     (127.0.0.1 / localhost) and any preview host stay clean, so dev
+     traffic never pollutes the analytics properties.
+
+  2. Consent gate. Nothing that stores or transmits identifiers runs
+     until the visitor accepts. See "Consent model" below.
 
 Installed:
-  - Google Analytics 4   G-6LM3EMLLZN
-  - Microsoft Clarity    xta7r2l6l3
-  - StatCounter          13338525
+  - Google Analytics 4   G-6LM3EMLLZN   (Consent Mode v2)
+  - Microsoft Clarity    xta7r2l6l3     (withheld until consent)
+  - StatCounter          13338525       (withheld until consent)
+  - LinkedIn Insight     9681908        (withheld until consent;
+                                         partials/_linkedin_insight.html,
+                                         screener page only)
+
+GA4 custom dimensions: `pillar` and `section`, supplied per-request by
+analytics/context_processors.py. Both must also be registered in the GA4
+admin (Admin -> Data display -> Custom definitions, scope Event) or the
+values are collected but invisible in reports.
+
+GA4 cross-domain linking: the domains list below must be identical on
+every SRJ property. Cross-domain linking is not one setting — each
+property has to name every partner, or a visitor arriving from a site
+missing from this list starts a new unattributed session and the funnel
+is lost in that direction. Do not shorten it to "the ones this site
+links to". theworldofai.org and srjconsultingservices.com shipped this
+identical four-domain list on 2026-07-31.
+
+CONSENT MODEL
+-------------
+GA4 uses Google Consent Mode v2. All four consent signals default to
+`denied` before the config call, so the tag loads but stores nothing and
+sends only cookieless pings until the visitor accepts. On acceptance the
+signals are updated to `granted` and full measurement begins.
+
+Clarity, StatCounter and LinkedIn Insight have no consent-mode
+equivalent, so they are not loaded at all until acceptance. They
+register through window.srjConsent.onGrant() and are injected only if
+and when consent arrives.
+
+Both <noscript> tracking pixels (StatCounter, LinkedIn) were removed:
+a bare <img> fires on page load and cannot be consent-gated, so keeping
+them would have made the gate cosmetic.
+
+The banner itself is partials/_consent_banner.html, included at the end
+of <body> in base.html. The decision is stored in localStorage under
+`srj_consent_v1` and is re-askable from the "Cookie settings" footer
+link on every page.
 {% endcomment %}
-{% if request.get_host == "aiauditforcompanies.com" or request.get_host == "www.aiauditforcompanies.com" or request.get_host == "srj-audit-web-gor5.onrender.com" %}
-  {# Google tag (gtag.js) — GA4 #}
+{% if analytics_enabled %}
+  {# ---------------------------------------------------------------- #}
+  {# Consent state machine. Must run BEFORE any tag loads.            #}
+  {# ---------------------------------------------------------------- #}
+  <script>
+  (function () {
+    var KEY = 'srj_consent_v1';
+    var pending = [];
+
+    function read() {
+      try {
+        var raw = window.localStorage.getItem(KEY);
+        if (!raw) return null;
+        var parsed = JSON.parse(raw);
+        return (parsed && parsed.state) ? parsed.state : null;
+      } catch (e) { return null; }   // Safari private mode, storage disabled
+    }
+
+    function write(state) {
+      try {
+        window.localStorage.setItem(KEY, JSON.stringify({
+          state: state,
+          at: new Date().toISOString(),
+          version: 1
+        }));
+      } catch (e) { /* choice holds for this page view only */ }
+    }
+
+    function flush() {
+      var queued = pending;
+      pending = [];
+      queued.forEach(function (fn) {
+        try { fn(); } catch (e) { /* one bad tag must not block the rest */ }
+      });
+    }
+
+    window.srjConsent = {
+      // 'granted' | 'denied' | null (undecided)
+      state: read,
+
+      // Register a loader that must not run before consent. Fires
+      // immediately if consent was already given on a previous visit.
+      onGrant: function (fn) {
+        if (typeof fn !== 'function') return;
+        if (read() === 'granted') { try { fn(); } catch (e) {} return; }
+        pending.push(fn);
+      },
+
+      grant: function () {
+        write('granted');
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', {
+            ad_storage: 'granted',
+            ad_user_data: 'granted',
+            ad_personalization: 'granted',
+            analytics_storage: 'granted'
+          });
+        }
+        flush();
+        document.dispatchEvent(new CustomEvent('srj:consent', { detail: 'granted' }));
+      },
+
+      deny: function () {
+        write('denied');
+        pending = [];   // drop the queue; these never load this visit
+        document.dispatchEvent(new CustomEvent('srj:consent', { detail: 'denied' }));
+      },
+
+      // Clears the stored decision so the banner reappears. Wired to the
+      // "Cookie settings" footer link. Does not retract already-loaded
+      // tags — a reload does that.
+      reset: function () {
+        try { window.localStorage.removeItem(KEY); } catch (e) {}
+        document.dispatchEvent(new CustomEvent('srj:consent', { detail: 'reset' }));
+      }
+    };
+  })();
+  </script>
+
+  {# Google tag (gtag.js) — GA4 with Consent Mode v2 #}
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-6LM3EMLLZN"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
+
+    // Denied by default, for every visitor, before anything else runs.
+    // wait_for_update gives the banner a moment to apply a stored
+    // decision before the first hit is sent.
+    gtag('consent', 'default', {
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      analytics_storage: 'denied',
+      functionality_storage: 'granted',
+      security_storage: 'granted',
+      wait_for_update: 500
+    });
+
+    // Returning visitor who already accepted — apply it before the first hit.
+    if (window.srjConsent && window.srjConsent.state() === 'granted') {
+      gtag('consent', 'update', {
+        ad_storage: 'granted',
+        ad_user_data: 'granted',
+        ad_personalization: 'granted',
+        analytics_storage: 'granted'
+      });
+    }
+
     gtag('js', new Date());
-    gtag('config', 'G-6LM3EMLLZN');
+    gtag('config', 'G-6LM3EMLLZN', {
+      pillar: "{{ ga4_pillar|escapejs }}",
+      section: "{{ ga4_section|escapejs }}",
+      linker: {
+        domains: [
+          'theworldofai.org',
+          'srjconsultingservices.com',
+          'aiauditforcompanies.com',
+          'outcomestar.app'
+        ],
+        decorate_forms: true
+      }
+    });
   </script>
 
-  {# Microsoft Clarity — session recordings + heatmaps #}
-  <script type="text/javascript">
+  {# GA4 intent events — delegated, one listener for the whole site. #}
+  <script>
+  (function () {
+    var SRJ_PILLAR  = "{{ ga4_pillar|escapejs }}";
+    var SRJ_SECTION = "{{ ga4_section|escapejs }}";
+
+    // Public helper. Every event carries the two custom dimensions, so a
+    // report can be sliced by pillar/section without per-event wiring.
+    // Callers outside this block must guard: if (window.srjTrack) ...
+    // — on a non-production host this function does not exist at all.
+    //
+    // Safe to call before consent: Consent Mode holds the hit cookieless
+    // rather than dropping it, so the listener does not need its own gate.
+    window.srjTrack = function (name, params) {
+      if (!name || typeof gtag !== 'function') return;
+      var payload = { pillar: SRJ_PILLAR, section: SRJ_SECTION };
+      if (params) {
+        Object.keys(params).forEach(function (k) { payload[k] = params[k]; });
+      }
+      try { gtag('event', name, payload); } catch (e) { /* never block the user */ }
+    };
+
+    function classify(anchor) {
+      var raw = anchor.getAttribute('href') || '';
+      if (!raw || raw.charAt(0) === '#') return null;
+
+      var lowered = raw.toLowerCase();
+      if (lowered.indexOf('mailto:') === 0 || lowered.indexOf('tel:') === 0) {
+        return { name: 'contact_click', detail: raw };
+      }
+
+      // Resolve against the current page so relative hrefs classify too.
+      var url;
+      try { url = new URL(anchor.href, window.location.href); }
+      catch (e) { return null; }
+
+      if (url.hostname && url.hostname !== window.location.hostname) {
+        return { name: 'outbound_click', detail: url.hostname };
+      }
+
+      var p = url.pathname;
+      // Screener entry — /aiscore/ and its alias /q/score/.
+      if (p.indexOf('/aiscore') === 0 || p.indexOf('/q/score') === 0) {
+        return { name: 'score_start_click', detail: p };
+      }
+      // Full audit entry — /startaiaudit/ and its alias /q/start/.
+      // This is the handoff the score page's CTA points at, so it is the
+      // stage that reconciles against marketing_attribution_view server-side.
+      if (p.indexOf('/startaiaudit') === 0 || p.indexOf('/q/start') === 0) {
+        return { name: 'audit_start_click', detail: p };
+      }
+      if (p.indexOf('/billing') === 0 || p.indexOf('/pricing') === 0) {
+        return { name: 'pricing_click', detail: p };
+      }
+      return null;
+    }
+
+    // Capture phase: HTMX intercepts submits and swaps nodes out from under
+    // bubbling handlers, so listen on the way down and read the anchor while
+    // it is still in the document.
+    document.addEventListener('click', function (evt) {
+      var target = evt.target;
+      if (!target || !target.closest) return;
+
+      // Explicit opt-in escape hatch for future buttons:
+      // <button data-srj-event="whatever_click">
+      var tagged = target.closest('[data-srj-event]');
+      if (tagged) {
+        window.srjTrack(tagged.getAttribute('data-srj-event'), {
+          link_text: (tagged.textContent || '').trim().slice(0, 80)
+        });
+        return;
+      }
+
+      var anchor = target.closest('a[href]');
+      if (!anchor) return;
+
+      var hit = classify(anchor);
+      if (!hit) return;
+
+      window.srjTrack(hit.name, {
+        link_url: hit.detail,
+        link_text: (anchor.textContent || '').trim().slice(0, 80)
+      });
+    }, true);
+  })();
+  </script>
+
+  {# ---------------------------------------------------------------- #}
+  {# Consent-gated trackers. No consent-mode support of their own, so  #}
+  {# these are not loaded at all until window.srjConsent grants.       #}
+  {# ---------------------------------------------------------------- #}
+  <script>
+  window.srjConsent.onGrant(function () {
+    // Microsoft Clarity — session recordings + heatmaps.
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
         t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
         y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", "xta7r2l6l3");
-  </script>
 
-  {# StatCounter — invisible pageview counter #}
-  <script type="text/javascript">
-    var sc_project=13338525;
-    var sc_invisible=1;
-    var sc_security="d5ff6432";
+    // StatCounter — invisible pageview counter. The <noscript> pixel that
+    // used to accompany this was removed: a bare <img> fires regardless of
+    // consent and would have made this gate cosmetic.
+    window.sc_project = 13338525;
+    window.sc_invisible = 1;
+    window.sc_security = "d5ff6432";
+    var sc = document.createElement('script');
+    sc.type = 'text/javascript';
+    sc.async = true;
+    sc.src = 'https://www.statcounter.com/counter/counter.js';
+    document.head.appendChild(sc);
+  });
   </script>
-  <script type="text/javascript"
-          src="https://www.statcounter.com/counter/counter.js"
-          async></script>
-  <noscript><div class="statcounter"><a title="Web Analytics"
-     href="https://statcounter.com/" target="_blank"><img
-     class="statcounter"
-     src="https://c.statcounter.com/13338525/0/d5ff6432/1/"
-     alt="Web Analytics"
-     referrerPolicy="no-referrer-when-downgrade"></a></div></noscript>
 {% endif %}

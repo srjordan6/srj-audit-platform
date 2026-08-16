@@ -1,0 +1,162 @@
+{% comment %}
+Cookie consent banner.
+
+Included from base.html at the end of <body>, so it never delays paint.
+Host gate matches partials/_analytics.html — on a non-production host no
+tags render, so there is nothing to consent to and no banner appears.
+
+Behaviour:
+  - Shown only when window.srjConsent.state() is null (no decision yet).
+  - "Accept" grants; GA4 consent signals flip to granted and Clarity,
+    StatCounter and LinkedIn Insight are injected via the onGrant queue.
+  - "Decline" denies; GA4 stays cookieless and nothing else ever loads.
+  - Either way the decision is stored in localStorage and the banner does
+    not reappear until the visitor clicks "Cookie settings" in the footer.
+
+The banner does not block the page. It is dismissible only by choosing,
+but the site behind it stays fully usable — a five-question screener that
+traps the visitor behind a modal would defeat the point of the funnel.
+
+Accessibility: role="dialog" + aria-labelledby, focus moves to the
+heading when shown, Escape does NOT dismiss (no implicit consent either
+way), and the buttons are real <button>s in tab order.
+{% endcomment %}
+{% if analytics_enabled %}
+<div id="srj-consent"
+     class="srj-consent"
+     role="dialog"
+     aria-labelledby="srj-consent-title"
+     aria-describedby="srj-consent-body"
+     hidden>
+  <div class="srj-consent__inner">
+    <div class="srj-consent__text">
+      <h2 id="srj-consent-title" class="srj-consent__title" tabindex="-1">
+        Cookies and measurement
+      </h2>
+      <p id="srj-consent-body" class="srj-consent__body">
+        We use analytics cookies to understand how people find and use this
+        site, including session recording and advertising measurement.
+        Nothing is loaded until you choose. Decline and the site works
+        exactly the same.
+        <a href="https://aiauditforcompanies.com/privacy.html"
+           target="_blank" rel="noopener">Privacy Policy</a>
+      </p>
+    </div>
+    <div class="srj-consent__actions">
+      <button type="button" id="srj-consent-decline"
+              class="btn btn-outline-secondary">Decline</button>
+      <button type="button" id="srj-consent-accept"
+              class="btn btn-primary">Accept</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .srj-consent {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 1080;
+    background: #fff;
+    border-top: 3px solid var(--srj-orange, #F07800);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
+    padding: 1rem 0;
+  }
+  .srj-consent[hidden] { display: none; }
+  .srj-consent__inner {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .srj-consent__text { flex: 1 1 420px; }
+  .srj-consent__title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--srj-navy, #201868);
+    margin: 0 0 0.25rem;
+  }
+  .srj-consent__title:focus { outline: none; }
+  .srj-consent__body {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0;
+    color: var(--srj-text, #1A1A2E);
+  }
+  .srj-consent__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex: 0 0 auto;
+  }
+  .srj-consent__actions .btn { min-width: 110px; }
+  @media (max-width: 575px) {
+    .srj-consent__inner { gap: 0.75rem; }
+    .srj-consent__actions { width: 100%; }
+    .srj-consent__actions .btn { flex: 1 1 0; min-width: 0; }
+  }
+</style>
+
+<script>
+(function () {
+  var banner  = document.getElementById('srj-consent');
+  var accept  = document.getElementById('srj-consent-accept');
+  var decline = document.getElementById('srj-consent-decline');
+  var title   = document.getElementById('srj-consent-title');
+
+  // srjConsent is defined in partials/_analytics.html, behind the same host
+  // gate. If it is somehow absent, show nothing rather than a banner whose
+  // buttons would do nothing.
+  if (!banner || !window.srjConsent) return;
+
+  // The banner is fixed to the bottom, so it sits on top of whatever the page
+  // ends with. Reserve that space rather than covering the footer, and keep
+  // the reserve correct when the bar rewraps on resize. Verified in a real
+  // browser against the marketing site, where it was clipping the primary CTA.
+  var priorPadding = null;
+
+  function reserveSpace() {
+    if (!banner || banner.hidden) return;
+    var height = banner.offsetHeight;
+    if (!height) return;
+    if (priorPadding === null) priorPadding = document.body.style.paddingBottom || '';
+    document.body.style.paddingBottom = height + 'px';
+  }
+
+  function releaseSpace() {
+    if (priorPadding === null) return;
+    document.body.style.paddingBottom = priorPadding;
+    priorPadding = null;
+  }
+
+  function show() {
+    banner.hidden = false;
+    reserveSpace();
+    if (title) { try { title.focus(); } catch (e) {} }
+  }
+
+  function hide() {
+    banner.hidden = true;
+    releaseSpace();
+  }
+
+  window.addEventListener('resize', reserveSpace);
+
+  if (window.srjConsent.state() === null) show();
+
+  if (accept)  accept.addEventListener('click',  function () { window.srjConsent.grant(); hide(); });
+  if (decline) decline.addEventListener('click', function () { window.srjConsent.deny();  hide(); });
+
+  // "Cookie settings" footer link re-opens the banner on any page.
+  document.addEventListener('click', function (evt) {
+    var link = evt.target && evt.target.closest && evt.target.closest('[data-srj-consent-reset]');
+    if (!link) return;
+    evt.preventDefault();
+    window.srjConsent.reset();
+    show();
+  });
+})();
+</script>
+{% endif %}
