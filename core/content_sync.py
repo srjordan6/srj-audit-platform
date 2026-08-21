@@ -34,6 +34,7 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 
 from django.conf import settings
 from django.db import connection, transaction
@@ -44,6 +45,51 @@ from django.views.decorators.http import require_http_methods
 logger = logging.getLogger(__name__)
 
 GUARD_MIN = {"glossary": 100, "tools": 50, "laws": 20}
+
+# Payloads that pass the count floor can still be garbage. On 2026-08-20 the
+# WordPress harvester followed a new 301 (srjconsultingservices.com's tools
+# page now redirects to theworldofai.org) and pushed 86 page headings as
+# tools - "Coding & Developer Tools 30 tools" under a "Browse by category"
+# category - deactivating all 634 real rows. Two guards close that class:
+# a shape check for chrome-like names, and a churn ceiling on deactivation.
+
+_CHROME_NAME = re.compile(r"\d+\s+tools?$", re.IGNORECASE)
+_CHROME_PHRASES = {"browse by category", "tools with a full profile"}
+
+
+class SyncRejected(Exception):
+    """Raised inside the transaction to roll back the whole sync."""
+
+
+def _reject_chrome_tools(items):
+    names = [(i.get("tool_name") or "").strip() for i in items]
+    cats = {(i.get("category") or "").strip().lower() for i in items}
+    chrome = sum(1 for n in names
+                 if _CHROME_NAME.search(n) or n.lower() in _CHROME_PHRASES)
+    if chrome and chrome * 20 >= len(names):  # >= 5% of the payload
+        raise SyncRejected(
+            "tools payload looks like scraped page chrome: "
+            f"{chrome} of {len(names)} names match heading patterns")
+    if cats & _CHROME_PHRASES:
+        raise SyncRejected(
+            "tools payload categories include page-navigation headings")
+
+
+def _guard_churn(cursor, table, name_col, names):
+    """Refuse a payload that would deactivate an implausible share of the
+    live set. A real weekly edit moves a handful of rows; only a broken
+    harvest replaces the majority at once. Mirrors the publish guard in
+    srj-pipeline: when the numbers say most of the catalog just vanished,
+    the correct response is to stop, not to obey."""
+    cursor.execute(
+        "SELECT count(*) FILTER (WHERE is_active), "
+        "count(*) FILTER (WHERE is_active AND NOT (" + name_col + " = ANY(%s))) "
+        "FROM " + table, (names,))
+    active, would_drop = cursor.fetchone()
+    if active >= 20 and would_drop * 100 > active * 40:
+        raise SyncRejected(
+            f"{table}: payload would deactivate {would_drop} of {active} "
+            "active rows (> 40% ceiling); rejecting as a broken harvest")
 
 
 def _verify(request) -> bool:
@@ -79,6 +125,7 @@ def _upsert_glossary(cursor, items: list[dict]) -> dict:
              (it.get("example") or "")[:1000],
              (it.get("category") or "")[:120]),
         )
+    _guard_churn(cursor, "synced_glossary_terms", "term", names)
     cursor.execute(
         "UPDATE synced_glossary_terms SET is_active = FALSE "
         "WHERE is_active = TRUE AND NOT (term = ANY(%s))",
@@ -89,6 +136,7 @@ def _upsert_glossary(cursor, items: list[dict]) -> dict:
 
 
 def _upsert_tools(cursor, items: list[dict]) -> dict:
+    _reject_chrome_tools(items)
     names = []
     for it in items:
         name = (it.get("tool_name") or "").strip()[:200]
@@ -113,6 +161,7 @@ def _upsert_tools(cursor, items: list[dict]) -> dict:
              (it.get("governance_notes") or ""),
              int(it.get("sort_order") or 0)),
         )
+    _guard_churn(cursor, "synced_tools", "tool_name", names)
     cursor.execute(
         "UPDATE synced_tools SET is_active = FALSE "
         "WHERE is_active = TRUE AND NOT (tool_name = ANY(%s))",
@@ -144,6 +193,7 @@ def _upsert_laws(cursor, items: list[dict]) -> dict:
              (it.get("url") or "")[:500],
              int(it.get("sort_order") or 0)),
         )
+    _guard_churn(cursor, "synced_laws", "law_name", names)
     cursor.execute(
         "UPDATE synced_laws SET is_active = FALSE "
         "WHERE is_active = TRUE AND NOT (law_name = ANY(%s))",
@@ -167,26 +217,31 @@ def content_sync_view(request):
     results: dict = {}
     skipped: list[str] = []
 
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            for key, fn in (("glossary", _upsert_glossary),
-                            ("tools", _upsert_tools),
-                            ("laws", _upsert_laws)):
-                items = payload.get(key) or []
-                if len(items) < GUARD_MIN[key]:
-                    skipped.append(f"{key} ({len(items)} < {GUARD_MIN[key]} floor)")
-                    continue
-                results[key] = fn(cursor, items)
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                for key, fn in (("glossary", _upsert_glossary),
+                                ("tools", _upsert_tools),
+                                ("laws", _upsert_laws)):
+                    items = payload.get(key) or []
+                    if len(items) < GUARD_MIN[key]:
+                        skipped.append(f"{key} ({len(items)} < {GUARD_MIN[key]} floor)")
+                        continue
+                    results[key] = fn(cursor, items)
 
-            cursor.execute(
-                "INSERT INTO events (event_type, payload) VALUES (%s, %s)",
-                ("content_sync", json.dumps({
-                    "source": payload.get("source"),
-                    "generated_at": payload.get("generated_at"),
-                    "results": results,
-                    "skipped": skipped,
-                })),
-            )
+                cursor.execute(
+                    "INSERT INTO events (event_type, payload) VALUES (%s, %s)",
+                    ("content_sync", json.dumps({
+                        "source": payload.get("source"),
+                        "generated_at": payload.get("generated_at"),
+                        "results": results,
+                        "skipped": skipped,
+                    })),
+                )
+    except SyncRejected as exc:
+        logger.error("content_sync REJECTED: %s", exc)
+        return JsonResponse({"ok": False, "rejected": str(exc)},
+                            status=409)
 
     # New content is live — drop the in-process loader caches so the
     # questionnaire picks it up on the next render instead of waiting
