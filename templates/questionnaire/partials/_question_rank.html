@@ -105,7 +105,7 @@ Sprint C browser walkthrough.
                   data-option="{{ option }}"
                   draggable="true">
                 <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
-                <span class="srj-question__rank-label-text">{{ option|glossary_annotate|safe }}</span>
+                <span class="srj-question__rank-label-text">{{ option|glossary_annotate }}</span>
               </li>
             {% endif %}
           {% endfor %}
@@ -128,7 +128,7 @@ Sprint C browser walkthrough.
                     draggable="true">
                   <span class="srj-question__rank-position badge bg-secondary me-2">{{ forloop.counter }}</span>
                   <span class="srj-question__rank-handle" aria-hidden="true">⋮⋮</span>
-                  <span class="srj-question__rank-label-text">{{ option|glossary_annotate|safe }}</span>
+                  <span class="srj-question__rank-label-text">{{ option|glossary_annotate }}</span>
                 </li>
               {% endif %}
             {% endfor %}

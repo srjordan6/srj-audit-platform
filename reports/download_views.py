@@ -32,7 +32,9 @@ inbox for the PDF.</p>
 
 
 def _session_respondent_id(request):
-    return request.session.get("respondent_id") or request.GET.get("respondent_id")
+    # Session-only identity (never the query string -- IDOR): a guessable
+    # ?respondent_id= must not be able to download someone else's report.
+    return request.session.get("respondent_id")
 
 
 @require_http_methods(["GET"])

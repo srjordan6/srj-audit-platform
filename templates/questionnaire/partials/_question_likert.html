@@ -58,7 +58,7 @@ not worth it.
                  {% if question.required %}required{% endif %}
                  {% if prior_answer and prior_answer.selected == option %}checked{% endif %}>
           <label class="form-check-label d-block" for="{{ input_id }}">
-            {{ option|glossary_annotate|safe }}
+            {{ option|glossary_annotate }}
           </label>
         </div>
         {% endwith %}

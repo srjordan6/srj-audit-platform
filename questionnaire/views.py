@@ -32,10 +32,10 @@ EXPIRED_TEMPLATE = "questionnaire/partials/_expired.html"
 
 
 def _resolve_respondent_id(request) -> str | None:
-    rid = request.session.get("respondent_id")
-    if not rid:
-        rid = request.GET.get("respondent_id")
-    return rid
+    # Identity comes ONLY from the session (set by start / signed resume
+    # token / aiscore). Never trust a respondent_id query parameter --
+    # accepting one lets anyone read or edit another respondent (IDOR).
+    return request.session.get("respondent_id")
 
 
 def _normalize_progress(progress):
@@ -363,8 +363,6 @@ def next_question(request):
     rid = _resolve_respondent_id(request)
     if not rid:
         return HttpResponseNotFound("respondent_id required")
-    if request.session.get("respondent_id") != rid:
-        request.session["respondent_id"] = rid
     with connection.cursor() as cursor:
         return _dispatch_by_state(request, cursor, rid)
 

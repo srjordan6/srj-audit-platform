@@ -24,9 +24,14 @@ register = template.Library()
 
 
 @register.filter(name="glossary_annotate")
-def glossary_annotate(value) -> str:
-    """Return HTML with glossary terms wrapped in info-icon spans."""
-    return annotate(value if value is not None else "")
+def glossary_annotate(value):
+    """Return HTML with glossary terms wrapped in info-icon spans.
+
+    annotate() HTML-escapes its input before adding markup, so the result
+    is safe by construction; marking it here lets templates drop |safe.
+    """
+    from django.utils.safestring import mark_safe
+    return mark_safe(annotate(value if value is not None else ""))
 
 
 _SECTION_NAMES = {

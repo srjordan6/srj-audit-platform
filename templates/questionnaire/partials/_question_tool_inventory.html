@@ -123,7 +123,7 @@ swap_target     HTMX hx-target CSS selector.
                        })(this)"
                        {% if prior_answer and tool in prior_answer.selected %}checked{% endif %}>
                 <label class="form-check-label" for="{{ input_id }}">
-                  {{ tool|glossary_annotate|safe }}
+                  {{ tool|glossary_annotate }}
                 </label>
               </div>
             </div>

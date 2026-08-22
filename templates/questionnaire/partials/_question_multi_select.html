@@ -117,7 +117,7 @@ engine treats {"selected": ["None of these"]} correctly regardless.
                  })(this)"
                  {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">
-            {{ option|glossary_annotate|safe }}
+            {{ option|glossary_annotate }}
           </label>
         </div>
         {% endwith %}

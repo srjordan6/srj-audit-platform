@@ -1,14 +1,17 @@
 # SRJ AI Audit Platform — Tier 1 dependencies
 # Locked versions per Part A v1.1 Appendix B.1.
+# Security refresh 2026-08-16 (Aikido): Django 5.2.17 LTS (5.1 is EOL),
+# gunicorn 26.1.0, django-storages 1.14.6, pypdf 6.16.1, requests 2.34.2,
+# cryptography pinned explicitly. Prior refresh 2026-07-19 notes below.
 # Security refresh 2026-07-19: Django 5.1.15, pypdf 6.13.3, WeasyPrint 68.0
 # (62 CVEs closed — see Security_Scan_Report_2026-07-19.md). django-allauth
 # removed (unused; zero imports anywhere in the codebase). Dev/test tools
 # moved to requirements-dev.txt so they don't ship in the production image.
 
-Django==5.1.15
+Django==5.2.17
 psycopg[binary]==3.2.3
 django-environ==0.11.2
-gunicorn==23.0.0
+gunicorn==26.1.0
 whitenoise==6.8.2
 
 # Background jobs
@@ -17,7 +20,7 @@ django-rq==2.10.2
 rq==1.16.2
 
 # Bot protection (Turnstile server-side verification)
-requests>=2.32.0
+requests==2.34.2
 
 # PDF generation
 # WeasyPrint 68.0 confirmed working on Render 2026-07-20 (generated a
@@ -29,12 +32,11 @@ requests>=2.32.0
 # (which covers PYSEC-2026-3412, still unpatched upstream).
 WeasyPrint==68.0
 pydyf==0.12.1
-pypdf==6.13.3
-cryptography>=42.0
+pypdf==6.16.1
 
 # S3-compatible storage (Backblaze B2)
-boto3==1.35.0
-django-storages==1.14.4
+boto3==1.43.78
+django-storages==1.14.6
 
 # Payments
 stripe==11.4.0
@@ -52,3 +54,6 @@ crispy-bootstrap5==2024.10
 
 # AI narrative analysis
 anthropic>=0.40.0
+
+# Explicit pin: transitive dep flagged by scanner (out-of-bounds read in older lines)
+cryptography==50.0.0

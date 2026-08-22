@@ -24,10 +24,8 @@ from questionnaire.question_bank import QUESTIONS
 
 
 def _resolve_respondent_id(request):
-    rid = request.session.get("respondent_id")
-    if not rid:
-        rid = request.GET.get("respondent_id")
-    return rid
+    # Session-only identity (never the query string -- IDOR).
+    return request.session.get("respondent_id")
 
 
 def _format_answer(value, is_dont_know):

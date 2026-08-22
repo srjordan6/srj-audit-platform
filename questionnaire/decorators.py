@@ -29,10 +29,8 @@ def _response_404(msg):
 def require_writable_state(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        rid = (
-            request.session.get("respondent_id")
-            or request.GET.get("respondent_id")
-        )
+        # Session-only identity (never the query string -- IDOR).
+        rid = request.session.get("respondent_id")
         if not rid:
             return _response_404("respondent_id required")
         with _get_cursor_ctx() as cursor:
