@@ -1,7 +1,7 @@
 """Glossary term annotator for questionnaire option labels.
 
 Scans respondent-facing option label text and inserts a small info-icon
-link next to any glossary term found. Links target srjconsultingservices.com
+link next to any glossary term found. Links target theworldofai.org
 governance reference pages.
 
 Scope (locked with Stephen 2026-07-12):
@@ -33,7 +33,7 @@ from html import escape as html_escape
 # to the same URL as their canonical full term.
 # ---------------------------------------------------------------------------
 
-_BASE = "https://srjconsultingservices.com/ai-governance"
+_BASE = "https://theworldofai.org/ai-compliance"
 
 TERMS: dict[str, str] = {
     # ---- Framework hub + top-level buckets --------------------------------
@@ -57,52 +57,52 @@ TERMS: dict[str, str] = {
 
     # ---- Named laws / acts ------------------------------------------------
     "EU AI Act": f"{_BASE}/eu-ai-act/",
-    "NYC Local Law 144": f"{_BASE}/nyc-ai-laws/nyc-ll-144/",
-    "NYC Local Law 35": f"{_BASE}/nyc-ai-laws/nyc-ll-35/",
-    "Colorado AI Act": f"{_BASE}/state-ai-laws/colorado-ai-act/",
-    "Texas Responsible AI Governance Act": f"{_BASE}/state-ai-laws/texas-ai-act/",
-    "California AI Laws": f"{_BASE}/state-ai-laws/california-ai-laws/",
-    "Illinois AI Laws": f"{_BASE}/state-ai-laws/illinois-ai-laws/",
-    "Connecticut AI Act": f"{_BASE}/state-ai-laws/connecticut-ai-act/",
-    "Tennessee ELVIS Act": f"{_BASE}/state-ai-laws/tennessee-elvis-act/",
+    "NYC Local Law 144": f"{_BASE}/nyc-ll-144/",
+    "NYC Local Law 35": f"{_BASE}/nyc-ll-35/",
+    "Colorado AI Act": f"{_BASE}/colorado-ai-act/",
+    "Texas Responsible AI Governance Act": f"{_BASE}/texas-ai-act/",
+    "California AI Laws": f"{_BASE}/california-ai-laws/",
+    "Illinois AI Laws": f"{_BASE}/illinois-ai-laws/",
+    "Connecticut AI Act": f"{_BASE}/connecticut-ai-act/",
+    "Tennessee ELVIS Act": f"{_BASE}/tennessee-elvis-act/",
 
     # ---- Agency enforcement -----------------------------------------------
-    "FTC AI Enforcement": f"{_BASE}/agency-enforcement/ftc-ai-enforcement/",
-    "EEOC AI Enforcement": f"{_BASE}/agency-enforcement/eeoc-ai-enforcement/",
-    "CFPB AI Enforcement": f"{_BASE}/agency-enforcement/cfpb-ai-enforcement/",
-    "SEC AI Enforcement": f"{_BASE}/agency-enforcement/sec-ai-enforcement/",
-    "HHS OCR AI Enforcement": f"{_BASE}/agency-enforcement/hhs-ocr-ai-enforcement/",
+    "FTC AI Enforcement": f"{_BASE}/ftc-ai-enforcement/",
+    "EEOC AI Enforcement": f"{_BASE}/eeoc-ai-enforcement/",
+    "CFPB AI Enforcement": f"{_BASE}/cfpb-ai-enforcement/",
+    "SEC AI Enforcement": f"{_BASE}/sec-ai-enforcement/",
+    "HHS OCR AI Enforcement": f"{_BASE}/hhs-ocr-ai-enforcement/",
 
     # ---- Sector rules + statutes ------------------------------------------
-    "HIPAA and AI": f"{_BASE}/sector-rules/hipaa-ai/",
-    "COPPA and AI": f"{_BASE}/sector-rules/coppa-ai/",
-    "GDPR and AI": f"{_BASE}/sector-rules/gdpr-ai/",
-    "GLBA and AI": f"{_BASE}/sector-rules/glba-ai/",
-    "FCRA and AI": f"{_BASE}/sector-rules/fcra-ai/",
-    "ECOA and AI": f"{_BASE}/sector-rules/ecoa-ai/",
-    "Title VII and AI": f"{_BASE}/sector-rules/title-vii-ai/",
-    "WARN Act and AI": f"{_BASE}/sector-rules/warn-ai/",
+    "HIPAA and AI": f"{_BASE}/hipaa-ai/",
+    "COPPA and AI": f"{_BASE}/coppa-ai/",
+    "GDPR and AI": f"{_BASE}/gdpr-ai/",
+    "GLBA and AI": f"{_BASE}/glba-ai/",
+    "FCRA and AI": f"{_BASE}/fcra-ai/",
+    "ECOA and AI": f"{_BASE}/ecoa-ai/",
+    "Title VII and AI": f"{_BASE}/title-vii-ai/",
+    "WARN Act and AI": f"{_BASE}/warn-ai/",
 
     # ---- Financial reporting ----------------------------------------------
-    "FASB ASU 2025-06": f"{_BASE}/financial-reporting/fasb-asu-2025-06/",
-    "AICPA AI Guidance": f"{_BASE}/financial-reporting/aicpa-ai-guidance/",
-    "PCAOB AI Guidance": f"{_BASE}/financial-reporting/pcaob-ai-guidance/",
-    "SOX 302 and 404 for AI": f"{_BASE}/financial-reporting/sox-302-404-ai/",
+    "FASB ASU 2025-06": f"{_BASE}/fasb-asu-2025-06/",
+    "AICPA AI Guidance": f"{_BASE}/aicpa-ai-guidance/",
+    "PCAOB AI Guidance": f"{_BASE}/pcaob-ai-guidance/",
+    "SOX 302 and 404 for AI": f"{_BASE}/sox-302-404-ai/",
 
     # ---- General business governance --------------------------------------
-    "ISO 27001 and AI": f"{_BASE}/general-business-governance/iso-27001-ai/",
-    "SOC 2 and AI": f"{_BASE}/general-business-governance/soc-2-ai/",
-    "NIST Cybersecurity Framework and AI": f"{_BASE}/general-business-governance/nist-csf-ai/",
-    "COSO ERM and AI": f"{_BASE}/general-business-governance/coso-erm-ai/",
+    "ISO 27001 and AI": f"{_BASE}/iso-27001-ai/",
+    "SOC 2 and AI": f"{_BASE}/soc-2-ai/",
+    "NIST Cybersecurity Framework and AI": f"{_BASE}/nist-csf-ai/",
+    "COSO ERM and AI": f"{_BASE}/coso-erm-ai/",
 
     # ---- Vendor disclosure ------------------------------------------------
-    "Software Bill of Materials": f"{_BASE}/vendor-disclosure/sbom/",
-    "AI Bill of Materials": f"{_BASE}/vendor-disclosure/aibom/",
+    "Software Bill of Materials": f"{_BASE}/sbom/",
+    "AI Bill of Materials": f"{_BASE}/aibom/",
 
     # ---- Data management --------------------------------------------------
-    "DAMA-DMBOK": f"{_BASE}/data-management-frameworks/dama-dmbok/",
-    "EDM Council DCAM": f"{_BASE}/data-management-frameworks/dcam/",
-    "CDMC Cloud Data Management": f"{_BASE}/data-management-frameworks/cdmc/",
+    "DAMA-DMBOK": f"{_BASE}/dama-dmbok/",
+    "EDM Council DCAM": f"{_BASE}/dcam/",
+    "CDMC Cloud Data Management": f"{_BASE}/cdmc/",
 
     # ---- Aliases / common abbreviations -----------------------------------
     # (These point to the same URL as their canonical entry. Placed here so
@@ -110,50 +110,50 @@ TERMS: dict[str, str] = {
     # phrase when both would fire at the same position.)
     "NIST AI RMF": f"{_BASE}/nist-ai-rmf/",
     "AI RMF": f"{_BASE}/nist-ai-rmf/",
-    "NIST CSF": f"{_BASE}/general-business-governance/nist-csf-ai/",
+    "NIST CSF": f"{_BASE}/nist-csf-ai/",
     "ISO 42001": f"{_BASE}/iso-42001/",
     "ISO 22989": f"{_BASE}/iso-22989/",
     "SR 11-7": f"{_BASE}/sr-11-7/",
     "OCC 2013-29": f"{_BASE}/sr-11-7/",
-    "Local Law 144": f"{_BASE}/nyc-ai-laws/nyc-ll-144/",
-    "Local Law 35": f"{_BASE}/nyc-ai-laws/nyc-ll-35/",
-    "LL 144": f"{_BASE}/nyc-ai-laws/nyc-ll-144/",
-    "LL 35": f"{_BASE}/nyc-ai-laws/nyc-ll-35/",
-    "Texas AI Act": f"{_BASE}/state-ai-laws/texas-ai-act/",
-    "TRAIGA": f"{_BASE}/state-ai-laws/texas-ai-act/",
-    "ELVIS Act": f"{_BASE}/state-ai-laws/tennessee-elvis-act/",
-    "HIPAA": f"{_BASE}/sector-rules/hipaa-ai/",
-    "COPPA": f"{_BASE}/sector-rules/coppa-ai/",
-    "GDPR": f"{_BASE}/sector-rules/gdpr-ai/",
-    "GLBA": f"{_BASE}/sector-rules/glba-ai/",
-    "FCRA": f"{_BASE}/sector-rules/fcra-ai/",
-    "ECOA": f"{_BASE}/sector-rules/ecoa-ai/",
-    "Title VII": f"{_BASE}/sector-rules/title-vii-ai/",
-    "WARN Act": f"{_BASE}/sector-rules/warn-ai/",
-    "FASB": f"{_BASE}/financial-reporting/fasb-asu-2025-06/",
-    "ASU 2025-06": f"{_BASE}/financial-reporting/fasb-asu-2025-06/",
-    "AICPA": f"{_BASE}/financial-reporting/aicpa-ai-guidance/",
-    "PCAOB": f"{_BASE}/financial-reporting/pcaob-ai-guidance/",
-    "SOX 302": f"{_BASE}/financial-reporting/sox-302-404-ai/",
-    "SOX 404": f"{_BASE}/financial-reporting/sox-302-404-ai/",
-    "SOX": f"{_BASE}/financial-reporting/sox-302-404-ai/",
-    "ISO 27001": f"{_BASE}/general-business-governance/iso-27001-ai/",
-    "SOC 2": f"{_BASE}/general-business-governance/soc-2-ai/",
-    "SOC2": f"{_BASE}/general-business-governance/soc-2-ai/",
-    "COSO ERM": f"{_BASE}/general-business-governance/coso-erm-ai/",
-    "COSO": f"{_BASE}/general-business-governance/coso-erm-ai/",
-    "DMBOK": f"{_BASE}/data-management-frameworks/dama-dmbok/",
-    "DAMA": f"{_BASE}/data-management-frameworks/dama-dmbok/",
-    "DCAM": f"{_BASE}/data-management-frameworks/dcam/",
-    "CDMC": f"{_BASE}/data-management-frameworks/cdmc/",
-    "SBOM": f"{_BASE}/vendor-disclosure/sbom/",
-    "AIBOM": f"{_BASE}/vendor-disclosure/aibom/",
-    "AI BOM": f"{_BASE}/vendor-disclosure/aibom/",
-    "FTC": f"{_BASE}/agency-enforcement/ftc-ai-enforcement/",
-    "EEOC": f"{_BASE}/agency-enforcement/eeoc-ai-enforcement/",
-    "CFPB": f"{_BASE}/agency-enforcement/cfpb-ai-enforcement/",
-    "SEC": f"{_BASE}/agency-enforcement/sec-ai-enforcement/",
-    "HHS OCR": f"{_BASE}/agency-enforcement/hhs-ocr-ai-enforcement/",
+    "Local Law 144": f"{_BASE}/nyc-ll-144/",
+    "Local Law 35": f"{_BASE}/nyc-ll-35/",
+    "LL 144": f"{_BASE}/nyc-ll-144/",
+    "LL 35": f"{_BASE}/nyc-ll-35/",
+    "Texas AI Act": f"{_BASE}/texas-ai-act/",
+    "TRAIGA": f"{_BASE}/texas-ai-act/",
+    "ELVIS Act": f"{_BASE}/tennessee-elvis-act/",
+    "HIPAA": f"{_BASE}/hipaa-ai/",
+    "COPPA": f"{_BASE}/coppa-ai/",
+    "GDPR": f"{_BASE}/gdpr-ai/",
+    "GLBA": f"{_BASE}/glba-ai/",
+    "FCRA": f"{_BASE}/fcra-ai/",
+    "ECOA": f"{_BASE}/ecoa-ai/",
+    "Title VII": f"{_BASE}/title-vii-ai/",
+    "WARN Act": f"{_BASE}/warn-ai/",
+    "FASB": f"{_BASE}/fasb-asu-2025-06/",
+    "ASU 2025-06": f"{_BASE}/fasb-asu-2025-06/",
+    "AICPA": f"{_BASE}/aicpa-ai-guidance/",
+    "PCAOB": f"{_BASE}/pcaob-ai-guidance/",
+    "SOX 302": f"{_BASE}/sox-302-404-ai/",
+    "SOX 404": f"{_BASE}/sox-302-404-ai/",
+    "SOX": f"{_BASE}/sox-302-404-ai/",
+    "ISO 27001": f"{_BASE}/iso-27001-ai/",
+    "SOC 2": f"{_BASE}/soc-2-ai/",
+    "SOC2": f"{_BASE}/soc-2-ai/",
+    "COSO ERM": f"{_BASE}/coso-erm-ai/",
+    "COSO": f"{_BASE}/coso-erm-ai/",
+    "DMBOK": f"{_BASE}/dama-dmbok/",
+    "DAMA": f"{_BASE}/dama-dmbok/",
+    "DCAM": f"{_BASE}/dcam/",
+    "CDMC": f"{_BASE}/cdmc/",
+    "SBOM": f"{_BASE}/sbom/",
+    "AIBOM": f"{_BASE}/aibom/",
+    "AI BOM": f"{_BASE}/aibom/",
+    "FTC": f"{_BASE}/ftc-ai-enforcement/",
+    "EEOC": f"{_BASE}/eeoc-ai-enforcement/",
+    "CFPB": f"{_BASE}/cfpb-ai-enforcement/",
+    "SEC": f"{_BASE}/sec-ai-enforcement/",
+    "HHS OCR": f"{_BASE}/hhs-ocr-ai-enforcement/",
 }
 
 
@@ -223,7 +223,7 @@ def _wrap_vocab(match_text: str, definition: str) -> str:
     )
 
 
-_GLOSSARY_URL = "https://srjconsultingservices.com/resources/ai-glossary/"
+_GLOSSARY_URL = "https://theworldofai.org/ai-glossary/"
 
 # Vocabulary patterns are compiled lazily on first annotate() call and
 # re-checked every CACHE_SECONDS via synced_content's own cache, so a

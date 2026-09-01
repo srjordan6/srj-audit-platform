@@ -183,7 +183,7 @@ def laws_flat() -> list[str]:
 # Glossary — {term: (definition, category)} for the vocabulary annotator.
 # ---------------------------------------------------------------------------
 
-GLOSSARY_URL = "https://srjconsultingservices.com/resources/ai-glossary/"
+GLOSSARY_URL = "https://theworldofai.org/ai-glossary/"
 
 # Curation (locked with Stephen 2026-07-21): only underline terms that
 # genuinely help a non-technical respondent. Multi-word technical terms
