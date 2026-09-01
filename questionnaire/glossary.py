@@ -206,16 +206,18 @@ def _wrap(match_text: str, url: str) -> str:
     )
 
 
-def _wrap_vocab(match_text: str, definition: str) -> str:
+def _wrap_vocab(match_text: str, definition: str, slug: str = "") -> str:
     """Underlined glossary-vocabulary link (distinct from framework ⓘ).
 
-    Links to the AI Glossary page; the definition rides along as the
-    hover title so respondents get the meaning without leaving the form.
+    Links to the term's own page when the feed supplied a slug, else to
+    the glossary index. The definition rides along as the hover title so
+    respondents get the meaning without leaving the form.
     """
     esc_term = html_escape(match_text, quote=True)
     tip = definition[:180] if definition else f"See the AI Glossary: {match_text}"
     esc_tip = html_escape(tip, quote=True)
-    esc_url = html_escape(_GLOSSARY_URL, quote=True)
+    url = f"{_GLOSSARY_URL}{slug}/" if slug else _GLOSSARY_URL
+    esc_url = html_escape(url, quote=True)
     return (
         f'{_SENTINEL_OPEN}<a class="glossary-vocab" href="{esc_url}" '
         f'target="_blank" rel="noopener" title="{esc_tip}" '
@@ -227,17 +229,18 @@ _GLOSSARY_URL = "https://theworldofai.org/ai-glossary/"
 
 # Vocabulary patterns are compiled lazily on first annotate() call and
 # re-checked every CACHE_SECONDS via synced_content's own cache, so a
-# WordPress glossary edit reaches the questionnaire without a deploy.
-_vocab_compiled: list[tuple[str, str, "re.Pattern"]] | None = None
+# glossary edit reaches the questionnaire without a deploy. The feed is
+# the audit_sync stage of srj-pipeline, pushing from Postgres.
+_vocab_compiled: list[tuple[str, str, str, "re.Pattern"]] | None = None
 _vocab_loaded_at: float = 0.0
 
 
-def _vocab_terms() -> list[tuple[str, str, "re.Pattern"]]:
+def _vocab_terms() -> list[tuple[str, str, str, "re.Pattern"]]:
     global _vocab_compiled, _vocab_loaded_at
     import time
     if _vocab_compiled is not None and time.time() - _vocab_loaded_at < 300:
         return _vocab_compiled
-    compiled: list[tuple[str, str, re.Pattern]] = []
+    compiled: list[tuple[str, str, str, re.Pattern]] = []
     try:
         from questionnaire.synced_content import glossary_terms
         terms = glossary_terms()
@@ -245,12 +248,12 @@ def _vocab_terms() -> list[tuple[str, str, "re.Pattern"]]:
         # ⓘ link to the specific reference page beats a generic glossary
         # link for those.
         framework_lower = {t.lower() for t in TERMS}
-        for term, definition in sorted(
+        for term, (definition, slug) in sorted(
             terms.items(), key=lambda kv: (-len(kv[0]), kv[0])
         ):
             if term.lower() in framework_lower:
                 continue
-            compiled.append((term, definition, _term_pattern(term)))
+            compiled.append((term, definition, slug, _term_pattern(term)))
     except Exception:  # noqa: BLE001
         compiled = []
     _vocab_compiled = compiled
@@ -295,9 +298,11 @@ def annotate(text: str) -> str:
     for term, url, pattern in _COMPILED:
         _protected_sub(pattern, lambda m, u=url: _wrap(m, u))
 
-    # Pass 2: WordPress-synced glossary vocabulary -> underlined links.
-    for term, definition, pattern in _vocab_terms():
-        _protected_sub(pattern, lambda m, d=definition: _wrap_vocab(m, d))
+    # Pass 2: synced glossary vocabulary -> underlined per-term links.
+    for term, definition, slug, pattern in _vocab_terms():
+        _protected_sub(
+            pattern, lambda m, d=definition, sl=slug: _wrap_vocab(m, d, sl)
+        )
 
     # Strip sentinels; keep the wrapped HTML.
     out = out.replace(_SENTINEL_OPEN, "").replace(_SENTINEL_CLOSE, "")

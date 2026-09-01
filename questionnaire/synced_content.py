@@ -204,19 +204,24 @@ _ACRONYM_ALLOW = {
 }
 
 
-def glossary_terms() -> dict[str, str]:
-    """Return {term: definition} for annotatable glossary terms."""
+def glossary_terms() -> dict[str, tuple[str, str]]:
+    """Return {term: (definition, slug)} for annotatable glossary terms.
+
+    `slug` is the theworldofai.org per-term page slug, supplied by the
+    audit_sync feed. Empty string when a row predates the slug column;
+    callers fall back to the glossary index in that case.
+    """
     def load():
         try:
             rows = _rows(
-                "SELECT term, definition FROM synced_glossary_terms "
-                "WHERE is_active = TRUE"
+                "SELECT term, definition, COALESCE(slug, '') "
+                "FROM synced_glossary_terms WHERE is_active = TRUE"
             )
         except Exception:  # noqa: BLE001
             logger.exception("synced_glossary_terms read failed")
             rows = []
-        out: dict[str, str] = {}
-        for term, definition in rows:
+        out: dict[str, tuple[str, str]] = {}
+        for term, definition, slug in rows:
             t = (term or "").strip()
             if not t:
                 continue
@@ -230,7 +235,7 @@ def glossary_terms() -> dict[str, str]:
                     continue
                 if not (t.isupper() or low in _ACRONYM_ALLOW):
                     continue
-            out[t] = definition or ""
+            out[t] = (definition or "", (slug or "").strip())
         return out
     return _cached("glossary", load)
 
