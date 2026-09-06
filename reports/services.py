@@ -197,11 +197,8 @@ def generate_and_lock(
             ctx = build_snapshot_context(engagement_id, fw)
             payloads[fw] = {
                 "overall": ctx.get("overall"),
-                "dimensions": ctx.get("dimensions"),
-                "modules": ctx.get("modules"),
-                "steps": ctx.get("steps"),
-                "components": ctx.get("components"),
-                "gaps": ctx.get("gaps"),
+                "items": ctx.get("items"),
+                "gaps": ctx.get("priority_gaps"),
             }
         persist_snapshot_scores(
             cursor,

@@ -14,10 +14,10 @@ Design (locked with Stephen 2026-09-05):
 
   * The four frameworks use different taxonomies (V1 dimensions, V2
     modules, V3 steps, Efficiency components). reports.context already
-    normalizes them into one {overall, <items>, gaps} payload shape, so
-    this module consumes those payloads rather than re-deriving four
-    result types. The framework key is stored alongside `dimension`, so
-    the flattened namespace stays unambiguous when queried.
+    normalizes all of them to one {overall, items, priority_gaps} shape,
+    so this module consumes that rather than re-deriving four result
+    types. The framework key is stored alongside `dimension`, so the
+    flattened namespace stays unambiguous when queried.
 
 A failure here must never lose a report: the caller is expected to treat
 persist_snapshot_scores as best-effort.
@@ -31,8 +31,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# The per-framework key under which reports.context puts its item list.
-_ITEM_KEYS = ("dimensions", "modules", "steps", "components")
+# reports.context normalizes every framework to this one key.
+_ITEM_KEYS = ("items",)
 
 _OVERALL_DIMENSION = "__overall__"
 
