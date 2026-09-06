@@ -185,6 +185,35 @@ def generate_and_lock(
         cursor, company_id, engagement_id, framework, pdf_bytes, buyer_email, now
     )
 
+    # Persist the scored snapshot alongside the report of record. Append-only
+    # and keyed to report_id, so regenerating adds a new set of rows and the
+    # history stays queryable (Tier 4 trend lines). Best-effort: a scoring
+    # write must never cost a generated report.
+    try:
+        from reports.context import build_snapshot_context
+        from scoring.persistence import persist_snapshot_scores
+        payloads = {}
+        for fw in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
+            ctx = build_snapshot_context(engagement_id, fw)
+            payloads[fw] = {
+                "overall": ctx.get("overall"),
+                "dimensions": ctx.get("dimensions"),
+                "modules": ctx.get("modules"),
+                "steps": ctx.get("steps"),
+                "components": ctx.get("components"),
+                "gaps": ctx.get("gaps"),
+            }
+        persist_snapshot_scores(
+            cursor,
+            company_id=company_id,
+            engagement_id=engagement_id,
+            report_id=report_id,
+            payloads=payloads,
+            now=now,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("score persistence failed for report %s (non-fatal)", report_id)
+
     # Phase 2e: persist the PDF to Cloudflare R2 (non-fatal). Replace the
     # inline:// placeholder with the real object key so the report can be
     # re-downloaded later. If R2 is down/unset, generation still succeeds.

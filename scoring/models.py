@@ -33,6 +33,18 @@ class Score(models.Model):
         db_column='engagement_id',
     )
     framework = models.CharField(max_length=50, choices=FRAMEWORK_CHOICES)
+    report = models.ForeignKey(
+        'reports.Report',
+        on_delete=models.CASCADE,
+        related_name='scores',
+        db_column='report_id',
+        null=True, blank=True,
+        help_text=(
+            'The report of record these scores were computed for. Rows are '
+            'appended per generation, never overwritten, so this is what '
+            'makes the table a trend source rather than a cache.'
+        ),
+    )
     dimension = models.CharField(
         max_length=100, blank=True, null=True,
         help_text='Sub-dimension name. Null = composite/overall framework score.',
