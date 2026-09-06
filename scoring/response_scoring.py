@@ -67,12 +67,12 @@ EXCLUDED TYPES
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 
+from core.dbjson import loads_maybe
 from questionnaire.question_bank import Question
 
 logger = logging.getLogger(__name__)
@@ -550,34 +550,6 @@ SCORERS = {
 }
 
 
-def _normalize_answer(answer: Any) -> Any:
-    """Decode an answer that arrived as a JSON string rather than a dict.
-
-    Responses are stored in a jsonb column, so `{"selected": "3"}` should
-    reach the scorers as a dict. Some driver/connection combinations hand
-    it back as the raw JSON *string* instead. Left alone, that string is
-    unparseable by _score_l5 (logged, scored 0.5) and -- worse -- silently
-    accepted by _score_ss_or_yn, which then heuristically scores the JSON
-    blob itself instead of the selected option.
-
-    Plain answers ("Yes", "Don't know") fail json.loads and pass through
-    untouched, so this is safe for every question type.
-    """
-    if isinstance(answer, (bytes, bytearray)):
-        try:
-            answer = answer.decode("utf-8")
-        except Exception:  # noqa: BLE001
-            return answer
-    if isinstance(answer, str):
-        t = answer.strip()
-        if t[:1] in ("{", "[") and t[-1:] in ("}", "]"):
-            try:
-                return json.loads(t)
-            except (ValueError, TypeError):
-                return answer
-    return answer
-
-
 def score_response(
     question: Question,
     answer_value: Any,
@@ -620,6 +592,6 @@ def score_response(
             note=f"unknown_type_{question.question_type}",
         )
     return scorer(
-        question, _normalize_answer(answer_value),
+        question, loads_maybe(answer_value),
         option_weight_override=option_weight_override,
     )

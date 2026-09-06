@@ -20,6 +20,7 @@ from django.views.decorators.http import require_http_methods
 
 from engagements import lifecycle
 from questionnaire import flow, services
+from core.dbjson import loads_maybe
 from questionnaire.question_bank import QUESTIONS
 
 
@@ -68,7 +69,10 @@ def review(request):
             "FROM responses WHERE respondent_id = %s",
             (rid,),
         )
-        answers = {row[0]: (row[1], bool(row[2])) for row in cursor.fetchall()}
+        answers = {
+            row[0]: (loads_maybe(row[1]), bool(row[2]))
+            for row in cursor.fetchall()
+        }
 
     state = lifecycle_ctx["state"]
     editable = lifecycle.is_writable(state)

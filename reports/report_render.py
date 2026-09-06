@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from core.dbjson import loads_maybe
 from django.db import connection
 from django.template.loader import render_to_string
 
@@ -128,7 +129,7 @@ def _load_responses(cursor, engagement_id: str) -> dict:
         """,
         [engagement_id],
     )
-    return {row[0]: {"value": row[1], "dont_know": bool(row[2])}
+    return {row[0]: {"value": loads_maybe(row[1]), "dont_know": bool(row[2])}
             for row in cursor.fetchall()}
 
 
