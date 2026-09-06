@@ -67,6 +67,7 @@ EXCLUDED TYPES
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -233,6 +234,11 @@ def _score_rank(question, answer, **kwargs) -> ResponseScore:
     framework-specific use.
     """
     return ResponseScore.excluded_(answer, note="rank_excluded_from_numeric")
+
+
+def _score_law_inventory(question, answer, **kwargs) -> ResponseScore:
+    """LAW_INVENTORY (T1-A-006): raw list, excluded from numeric scoring."""
+    return ResponseScore.excluded_(answer, note="law_inventory_excluded_from_numeric")
 
 
 def _score_l5(question, answer, **kwargs) -> ResponseScore:
@@ -533,10 +539,43 @@ SCORERS = {
     "MS": _score_ms,
     "NR": _score_nr,
     "L5": _score_l5,
+    # T1-A-006: an inventory of which laws/frameworks apply. Like RANK, the
+    # list carries no defensible universal 0-1 value; framework aggregators
+    # consume the raw list. Excluded rather than unscored so it stops
+    # warning on every generation.
+    "LAW_INVENTORY": _score_law_inventory,
     "RANK": _score_rank,
     "MATRIX": _score_matrix,
     "TEXT": _score_text,
 }
+
+
+def _normalize_answer(answer: Any) -> Any:
+    """Decode an answer that arrived as a JSON string rather than a dict.
+
+    Responses are stored in a jsonb column, so `{"selected": "3"}` should
+    reach the scorers as a dict. Some driver/connection combinations hand
+    it back as the raw JSON *string* instead. Left alone, that string is
+    unparseable by _score_l5 (logged, scored 0.5) and -- worse -- silently
+    accepted by _score_ss_or_yn, which then heuristically scores the JSON
+    blob itself instead of the selected option.
+
+    Plain answers ("Yes", "Don't know") fail json.loads and pass through
+    untouched, so this is safe for every question type.
+    """
+    if isinstance(answer, (bytes, bytearray)):
+        try:
+            answer = answer.decode("utf-8")
+        except Exception:  # noqa: BLE001
+            return answer
+    if isinstance(answer, str):
+        t = answer.strip()
+        if t[:1] in ("{", "[") and t[-1:] in ("}", "]"):
+            try:
+                return json.loads(t)
+            except (ValueError, TypeError):
+                return answer
+    return answer
 
 
 def score_response(
@@ -580,4 +619,7 @@ def score_response(
             value=0.5, raw_answer=answer_value, is_dont_know=False,
             note=f"unknown_type_{question.question_type}",
         )
-    return scorer(question, answer_value, option_weight_override=option_weight_override)
+    return scorer(
+        question, _normalize_answer(answer_value),
+        option_weight_override=option_weight_override,
+    )
