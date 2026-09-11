@@ -30,7 +30,7 @@ requests==2.34.2
 # Defence in depth on its two SSRF CVEs: running 68.0 (which patches
 # PYSEC-2026-2034) AND the deny-all url_fetcher in reports/generator.py
 # (which covers PYSEC-2026-3412, still unpatched upstream).
-WeasyPrint==68.0
+WeasyPrint==70.0
 pydyf==0.12.1
 pypdf==6.16.1
 
