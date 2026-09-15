@@ -1,0 +1,20 @@
+# Gitleaks configuration for srj-audit-platform.
+#
+# Keep the full default ruleset; add narrowly scoped allowlists only for
+# verified false positives. Every entry names the file and the exact
+# string, so a real credential landing in the same file still trips.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+reports/generator.py module docstring describes the OD-18 PDF encryption
+design in prose. The generic-api-key rule matches on "user password,"
+followed by the permissions text and scores it as high entropy. No
+credential is present: owner_password is a function parameter supplied
+from settings, and user_password is an intentional empty string so that
+delivered reports open without a prompt.
+"""
+paths = ['''reports/generator\.py''']
+regexes = ['''permissions_flag=0 \(no copy/print/edit/annotate/extract\)''']
