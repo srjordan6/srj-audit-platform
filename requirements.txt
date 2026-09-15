@@ -35,7 +35,7 @@ pydyf==0.12.1
 pypdf==6.16.1
 
 # S3-compatible storage (Backblaze B2)
-boto3==1.43.78
+boto3==1.43.93
 django-storages==1.14.6
 
 # Payments
