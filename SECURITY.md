@@ -56,39 +56,32 @@ high entropy. No credential is present: `owner_password` is a function parameter
 supplied from settings, and `user_password` is an intentional empty string so
 that delivered reports open without a prompt.
 
-## Held dependencies
+## Dependency policy
 
-**WeasyPrint is pinned at 68.0.** It renders every Tier 1 PDF report, and major
-version bumps change CSS layout, so an upgrade must be validated by generating a
-full report end to end and comparing it against a known-good PDF before merging.
-Major bumps are therefore excluded from automated proposals in `dependabot.yml`
-and reviewed by hand.
+**WeasyPrint renders every Tier 1 PDF report**, so version bumps are reviewed by
+hand rather than merged automatically — major releases change CSS layout.
+`dependabot.yml` excludes WeasyPrint major bumps from automated proposals for
+this reason. The validation before any bump is: render `tier1_snapshot.html` on
+both versions and compare page count, page sizes and per-page extracted text,
+including an inflated run long enough to exercise page breaks.
 
-68.0 carries two open MODERATE advisories. Neither is reachable from this
-codebase today, verified against OSV on 2026-09-15:
+It sat at 68.0 until 2026-09-15 and now runs 70.0, which closes
+CVE-2026-55073 (SSRF) and CVE-2026-49452 (CSS injection). Two notes worth
+keeping, because the earlier rationale in this repository was wrong about both:
 
-**CVE-2026-55073 / GHSA-jf6q-chmf-3h3v — SSRF, fixed in 70.0.** `write_pdf()`
-ignores the document's `url_fetcher` on the `xmp_metadata` and `attachments`
-channels and constructs a fresh default fetcher instead. The deny-all
-`url_fetcher` in `reports/generator.py` does **not** mitigate this — being
-bypassed is the vulnerability. The platform is unaffected only because
-`generator.py` calls `write_pdf()` with no arguments, so neither channel is
-used. Passing `xmp_metadata=` or `attachments=` a URL would expose it.
+The deny-all `url_fetcher` in `reports/generator.py` did **not** mitigate the
+SSRF. `write_pdf()` ignored the document's fetcher on the `xmp_metadata` and
+`attachments` channels and built a fresh default one — being bypassed was the
+vulnerability. The platform was unaffected only because `write_pdf()` is called
+with no arguments. Keep the deny-all fetcher anyway: it is what blocks remote
+and `file://` loads on the normal render path.
 
-**CVE-2026-49452 / GHSA-jhhc-3hcp-qhm5 — CSS injection, affects ≤ 68.1.**
-Unescaped attribute values are embedded into CSS when HTML presentational hints
-are enabled. This is unrelated to `url_fetcher`. The platform is unaffected
-because `presentational_hints` defaults to `False` and is never enabled.
+The CSS injection had nothing to do with `url_fetcher` either. It required
+`presentational_hints=True`, which is never set.
 
-Both are fixed in 70.0, so the upgrade is wanted, not avoided. Until it happens,
-two invariants must hold, and any change touching them requires re-reading this
-section: `write_pdf()` takes no `xmp_metadata` or `attachments` argument, and
-`presentational_hints` is never set to `True`.
-
-An earlier version of this rationale claimed the deny-all `url_fetcher` covered
-the outstanding advisory. That was wrong on both counts and has been corrected —
-the note is kept here because acting on it would have left a real gap looking
-closed.
+The general lesson: a compensating control is only a control if it sits in the
+path the advisory describes. Record which mechanism a mitigation actually
+blocks, not which one it is near.
 
 ## Secrets
 
