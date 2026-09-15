@@ -1,12 +1,48 @@
+# Dependabot configuration for srj-audit-platform.
+#
+# Two ecosystems: the GitHub Actions used by .github/workflows, and the
+# Python requirements at the repository root. requirements-dev.txt is
+# picked up automatically because it lives in the same directory.
+#
+# Note: Dependabot SECURITY updates (advisory-driven) run regardless of
+# this file. What is configured here is routine VERSION updates.
+
 version: 2
 updates:
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: "pip"
-    directory: "atform"
+    directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
     open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "factory-boy"
+          - "django-debug-toolbar"
+    ignore:
+      # WeasyPrint is held at 68.0 deliberately. See SECURITY.md,
+      # "Held dependencies". Major bumps change PDF layout and must be
+      # validated against a generated report before merging, so they are
+      # reviewed by hand rather than auto-proposed.
+      - dependency-name: "WeasyPrint"
+        update-types: ["version-update:semver-major"]
