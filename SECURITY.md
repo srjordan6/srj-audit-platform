@@ -59,15 +59,36 @@ that delivered reports open without a prompt.
 ## Held dependencies
 
 **WeasyPrint is pinned at 68.0.** It renders every Tier 1 PDF report, and major
-version bumps have historically changed CSS layout behaviour. Any upgrade must be
-validated by generating a full report end to end and comparing the output before
-it is merged, so major bumps are excluded from automated proposals in
-`dependabot.yml` and reviewed by hand instead.
+version bumps change CSS layout, so an upgrade must be validated by generating a
+full report end to end and comparing it against a known-good PDF before merging.
+Major bumps are therefore excluded from automated proposals in `dependabot.yml`
+and reviewed by hand.
 
-68.0 patches PYSEC-2026-2034. Its second SSRF advisory, PYSEC-2026-3412, remains
-unpatched upstream; the deny-all `url_fetcher` in `reports/generator.py` is the
-compensating control and must stay in place for as long as that advisory is open.
-Removing it would reintroduce the exposure regardless of the installed version.
+68.0 carries two open MODERATE advisories. Neither is reachable from this
+codebase today, verified against OSV on 2026-09-15:
+
+**CVE-2026-55073 / GHSA-jf6q-chmf-3h3v — SSRF, fixed in 70.0.** `write_pdf()`
+ignores the document's `url_fetcher` on the `xmp_metadata` and `attachments`
+channels and constructs a fresh default fetcher instead. The deny-all
+`url_fetcher` in `reports/generator.py` does **not** mitigate this — being
+bypassed is the vulnerability. The platform is unaffected only because
+`generator.py` calls `write_pdf()` with no arguments, so neither channel is
+used. Passing `xmp_metadata=` or `attachments=` a URL would expose it.
+
+**CVE-2026-49452 / GHSA-jhhc-3hcp-qhm5 — CSS injection, affects ≤ 68.1.**
+Unescaped attribute values are embedded into CSS when HTML presentational hints
+are enabled. This is unrelated to `url_fetcher`. The platform is unaffected
+because `presentational_hints` defaults to `False` and is never enabled.
+
+Both are fixed in 70.0, so the upgrade is wanted, not avoided. Until it happens,
+two invariants must hold, and any change touching them requires re-reading this
+section: `write_pdf()` takes no `xmp_metadata` or `attachments` argument, and
+`presentational_hints` is never set to `True`.
+
+An earlier version of this rationale claimed the deny-all `url_fetcher` covered
+the outstanding advisory. That was wrong on both counts and has been corrected —
+the note is kept here because acting on it would have left a real gap looking
+closed.
 
 ## Secrets
 

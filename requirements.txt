@@ -23,13 +23,31 @@ rq==1.16.2
 requests==2.34.2
 
 # PDF generation
-# WeasyPrint 68.0 confirmed working on Render 2026-07-20 (generated a
-# 286 KB report end-to-end). An earlier "68 segfaults" diagnosis was
-# wrong — generation simply takes ~3 minutes because the Claude narrative
-# call runs inside it, and the check happened before it finished.
-# Defence in depth on its two SSRF CVEs: running 68.0 (which patches
-# PYSEC-2026-2034) AND the deny-all url_fetcher in reports/generator.py
-# (which covers PYSEC-2026-3412, still unpatched upstream).
+# WeasyPrint is held at 68.0. 68.0 renders a full Tier 1 report correctly
+# (verified 2026-07-20, 286 KB end to end); an earlier "68 segfaults"
+# diagnosis was wrong, generation simply takes ~3 minutes because the
+# Claude narrative call runs inside it.
+#
+# 68.0 carries two open MODERATE advisories. Neither is reachable from
+# this codebase today, but NOT for the reasons previously recorded here.
+# Verified against OSV 2026-09-15:
+#
+#   CVE-2026-55073 / GHSA-jf6q-chmf-3h3v  SSRF, fixed in 70.0.
+#     write_pdf() IGNORES the document url_fetcher on the xmp_metadata and
+#     attachments channels and builds a fresh default fetcher. The deny-all
+#     url_fetcher in reports/generator.py does NOT mitigate this - being
+#     bypassed is the vulnerability. We are unaffected only because
+#     generator.py calls write_pdf() with no arguments, so neither channel
+#     is used. Passing xmp_metadata= or attachments= would expose us.
+#
+#   CVE-2026-49452 / GHSA-jhhc-3hcp-qhm5  CSS injection, affects <= 68.1.
+#     Unescaped attribute values embedded into CSS when HTML presentational
+#     hints are enabled. Unrelated to url_fetcher. We are unaffected because
+#     presentational_hints defaults to False and we never enable it.
+#
+# 70.0 fixes both. The upgrade is wanted; it is held only until a full
+# report is generated on 70.0 and compared against a known-good PDF,
+# because major bumps change CSS layout. See SECURITY.md.
 WeasyPrint==68.0
 pydyf==0.12.1
 pypdf==6.16.1
