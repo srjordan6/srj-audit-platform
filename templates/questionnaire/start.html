@@ -247,12 +247,32 @@
     var el = document.getElementById("company_industry");
     if (!el) return;
     new TomSelect(el, {
-      maxOptions: 200,
+      // 1012, not 200. A broad term like "manufactur" hit the old cap and
+      // silently showed a truncated list with no indication it was truncated.
+      maxOptions: 1012,
       searchField: ["text"],
       // Keep sectors visible as headers in the dropdown
       optgroupField: "optgroup",
       allowEmptyOption: false,
       placeholder: "Type to search 1,012 industries…",
+      // NAICS names an industry "Book Publishers", never "Book Publishing",
+      // so a visitor typing the natural word for their own trade got an empty
+      // dropdown - which reads as a broken page, not as no match. Score the
+      // query twice: as typed, and with a common English suffix stripped, so
+      // "publishing" also finds "Publishers". Same for manufacturing,
+      // consulting, retailing, printing, farming and the rest of that shape.
+      score: function (search) {
+        var stem = search.replace(/(ings?|ers?|s)$/i, "");
+        var primary = this.getScoreFunction(search);
+        var fallback = (stem && stem !== search)
+          ? this.getScoreFunction(stem)
+          : null;
+        return function (item) {
+          var a = primary(item);
+          var b = fallback ? fallback(item) : 0;
+          return a > b ? a : b;
+        };
+      },
     });
   })();
 </script>
