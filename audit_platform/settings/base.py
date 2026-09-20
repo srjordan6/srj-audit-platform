@@ -87,9 +87,20 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'audit_platform.urls'
 WSGI_APPLICATION = 'audit_platform.wsgi.application'
 
+# Two databases since the 2026-09-20 split.
+#
+# 'default' holds the fourteen tables this app owns and is the only one it
+# writes to. 'content' is read-only and points at srj_audit, where the three
+# synced_* tables live: the pipeline writes them and theworldofai.org also
+# reads them, so they are shared content rather than this app's tables and
+# were deliberately left behind. See claude/srj_audit_database_split_runbook.md.
 DATABASES = {
     'default': env.db(
         'DATABASE_URL',
+        default='postgres://postgres:devpass@localhost:5432/srj_platform',
+    ),
+    'content': env.db(
+        'CONTENT_DATABASE_URL',
         default='postgres://postgres:devpass@localhost:5432/srj_audit',
     ),
 }

@@ -36,8 +36,14 @@ def _cached(key: str, loader):
 
 
 def _rows(sql: str, params=()) -> list[tuple]:
-    from django.db import connection
-    with connection.cursor() as cursor:
+    # Reads the synced_* tables, which stayed in srj_audit when the audit
+    # platform's own tables moved to their own database on 2026-09-20. The
+    # pipeline writes them and theworldofai.org also reads them, so they are
+    # shared content; this app is one consumer among several. Every query in
+    # this module funnels through here, so this is the only binding that has
+    # to change.
+    from django.db import connections
+    with connections['content'].cursor() as cursor:
         cursor.execute(sql, params)
         return cursor.fetchall()
 
