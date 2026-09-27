@@ -23,6 +23,7 @@ re-running one is safe.
 
 | File | Applied | What |
 |---|---|---|
+| `2026-09-27_multi_respondent_w1s1.sql` | 2026-09-27 | `respondents.last_nudged_at`, `respondents.reminders_disabled`, `questions.instrument` (default `tier_1`, for AIITSA), two indexes, grants. W1 Sprint 1. |
 | `2026-09-05_scores_report_id.sql` | 2026-09-05 | `scores.report_id` FK to `reports`, two indexes, INSERT grant to `srj_audit_app`. Enables append-per-generation score history (Tier 4 trend lines). |
 
 ## Conventions

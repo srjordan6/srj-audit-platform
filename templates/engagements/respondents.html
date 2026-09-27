@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Respondents | {{ company }} | SRJ AI Audit Platform{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 960px;">
+  <h1 class="h3 mb-1">Audit respondents</h1>
+  <p class="text-muted mb-4">{{ company }}{% if size_bracket %} | {{ size_bracket }} employees{% endif %} | {{ tier|upper }}</p>
+
+  {% if messages %}{% for m in messages %}
+    <div class="alert alert-{{ m.tags|default:'info' }}">{{ m }}</div>
+  {% endfor %}{% endif %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      {% if coverage.is_met %}
+        <h2 class="h5 text-success mb-1">Coverage met</h2>
+        <p class="mb-0">{{ coverage.counted }} of {{ coverage.minimum }} required respondents have completed and attested.
+        {% if coverage_met_at %}Your report is being prepared.{% else %}Your report will be generated shortly.{% endif %}</p>
+      {% else %}
+        <h2 class="h5 mb-1">Coverage: {{ coverage.counted }} of {{ coverage.minimum }} minimum</h2>
+        <p class="mb-2">Your audit report cannot be generated yet. Its defensibility depends on these minimums:</p>
+        <ul class="mb-2">{% for item in coverage.missing_items %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% if required_roles %}
+          <p class="small text-muted mb-0">Required role mix for your company size:
+            {% for label, n in required_roles %}{{ n }}x {{ label }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+            A respondent counts once they have answered {{ min_completion_pct }}% of their questions and signed the attestation.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <table class="table align-middle">
+    <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Progress</th><th></th></tr></thead>
+    <tbody>
+    {% for r in respondents %}
+      <tr>
+        <td>{{ r.name }}<br><span class="small text-muted">{{ r.email }}</span></td>
+        <td>{{ r.role_label }}{% if r.title %}<br><span class="small text-muted">{{ r.title }}</span>{% endif %}</td>
+        <td>
+          {% if r.status == "completed" %}<span class="badge bg-success">Completed</span>
+          {% elif r.status == "in_progress" %}<span class="badge bg-primary">In progress</span>
+          {% else %}<span class="badge bg-secondary">Invited</span>{% endif %}
+          {% if r.counts %}<br><span class="small text-success">counts toward coverage</span>{% endif %}
+        </td>
+        <td style="min-width: 140px;">
+          <div class="progress" style="height: 8px;"><div class="progress-bar" style="width: {{ r.percent }}%"></div></div>
+          <span class="small text-muted">{{ r.percent }}% | {% if r.attested %}attested{% else %}not attested{% endif %}</span>
+        </td>
+        <td class="text-end text-nowrap">
+          {% if r.status != "completed" %}
+          <form method="post" action="{% url 'engagements:nudge_respondent' engagement_id r.id %}" class="d-inline">{% csrf_token %}
+            <button class="btn btn-sm btn-outline-primary" {% if r.last_nudged %}title="Last reminder {{ r.last_nudged|date:'M j, H:i' }}"{% endif %}>Nudge</button></form>
+          <form method="post" action="{% url 'engagements:remove_respondent' engagement_id r.id %}" class="d-inline"
+                onsubmit="return confirm('Remove {{ r.name|escapejs }} from this audit?');">{% csrf_token %}
+            <button class="btn btn-sm btn-outline-danger">Remove</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-muted">No respondents yet. Add the first one below.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="card">
+    <div class="card-body">
+      <h2 class="h5">Invite a respondent</h2>
+      <p class="small text-muted">They receive an email with a private link. Their answers are confidential to the platform; you will see progress only.</p>
+      <form method="post" action="{% url 'engagements:add_respondent' engagement_id %}" class="row g-3">{% csrf_token %}
+        <div class="col-md-4"><label class="form-label">Name</label><input name="name" class="form-control" required maxlength="120"></div>
+        <div class="col-md-4"><label class="form-label">Email</label><input name="email" type="email" class="form-control" required></div>
+        <div class="col-md-4"><label class="form-label">Role</label>
+          <select name="role" class="form-select" required>
+            <option value="">Choose...</option>
+            {% for code, label in roles.items %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+          </select></div>
+        <div class="col-md-6"><label class="form-label">Title <span class="text-muted">(optional, appears in the report)</span></label><input name="title" class="form-control" maxlength="120"></div>
+        <div class="col-md-6"><label class="form-label">Personal note <span class="text-muted">(optional, 500 chars, included in the email)</span></label><input name="note" class="form-control" maxlength="500"></div>
+        <div class="col-12"><button class="btn btn-primary">Send invitation</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

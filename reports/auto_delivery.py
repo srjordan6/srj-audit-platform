@@ -284,6 +284,31 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
     if info is None:
         return False
     engagement_id, email, name, company = info
+
+    # Multi-respondent tiers do not generate on a single completion. Each
+    # completion re-runs the coverage check (Part B-1 S.3.6); generation is
+    # gated on coverage_met and lands in Sprint 2 with the aggregation
+    # engine. Tier 1 keeps the existing single-respondent path.
+    cursor.execute("SELECT tier, coverage_met_at FROM engagements WHERE id = %s", [engagement_id])
+    tier_row = cursor.fetchone()
+    tier = (tier_row[0] if tier_row else None) or "tier_1"
+    if tier != "tier_1":
+        from engagements.coverage import check_coverage
+        cov = check_coverage(cursor, engagement_id)
+        _log_event(cursor, {
+            "engagement_id": engagement_id, "respondent_id": respondent_id,
+            "status": "coverage_check", "coverage_met": cov.is_met,
+            "counted": cov.counted, "minimum": cov.minimum,
+            "missing": cov.missing_items[:10],
+        })
+        if cov.is_met and tier_row[1] is None:
+            cursor.execute(
+                "UPDATE engagements SET coverage_met_at = NOW() WHERE id = %s AND coverage_met_at IS NULL",
+                [engagement_id],
+            )
+            _log_event(cursor, {"engagement_id": engagement_id, "status": "coverage_met"})
+        return False
+
     _log_event(cursor, {
         "engagement_id": engagement_id,
         "to": email,

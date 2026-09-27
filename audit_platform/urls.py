@@ -18,6 +18,7 @@ from django.urls import include, path
 
 from core.content_sync import content_sync_view
 from questionnaire import views as q_views
+from engagements.buyer_views import buyer_link
 
 
 def healthz(request):
@@ -50,7 +51,9 @@ urlpatterns = [
     # path('', include('engagements.urls')),
     path('q/', include('questionnaire.urls', namespace='questionnaire')),
     path('reports/', include('reports.urls', namespace='reports')),
-    # path('r/', include('questionnaire.respondent_urls')),
+    path('r/', include('questionnaire.respondent_urls')),
+    path('e/', include('engagements.urls', namespace='engagements')),
+    path('e/link/<str:token>/', buyer_link, name='buyer_link'),
     path('billing/', include('billing.urls', namespace='billing')),
     path('dashboard/', include('dashboard.urls', namespace='dashboard')),
 ]

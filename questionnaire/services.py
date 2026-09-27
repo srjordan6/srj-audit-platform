@@ -118,6 +118,38 @@ def save_response(
         """,
         (respondent_id, question_id, json.dumps(answer_value), is_dont_know, company_id),
     )
+    _update_progress(cursor, respondent_id)
+
+
+def _update_progress(cursor, respondent_id: str) -> None:
+    """Keep respondents.completion_percentage / status / last_activity_at
+    current. Coverage (Part B-1 S.3.2) counts a respondent only at >= 60%
+    of the questions visible to their role, so the denominator must be
+    role-aware, not the whole bank."""
+    try:
+        role = get_respondent_role(cursor, respondent_id)
+        if not role:
+            return
+        answered = load_answered_by_id(cursor, respondent_id)
+        visible = flow.questions_visible_to_role(role, answered)
+        total = len(visible) or 1
+        done = sum(1 for q in visible if q.id in answered)
+        cursor.execute(
+            """
+            UPDATE respondents
+               SET completion_percentage = %s,
+                   last_activity_at = NOW(),
+                   started_at = coalesce(started_at, NOW()),
+                   status = CASE WHEN status IN ('invited', 'in_progress') OR status IS NULL
+                                 THEN 'in_progress' ELSE status END
+             WHERE id = %s
+            """,
+            (round(min(done / total, 1.0), 4), respondent_id),
+        )
+    except Exception:  # noqa: BLE001
+        # Progress is a convenience for the buyer dashboard; never let it
+        # break an answer save.
+        logger.exception("progress update failed for %s", respondent_id)
 
 
 def get_next_question_context(

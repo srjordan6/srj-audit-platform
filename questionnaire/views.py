@@ -929,3 +929,57 @@ def exposure_score_log(request):
         return JsonResponse({"ok": False}, status=200)
 
     return JsonResponse({"ok": True, "score": scored["score"]})
+
+
+# ---------------------------------------------------------------------------
+# Multi-respondent magic link (Part B-1 S.4.1): /r/<token>/
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["GET"])
+def respondent_link(request, token: str):
+    """Invited respondent arrives from their email.
+
+    The token is the same HMAC+timestamp form as Tier 1 resume links, but
+    its lifetime is the engagement's: 30 days plus 30 per buyer extension,
+    to a maximum of 90 (B-1 S.4.1). Tokens are deliberately not rotated on
+    use, so the same email link resumes across sessions.
+    """
+    from engagements.invitations import token_max_age_seconds
+
+    # Parse once with the maximum possible lifetime, then enforce the
+    # engagement's actual lifetime below -- we need the respondent id to
+    # know which engagement (and therefore which extension count) applies.
+    rid = session_module.parse_resume_token(token, max_age_seconds=token_max_age_seconds(99))
+    if rid is None:
+        return HttpResponseNotFound("This invitation link is invalid.")
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT r.status, r.invitation_sent_at, e.extension_count,
+                   r.attestation_signed_at IS NOT NULL
+            FROM respondents r JOIN engagements e ON e.id = r.engagement_id
+            WHERE r.id = %s
+            """,
+            [rid],
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return HttpResponseNotFound("This invitation link is invalid.")
+        status, sent_at, ext, attested = row
+        if status == "removed":
+            return HttpResponseNotFound("This invitation has been withdrawn by the audit buyer.")
+        if sent_at is not None:
+            from django.utils import timezone
+            age = (timezone.now() - sent_at).total_seconds()
+            if age > token_max_age_seconds(ext or 0):
+                return HttpResponseNotFound(
+                    "This invitation link has expired. Ask the audit buyer to extend or re-send it.")
+        if status == "invited":
+            cursor.execute(
+                "UPDATE respondents SET status = 'in_progress', started_at = coalesce(started_at, NOW()) "
+                "WHERE id = %s", [rid],
+            )
+
+    request.session["respondent_id"] = rid
+    return redirect("questionnaire:next_question" if attested else "questionnaire:attest")
