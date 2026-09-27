@@ -217,7 +217,12 @@ def generate_and_lock(
     # re-downloaded later. If R2 is down/unset, generation still succeeds.
     try:
         from reports import storage
-        _r2_key = storage.upload_report_pdf(engagement_id, report_id, pdf_bytes)
+        cursor.execute("SELECT tier FROM engagements WHERE id = %s", (engagement_id,))
+        _tier_row = cursor.fetchone()
+        _r2_key = storage.upload_report_pdf(
+            engagement_id, report_id, pdf_bytes,
+            tier=(_tier_row[0] if _tier_row and _tier_row[0] else "tier_1"),
+        )
         if _r2_key:
             cursor.execute(
                 "UPDATE reports SET file_path = %s WHERE id = %s",

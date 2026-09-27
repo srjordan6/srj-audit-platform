@@ -50,16 +50,19 @@ def _bucket() -> str:
     return os.environ.get("R2_BUCKET", "srj-audit-reports")
 
 
-def report_key(engagement_id: str, report_id: str) -> str:
-    return f"reports/tier_1/{engagement_id}/{report_id}.pdf"
+def report_key(engagement_id: str, report_id: str, tier: str = "tier_1") -> str:
+    """Key scheme from the 2026-07-17 R2 architecture record:
+    reports/tier_1/..., reports/tier_2/..., reports/tier_3/..."""
+    tier = tier if tier in ("tier_1", "tier_2", "tier_3") else "tier_1"
+    return f"reports/{tier}/{engagement_id}/{report_id}.pdf"
 
 
-def upload_report_pdf(engagement_id: str, report_id: str, pdf_bytes: bytes):
+def upload_report_pdf(engagement_id: str, report_id: str, pdf_bytes: bytes, tier: str = "tier_1"):
     """Upload the PDF to R2. Returns the object key on success, else None."""
     client = _client()
     if client is None:
         return None
-    key = report_key(engagement_id, report_id)
+    key = report_key(engagement_id, report_id, tier)
     try:
         client.put_object(
             Bucket=_bucket(),
