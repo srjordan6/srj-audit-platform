@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.db import connection
-from django.http import Http404, HttpResponseForbidden
+from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST, require_http_methods
 
 from engagements import coverage, invitations
 from questionnaire import session as session_module
@@ -117,6 +118,33 @@ def add_respondent(request, engagement_id):
     except invitations.InvitationError as exc:
         messages.error(request, str(exc))
     return redirect("engagements:respondents", engagement_id=engagement_id)
+
+
+# ----------------------------------------------------------------------------
+# Automatic reminders: called by the srj-platform-monitor Worker's daily cron.
+# ----------------------------------------------------------------------------
+
+@csrf_exempt
+@require_POST
+def run_reminders(request):
+    """POST /e/reminders/run/  with header X-Reminder-Key.
+
+    The key lives in REMINDER_RUN_KEY (platform.env) and as a secret on the
+    monitor Worker. An unset key disables the endpoint rather than opening
+    it. Response is the run summary so the Worker can push a ntfy alert on
+    failures.
+    """
+    import hmac
+    import os
+
+    expected = os.environ.get("REMINDER_RUN_KEY", "")
+    provided = request.headers.get("X-Reminder-Key", "")
+    if not expected or not hmac.compare_digest(expected, provided):
+        raise Http404
+    from engagements.reminders import run
+    with connection.cursor() as cursor:
+        summary = run(cursor)
+    return JsonResponse(summary)
 
 
 @require_http_methods(["POST"])
