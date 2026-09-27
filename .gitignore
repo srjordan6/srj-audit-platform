@@ -65,3 +65,7 @@ coverage.xml
 
 # Local backup files from one-shot patches
 *.bak
+*.bak_*
+_backups_*/
+*.patch
+deploy_hook.log
