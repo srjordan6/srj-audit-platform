@@ -57,7 +57,7 @@
     <div class="rpt-company">{{ company.name }}</div>
     <div class="rpt-meta">
       {{ company.industry }} &middot; {{ company.size_bracket }} employees<br>
-      Generated {{ generated_at|slice:":10" }} &middot; Tier 1 &middot; Single-respondent snapshot
+      Generated {{ generated_at|slice:":10" }} &middot; {% if respondent_count > 1 %}Tier 2{% else %}Tier 1{% endif %} &middot; {{ respondent_basis }}
     </div>
   {% endif %}
   <div class="rpt-toc">
@@ -381,7 +381,7 @@
     {% if opinion.kind == "unqualified" %}
     <h3>Unqualified Opinion</h3>
     <p style="font-size: 9.5pt;">
-      Based on the respondent's answers and the scoring methodology documented herein,
+      Based on the {% if respondent_count > 1 %}respondents'{% else %}respondent's{% endif %} answers and the scoring methodology documented herein,
       the findings present no material weakness across the assessed frameworks.
       The company's AI posture, as self-reported, supports an unqualified opinion at the
       Tier 1 snapshot level.
@@ -394,7 +394,7 @@
     </p>
     {% endif %}
     <p style="font-size: 9.5pt;">
-      Based on the respondent's answers and the scoring methodology documented herein,
+      Based on the {% if respondent_count > 1 %}respondents'{% else %}respondent's{% endif %} answers and the scoring methodology documented herein,
       the following matters prevent an unqualified opinion:
     </p>
     <ul style="font-size: 9pt;">
@@ -430,8 +430,10 @@
     {% endif %}
 
     <p style="font-size: 8pt; color: #6B7280;">
-      Opinion issued per the Tier 1 single-respondent snapshot methodology. A full
-      multi-respondent Tier 2 or Tier 3 engagement provides board-grade assurance.
+      {% if respondent_count > 1 %}Opinion issued per the Tier 2 multi-respondent methodology: {{ respondent_count }} respondents scored
+      independently and combined by role-weighted mean, with leadership and workforce
+      divergence measured before averaging.{% else %}Opinion issued per the Tier 1 single-respondent snapshot methodology. A full
+      multi-respondent Tier 2 or Tier 3 engagement provides board-grade assurance.{% endif %}
     </p>
   </div>
 </div>

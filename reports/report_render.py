@@ -119,18 +119,54 @@ def _question_index() -> dict:
     return {q["id"]: q for q in QUESTIONS}
 
 
-def _load_responses(cursor, engagement_id: str) -> dict:
+# Which respondent's answer stands for "the company's answer" on the
+# factual Section 1 fields (policy exists, inventory exists...) when several
+# respondents answered. Leadership first: those are statements about what the
+# organisation has, and the people accountable for it are the source of
+# record. Divergence is surfaced separately (Part B-3 S.2.2), not hidden here.
+_ROLE_PRECEDENCE = ["CEO", "BOARD", "CFO", "CIO", "CISO", "COO", "VP", "DIR", "HR", "MGR", "IC"]
+_ROLE_LABELS = {"BOARD": "Board", "CEO": "CEO", "CFO": "CFO", "CIO": "CIO", "CISO": "CISO",
+                "COO": "COO", "VP": "VP", "DIR": "Director", "MGR": "Manager",
+                "IC": "Individual contributor", "HR": "HR"}
+
+
+def _load_responses(cursor, engagement_id: str) -> tuple[dict, dict, int]:
+    """Returns (primary, by_question, respondent_count).
+
+    primary      {qid: resp}            one answer per question, leadership-first
+    by_question  {qid: [(role, resp)]}  every completed respondent's answer,
+                                        for the Appendix A rendering
+    Answers are keyed by role, never by name: Part B-1 S.1.2 and B-3 S.4.3
+    -- individual answers are confidential to the platform and the report
+    aggregates and anonymises.
+    """
     cursor.execute(
         """
-        SELECT r.question_id, r.answer_value, r.is_dont_know
+        SELECT r.question_id, r.answer_value, r.is_dont_know,
+               coalesce(rs.role, ''), rs.id::text
         FROM responses r
         JOIN respondents rs ON r.respondent_id = rs.id
         WHERE rs.engagement_id = %s
+          AND rs.status <> 'removed'
+        ORDER BY r.question_id, rs.completed_at NULLS LAST
         """,
         [engagement_id],
     )
-    return {row[0]: {"value": loads_maybe(row[1]), "dont_know": bool(row[2])}
-            for row in cursor.fetchall()}
+    by_question: dict[str, list] = {}
+    respondents: set[str] = set()
+    for qid, av, dk, role, rid in cursor.fetchall():
+        respondents.add(rid)
+        by_question.setdefault(qid, []).append(
+            (role, {"value": loads_maybe(av), "dont_know": bool(dk)}))
+
+    def _rank(role: str) -> int:
+        return _ROLE_PRECEDENCE.index(role) if role in _ROLE_PRECEDENCE else len(_ROLE_PRECEDENCE)
+
+    primary = {}
+    for qid, entries in by_question.items():
+        entries.sort(key=lambda e: _rank(e[0]))
+        primary[qid] = entries[0][1]
+    return primary, by_question, len(respondents)
 
 
 def _format_answer(resp) -> str:
@@ -245,7 +281,7 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
     qindex = _question_index()
 
     with connection.cursor() as cursor:
-        responses = _load_responses(cursor, engagement_id)
+        responses, responses_by_question, respondent_count = _load_responses(cursor, engagement_id)
 
     frameworks = []
     for key in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
@@ -365,18 +401,29 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
     # --- Appendix A ---
     appendix = []
     for q in QUESTIONS:
-        resp = responses.get(q["id"])
+        entries = responses_by_question.get(q["id"], [])
+        if respondent_count > 1 and len(entries) > 1:
+            # Every respondent's answer, by role. The report gains rows, not
+            # a new shape (operator decision 2026-09-27).
+            answer = "; ".join(
+                f"{_ROLE_LABELS.get(role, role or 'Respondent')}: {_format_answer(resp)}"
+                for role, resp in entries)
+        else:
+            answer = _format_answer(responses.get(q["id"]))
         appendix.append({
             "qid": q["id"],
             "section": q.get("section", ""),
             "question": q["question_text"],
-            "answer": _format_answer(resp),
+            "answer": answer,
         })
 
     context = {
         "company": (first["company"] if first else None),
         "engagement": (first["engagement"] if first else None),
         "generated_at": (first["generated_at"] if first else ""),
+        "respondent_count": respondent_count,
+        "respondent_basis": ("Single-respondent snapshot" if respondent_count <= 1
+                             else f"{respondent_count}-respondent engagement"),
         "frameworks": frameworks,
         "section1": section1,
         "gap_analysis": gap_analysis,

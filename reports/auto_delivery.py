@@ -268,6 +268,20 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     return True
 
 
+def _buyer_contact(cursor, engagement_id: str):
+    """(email, name) of the engagement's buyer, or None if no buyer user."""
+    cursor.execute(
+        """
+        SELECT u.email, coalesce(nullif(u.name, ''), u.email)
+        FROM engagements e JOIN users u ON u.id = e.buyer_user_id
+        WHERE e.id = %s
+        """,
+        [engagement_id],
+    )
+    row = cursor.fetchone()
+    return (row[0], row[1]) if row and row[0] else None
+
+
 def on_respondent_complete(cursor, respondent_id: str) -> bool:
     """Call when the respondent has no next question. Returns True if this
     call triggered generation+delivery, False if it was already done.
@@ -286,9 +300,12 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
     engagement_id, email, name, company = info
 
     # Multi-respondent tiers do not generate on a single completion. Each
-    # completion re-runs the coverage check (Part B-1 S.3.6); generation is
-    # gated on coverage_met and lands in Sprint 2 with the aggregation
-    # engine. Tier 1 keeps the existing single-respondent path.
+    # completion re-runs the coverage check (Part B-1 S.3.6). The first
+    # completion that meets coverage stamps coverage_met_at and starts the
+    # SAME generate + deliver worker Tier 1 uses, addressed to the buyer;
+    # scoring.engine aggregates the respondents (Part B-3 S.2). Later
+    # completions on an already-met engagement do nothing here -- the
+    # buyer regenerates from their dashboard if they want the extra data.
     cursor.execute("SELECT tier, coverage_met_at FROM engagements WHERE id = %s", [engagement_id])
     tier_row = cursor.fetchone()
     tier = (tier_row[0] if tier_row else None) or "tier_1"
@@ -301,13 +318,21 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
             "counted": cov.counted, "minimum": cov.minimum,
             "missing": cov.missing_items[:10],
         })
-        if cov.is_met and tier_row[1] is None:
-            cursor.execute(
-                "UPDATE engagements SET coverage_met_at = NOW() WHERE id = %s AND coverage_met_at IS NULL",
-                [engagement_id],
-            )
-            _log_event(cursor, {"engagement_id": engagement_id, "status": "coverage_met"})
-        return False
+        if not cov.is_met or tier_row[1] is not None:
+            return False
+        cursor.execute(
+            "UPDATE engagements SET coverage_met_at = NOW() "
+            "WHERE id = %s AND coverage_met_at IS NULL RETURNING id",
+            [engagement_id],
+        )
+        if cursor.fetchone() is None:
+            return False  # another completion won the race
+        buyer_email, buyer_name = _buyer_contact(cursor, engagement_id) or (email, name)
+        _log_event(cursor, {
+            "engagement_id": engagement_id, "status": "coverage_met",
+            "to": buyer_email, "respondents": cov.counted,
+        })
+        email, name = buyer_email, buyer_name
 
     _log_event(cursor, {
         "engagement_id": engagement_id,

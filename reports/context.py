@@ -129,6 +129,9 @@ def build_snapshot_context(engagement_id: str, framework: str) -> dict[str, Any]
             "subtitle": "Snapshot Report",
         },
         "overall": payload["overall"],
+        # Part B-3 S.2 divergence / contested-question summary; None for a
+        # single respondent.
+        "aggregation": (result.aggregation.as_dict() if getattr(result, "aggregation", None) else None),
         "items": payload["items"],
         "cross_cutting_signals": payload.get("cross_cutting_signals", []),
         "priority_gaps": payload["priority_gaps"],

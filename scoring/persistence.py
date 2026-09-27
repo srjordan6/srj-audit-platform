@@ -74,10 +74,22 @@ def persist_snapshot_scores(
     rows = []
     for framework, payload in payloads.items():
         overall = payload.get("overall") or {}
+        components = {k: v for k, v in overall.items() if k != "score_0_100"}
+        if payload.get("aggregation"):
+            # Multi-respondent: keep the divergence and contested-question
+            # summary with the score of record, scoped to this framework.
+            agg = payload["aggregation"]
+            components["aggregation"] = {
+                "respondent_count": agg.get("respondent_count"),
+                "roles": agg.get("roles"),
+                "divergence_threshold": agg.get("divergence_threshold"),
+                "dimensions": [d for d in agg.get("dimensions", []) if d.get("framework") == framework],
+                "contested": agg.get("contested", []),
+            }
         rows.append(_row(
             company_id, engagement_id, report_id, framework, _OVERALL_DIMENSION,
             overall.get("score_0_100"), overall.get("maturity_level"),
-            {k: v for k, v in overall.items() if k != "score_0_100"},
+            components,
             overall.get("confidence_level"), payload.get("gaps"), now,
         ))
         for item in _items(payload):

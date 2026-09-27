@@ -133,13 +133,16 @@ class CombinedScoringResult:
     v2: v2_readiness.V2FrameworkResult
     v3: v3_governance.V3FrameworkResult
     eff: efficiency.EfficiencyFrameworkResult
+    # Part B-3 S.2 summary (divergence, contested questions). None for a
+    # single respondent.
+    aggregation: Any = None
 
 
 # ----------------------------------------------------------------------------
 # Response loading
 # ----------------------------------------------------------------------------
 
-def _load_completed_respondent_ids(engagement_id: str) -> list[UUID]:
+def _load_completed_respondent_ids(engagement_id: str) -> list[tuple[UUID, str]]:
     """Return UUIDs of respondents who marked themselves complete for this engagement.
 
     Filters to status='completed' to exclude in-progress/abandoned/removed
@@ -149,7 +152,7 @@ def _load_completed_respondent_ids(engagement_id: str) -> list[UUID]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id
+            SELECT id, coalesce(role, '')
             FROM respondents
             WHERE engagement_id = %s
               AND status = 'completed'
@@ -157,7 +160,7 @@ def _load_completed_respondent_ids(engagement_id: str) -> list[UUID]:
             """,
             [engagement_id],
         )
-        return [row[0] for row in cursor.fetchall()]
+        return [(row[0], row[1]) for row in cursor.fetchall()]
 
 
 def _load_responses_for_respondent(respondent_id: UUID) -> dict[str, ResponseRecord]:
@@ -279,31 +282,20 @@ def _aggregate_multi_respondent(
         v3_governance.V3FrameworkResult,
         efficiency.EfficiencyFrameworkResult,
     ]],
-) -> tuple[
-    v1_audit.V1FrameworkResult,
-    v2_readiness.V2FrameworkResult,
-    v3_governance.V3FrameworkResult,
-    efficiency.EfficiencyFrameworkResult,
-]:
-    """TODO: aggregate per-respondent results into engagement-level results.
+    roles: list[str] | None = None,
+):
+    """Combine per-respondent results into engagement-level results.
 
-    v0.2 plan: score each respondent independently (above), then average
-    framework results across respondents at the dimension/module/step/
-    component level. This requires synthesizing new V*FrameworkResult
-    instances from the per-respondent ones — combining contributions,
-    re-computing weighted means and confidence levels, and producing a
-    single "engagement view" Result.
-
-    Not blocking for Tier 1 — score_engagement falls through to single-
-    respondent path when respondent_count == 1.
+    One respondent: identity, no summary (Tier 1). Two or more: Part B-3
+    S.2 -- role-weighted mean per dimension, leadership/workforce
+    divergence, minimum-contribution guard, contested questions -- via
+    scoring.aggregation. Returns ((v1, v2, v3, eff), summary_or_None).
     """
     if len(per_respondent_results) == 1:
-        return per_respondent_results[0]
-
-    raise NotImplementedError(
-        "Multi-respondent aggregation not yet implemented (Tier 2/3 path). "
-        "See scoring.engine._aggregate_multi_respondent docstring for v0.2 plan."
-    )
+        return per_respondent_results[0], None
+    from scoring.aggregation import aggregate
+    roles = roles or [""] * len(per_respondent_results)
+    return aggregate(list(zip(roles, per_respondent_results)))
 
 
 # ----------------------------------------------------------------------------
@@ -359,9 +351,10 @@ def score_engagement(
         respondent_ids = respondent_ids[:1]
 
     # Load responses per respondent
+    roles = [role for _, role in respondent_ids]
     per_respondent_responses: list[dict[str, ResponseRecord]] = [
         _load_responses_for_respondent(rid)
-        for rid in respondent_ids
+        for rid, _ in respondent_ids
     ]
     total_responses = sum(len(r) for r in per_respondent_responses)
 
@@ -372,7 +365,7 @@ def score_engagement(
     ]
 
     # Aggregate (Tier 1: identity; Tier 2/3: TODO)
-    v1, v2, v3, eff = _aggregate_multi_respondent(per_respondent_results)
+    (v1, v2, v3, eff), aggregation = _aggregate_multi_respondent(per_respondent_results, roles)
 
     coverage_complete = (
         meta.coverage_met_at is not None
@@ -390,6 +383,7 @@ def score_engagement(
         v2=v2,
         v3=v3,
         eff=eff,
+        aggregation=aggregation,
     )
 
 

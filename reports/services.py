@@ -199,6 +199,7 @@ def generate_and_lock(
                 "overall": ctx.get("overall"),
                 "items": ctx.get("items"),
                 "gaps": ctx.get("priority_gaps"),
+                "aggregation": ctx.get("aggregation"),
             }
         persist_snapshot_scores(
             cursor,
