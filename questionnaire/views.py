@@ -513,6 +513,25 @@ def _instrument_from(request) -> str:
     return v if v in INSTRUMENT_COPY else "tier_1"
 
 
+def _tier_from(request) -> str:
+    v = (getattr(request, "_forced_tier", None) or request.POST.get("tier") or "tier_1").strip().lower()
+    return v if v in ("tier_1", "tier_2") else "tier_1"
+
+
+TIER_2_COPY = {
+    "title": "AI Audit: Self-Service Audit (Tier 2)", "price": "$2,500 to $7,500 by company size",
+    "blurb": "A multi-respondent audit: you invite 3 to 25 people across leadership and the workforce, "
+             "each answers for their role, and the compiled report shows where they agree and where they "
+             "do not. Priced by company size; you pay once, then invite your respondents.",
+    "meta": "Start a Tier 2 Self-Service AI Audit: multi-respondent, board-grade, priced $2,500 to $7,500 by company size.",
+}
+
+
+def start_tier2(request):
+    request._forced_tier = "tier_2"
+    return start(request)
+
+
 def start_aiitsa(request):
     request._forced_instrument = "aiitsa"
     return start(request)
@@ -528,6 +547,7 @@ def start_combined(request):
 def start(request):
     from questionnaire import bot_protection as bp
     instrument = _instrument_from(request)
+    tier = _tier_from(request)
 
     # Marketing attribution: capture utm_* from the query string so we can
     # measure which channel drove each start. Carried through the form as
@@ -616,7 +636,8 @@ def start(request):
                 "code_label": code_label,
                 "utm": utm,
                 "instrument": instrument,
-                "copy": INSTRUMENT_COPY[instrument],
+                "tier": tier,
+                "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
             },
@@ -652,7 +673,8 @@ def start(request):
                 ]},
                 "prefill_code": request.POST.get("access_code", ""),
                 "instrument": instrument,
-                "copy": INSTRUMENT_COPY[instrument],
+                "tier": tier,
+                "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
                 "access_code_error": (
@@ -707,7 +729,8 @@ def start(request):
                     "prefill_code": submitted_code,
                     "prefill_values": values,
                     "instrument": instrument,
-                    "copy": INSTRUMENT_COPY[instrument],
+                    "tier": tier,
+                    "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                     "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
                         "That code is not recognized, has already been "
@@ -736,6 +759,7 @@ def start(request):
                     middle_name=values["middle_name"],
                     last_name=values["last_name"],
                     instrument=instrument,
+                    tier=tier,
                 )
     except ValueError as exc:
         # Currently the only ValueError services raises is the
@@ -749,7 +773,8 @@ def start(request):
                 {
                     "prefill_values": values,
                     "instrument": instrument,
-                    "copy": INSTRUMENT_COPY[instrument],
+                    "tier": tier,
+                    "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                     "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
                         "That code was just fully redeemed by another "
@@ -800,6 +825,18 @@ def start(request):
         # do not let anything here block the redirect.
         pass
 
+    if tier == "tier_2":
+        # Tier 2: the buyer lands on the respondents dashboard, not the
+        # questionnaire. Their own respondent row is there with a link to
+        # answer for their role. Payment (or a comped code) precedes
+        # invitations, per Part B-1 S.3.1; the dashboard enforces it.
+        with connection.cursor() as _c:
+            _c.execute("SELECT engagement_id::text FROM respondents WHERE id = %s", [rid])
+            _eng = _c.fetchone()[0]
+        ids = set(request.session.get("buyer_engagements", []))
+        ids.add(_eng)
+        request.session["buyer_engagements"] = list(ids)
+        return redirect("engagements:respondents", engagement_id=_eng)
     return redirect("questionnaire:attest")
 
 

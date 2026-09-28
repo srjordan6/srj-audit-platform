@@ -9,6 +9,15 @@
     <div class="alert alert-{{ m.tags|default:'info' }}">{{ m }}</div>
   {% endfor %}{% endif %}
 
+  {% if just_paid %}
+    <div class="alert alert-success">Payment received. You can invite respondents now; a copy of this dashboard link is on its way to your inbox.</div>
+  {% elif not paid %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center">
+      <div><strong>Payment pending.</strong> Your Tier 2 audit{% if price_label %} is {{ price_label }} for a company of {{ size_bracket }} employees{% endif %}. Invitations open the moment payment clears.</div>
+      <a class="btn btn-primary ms-3" href="{% url 'billing:checkout_tier2' engagement_id %}">Pay and start inviting</a>
+    </div>
+  {% endif %}
+
   <div class="card mb-4">
     <div class="card-body">
       {% if coverage.is_met %}
@@ -47,6 +56,7 @@
         </td>
         <td class="text-end text-nowrap">
           {% if r.status != "completed" %}
+          {% if r.own_link %}<a class="btn btn-sm btn-success me-1" href="{{ r.own_link }}">Answer my part</a>{% endif %}
           <form method="post" action="{% url 'engagements:nudge_respondent' engagement_id r.id %}" class="d-inline">{% csrf_token %}
             <button class="btn btn-sm btn-outline-primary" {% if r.last_nudged %}title="Last reminder {{ r.last_nudged|date:'M j, H:i' }}"{% endif %}>Nudge</button></form>
           <form method="post" action="{% url 'engagements:remove_respondent' engagement_id r.id %}" class="d-inline"

@@ -35,6 +35,7 @@ def create_checkout_session(
     unit_amount_cents: int = TIER_1_UNIT_AMOUNT_CENTS,
     product_name: str = "AI Audit Snapshot",
     product_description: str = "Tier 1 AI Audit \u2014 locked PDF report",
+    tier: str = "tier_1",
 ) -> dict[str, Any]:
     """Create a Stripe Checkout Session for Tier 1 snapshot purchase.
 
@@ -79,6 +80,7 @@ def create_checkout_session(
         metadata={
             "engagement_id": engagement_id,
             "buyer_email": buyer_email,
+            "tier": tier,
         },
     )
 
@@ -119,6 +121,8 @@ def extract_checkout_completed_metadata(event: dict) -> Optional[dict]:
     return {
         "engagement_id": engagement_id,
         "buyer_email": buyer_email,
+        "tier": metadata.get("tier") or "tier_1",
         "session_id": session.get("id"),
         "payment_intent": session.get("payment_intent"),
+        "amount_total": session.get("amount_total"),
     }

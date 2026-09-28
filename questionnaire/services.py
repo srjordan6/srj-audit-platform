@@ -547,6 +547,7 @@ def create_engagement_and_respondent(
     middle_name: str = "",
     last_name: str = "",
     instrument: str = "tier_1",
+    tier: str = "tier_1",
 ) -> str:
     """Create/find company + user, then create engagement + respondent.
 
@@ -603,20 +604,28 @@ def create_engagement_and_respondent(
 
     if instrument not in ("tier_1", "aiitsa", "combined"):
         instrument = "tier_1"
+    if tier not in ("tier_1", "tier_2"):
+        tier = "tier_1"
+    # Tier 2 (Part B-1 S.2.2): priced by company size, paid before the
+    # buyer invites anyone; 'unpaid' until the Stripe webhook flips it.
+    price_cents = 0
+    if tier == "tier_2":
+        from billing.pricing import get_tier_2_price_cents
+        price_cents = get_tier_2_price_cents(company_size_bracket)
     if access_code_row is not None:
         # Comped engagement — no Stripe path, payment_status = 'comped'.
         cursor.execute(
             "INSERT INTO engagements "
             "(company_id, buyer_user_id, tier, status, payment_status, price_cents, instrument) "
-            "VALUES (%s, %s, 'tier_1', 'in_progress', 'comped', 0, %s) RETURNING id",
-            (company_id, user_id, instrument),
+            "VALUES (%s, %s, %s, 'in_progress', 'comped', 0, %s) RETURNING id",
+            (company_id, user_id, tier, instrument),
         )
     else:
         cursor.execute(
             "INSERT INTO engagements "
             "(company_id, buyer_user_id, tier, status, payment_status, price_cents, instrument) "
-            "VALUES (%s, %s, 'tier_1', 'in_progress', 'free', 0, %s) RETURNING id",
-            (company_id, user_id, instrument),
+            "VALUES (%s, %s, %s, 'in_progress', %s, %s, %s) RETURNING id",
+            (company_id, user_id, tier, ("unpaid" if tier == "tier_2" else "free"), price_cents, instrument),
         )
     engagement_id = cursor.fetchone()[0]
 

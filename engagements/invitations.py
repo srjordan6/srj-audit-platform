@@ -338,3 +338,69 @@ def notify_buyer_progress(cursor, engagement_id: str, respondent_id: str, cov) -
                      "status": "delivered" if ok else "failed", "postmark": msg[:300]})],
     )
     return ok, msg
+
+
+# ----------------------------------------------------------------------------
+# Buyer dashboard link (after Tier 2 payment, and on request from /e/login/)
+# ----------------------------------------------------------------------------
+
+BUYER_LINK_SUBJECT = "{company} AI audit: your respondents dashboard"
+BUYER_LINK_BODY = """Hi {buyer},
+
+Your Tier 2 AI audit for {company} is ready to staff. Invite the people who will answer for their roles, watch progress, and nudge stragglers here:
+
+{url}
+
+This link is private to you and stays valid for 180 days. When enough respondents have completed their part, the compiled report is generated and emailed to you automatically.
+
+SRJ Consulting & Services
+"""
+
+
+def send_buyer_dashboard_link(cursor, engagement_id: str) -> tuple[bool, str]:
+    cursor.execute(
+        """
+        SELECT u.email, coalesce(nullif(u.name, ''), u.email), c.name
+        FROM engagements e JOIN users u ON u.id = e.buyer_user_id
+        LEFT JOIN companies c ON c.id = e.company_id WHERE e.id = %s
+        """,
+        [engagement_id],
+    )
+    row = cursor.fetchone()
+    if not row or not row[0]:
+        return False, "no buyer email"
+    email, buyer, company = row
+    ctx = {"buyer": buyer, "company": company or "your company", "url": build_buyer_link(engagement_id)}
+    ok, msg = _postmark({
+        "From": os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM),
+        "To": email,
+        "Subject": BUYER_LINK_SUBJECT.format(**ctx),
+        "TextBody": BUYER_LINK_BODY.format(**ctx),
+        "MessageStream": "outbound",
+    })
+    cursor.execute(
+        "INSERT INTO events (event_type, payload) VALUES ('buyer_link_sent', %s::jsonb)",
+        [json.dumps({"engagement_id": str(engagement_id), "to": email,
+                     "status": "delivered" if ok else "failed", "postmark": msg[:300]})],
+    )
+    return ok, msg
+
+
+def send_buyer_login_links(cursor, email: str) -> int:
+    """/e/login/: every open Tier 2/3 engagement this email bought gets a
+    fresh dashboard link. Returns how many were sent; the caller never
+    reveals whether the address exists."""
+    cursor.execute(
+        """
+        SELECT e.id::text FROM engagements e JOIN users u ON u.id = e.buyer_user_id
+        WHERE lower(u.email) = lower(%s) AND e.tier IN ('tier_2', 'tier_3')
+          AND e.status = 'in_progress'
+        ORDER BY e.created_at DESC LIMIT 10
+        """,
+        [email.strip()],
+    )
+    sent = 0
+    for (eid,) in cursor.fetchall():
+        ok, _ = send_buyer_dashboard_link(cursor, eid)
+        sent += 1 if ok else 0
+    return sent

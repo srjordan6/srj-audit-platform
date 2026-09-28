@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Buyer sign-in | SRJ AI Audit Platform{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 520px;">
+  <h1 class="h3 mb-2">Open your audit dashboard</h1>
+  <p class="text-muted mb-4">Enter the email you bought the audit with. We will send you a private link to your respondents dashboard. There is no password.</p>
+  {% if sent %}
+    <div class="alert alert-success">If that address has an open audit, a dashboard link is on its way. Links stay valid for 180 days.</div>
+  {% else %}
+    <form method="post">{% csrf_token %}
+      <div class="mb-3"><label class="form-label" for="email">Email</label>
+        <input class="form-control" type="email" id="email" name="email" required autocomplete="email"></div>
+      <button class="btn btn-primary">Send my link</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

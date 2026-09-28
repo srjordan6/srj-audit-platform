@@ -58,8 +58,10 @@ def respondents(request, engagement_id):
         cursor.execute(
             """
             SELECT e.tier, e.snapshot_state::text, e.coverage_met_at, e.extension_count,
-                   c.name, c.size_bracket
+                   c.name, c.size_bracket, e.payment_status, e.price_cents,
+                   lower(coalesce(u.email, ''))
             FROM engagements e LEFT JOIN companies c ON c.id = e.company_id
+            LEFT JOIN users u ON u.id = e.buyer_user_id
             WHERE e.id = %s
             """,
             [str(engagement_id)],
@@ -67,7 +69,7 @@ def respondents(request, engagement_id):
         row = cursor.fetchone()
         if row is None:
             raise Http404
-        tier, state, met_at, ext, company, bracket = row
+        tier, state, met_at, ext, company, bracket, payment_status, price_cents, buyer_email = row
         cov = coverage.check_coverage(cursor, str(engagement_id))
         cursor.execute(
             """
@@ -86,6 +88,9 @@ def respondents(request, engagement_id):
             "status": r[5], "percent": int(float(r[6]) * 100), "attested": r[7],
             "invited_at": r[8], "last_activity": r[9], "last_nudged": r[10],
             "counts": float(r[6]) >= coverage.MIN_COMPLETION and r[7],
+            # the buyer's own row gets a direct link to answer for their role
+            "own_link": (invitations.build_magic_link(r[0])
+                         if buyer_email and (r[2] or "").lower() == buyer_email and r[5] != "completed" else None),
         } for r in cursor.fetchall()]
     req = coverage.REQUIREMENTS.get(bracket or "")
     return render(request, "engagements/respondents.html", {
@@ -93,6 +98,9 @@ def respondents(request, engagement_id):
         "company": company, "size_bracket": bracket, "coverage": cov,
         "coverage_met_at": met_at, "extension_count": ext or 0,
         "respondents": rows, "roles": invitations.ROLE_LABELS,
+        "payment_status": payment_status, "paid": payment_status in ("paid", "comped"),
+        "price_label": (f"${(price_cents or 0) / 100:,.0f}" if price_cents else ""),
+        "just_paid": request.GET.get("paid") == "1",
         "required_roles": [(label, n) for label, _, n in (req["roles"] if req else [])],
         "min_completion_pct": int(coverage.MIN_COMPLETION * 100),
     })
@@ -102,6 +110,12 @@ def respondents(request, engagement_id):
 def add_respondent(request, engagement_id):
     if (deny := _guard(request, engagement_id)):
         return deny
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT payment_status FROM engagements WHERE id = %s", [str(engagement_id)])
+        _ps = cursor.fetchone()
+    if _ps and _ps[0] not in ("paid", "comped", "free"):
+        messages.error(request, "Complete payment before inviting respondents.")
+        return redirect("engagements:respondents", engagement_id=engagement_id)
     try:
         with connection.cursor() as cursor:
             rid = invitations.create_respondent(
@@ -175,3 +189,22 @@ def remove_respondent(request, engagement_id, respondent_id):
     except invitations.InvitationError as exc:
         messages.error(request, str(exc))
     return redirect("engagements:respondents", engagement_id=engagement_id)
+
+
+# ----------------------------------------------------------------------------
+# Buyer login: the magic link IS the account. /e/login/ re-sends it.
+# ----------------------------------------------------------------------------
+
+@require_http_methods(["GET", "POST"])
+def buyer_login(request):
+    sent = False
+    if request.method == "POST":
+        email = (request.POST.get("email") or "").strip()
+        if email:
+            with connection.cursor() as cursor:
+                try:
+                    invitations.send_buyer_login_links(cursor, email)
+                except Exception:  # noqa: BLE001
+                    pass
+        sent = True   # same answer whether or not the address exists
+    return render(request, "engagements/login.html", {"sent": sent})

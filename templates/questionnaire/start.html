@@ -45,6 +45,7 @@
 
         {% comment %}Marketing attribution — carried from the landing query string.{% endcomment %}
         <input type="hidden" name="instrument" value="{{ instrument|default:'tier_1' }}">
+        <input type="hidden" name="tier" value="{{ tier|default:'tier_1' }}">
         <input type="hidden" name="utm_source" value="{{ utm.utm_source|default:'' }}">
         <input type="hidden" name="utm_medium" value="{{ utm.utm_medium|default:'' }}">
         <input type="hidden" name="utm_campaign" value="{{ utm.utm_campaign|default:'' }}">
