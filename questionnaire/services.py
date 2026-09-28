@@ -81,6 +81,18 @@ def get_respondent_role(cursor, respondent_id: str) -> Optional[str]:
     return row[0]
 
 
+def get_respondent_instrument(cursor, respondent_id: str) -> str:
+    """Which question bank this respondent walks: engagements.instrument
+    (tier_1 | aiitsa | combined). Pillar I when unset."""
+    cursor.execute(
+        "SELECT coalesce(e.instrument, 'tier_1') FROM respondents r "
+        "JOIN engagements e ON e.id = r.engagement_id WHERE r.id = %s",
+        [respondent_id],
+    )
+    row = cursor.fetchone()
+    return (row[0] if row and row[0] else "tier_1")
+
+
 def get_respondent_company_id(cursor, respondent_id: str) -> Optional[str]:
     """Return the company_id of the engagement owning this respondent."""
     cursor.execute(
@@ -130,8 +142,9 @@ def _update_progress(cursor, respondent_id: str) -> None:
         role = get_respondent_role(cursor, respondent_id)
         if not role:
             return
+        instrument = get_respondent_instrument(cursor, respondent_id)
         answered = load_answered_by_id(cursor, respondent_id)
-        visible = flow.questions_visible_to_role(role, answered)
+        visible = flow.questions_visible_to_role(role, answered, instrument)
         total = len(visible) or 1
         done = sum(1 for q in visible if q.id in answered)
         cursor.execute(
@@ -157,10 +170,11 @@ def get_next_question_context(
     respondent_id: str,
 ) -> Optional[dict]:
     role = get_respondent_role(cursor, respondent_id)
+    instrument = get_respondent_instrument(cursor, respondent_id)
     if role is None:
         return None
     answered = load_answered_by_id(cursor, respondent_id)
-    visible = flow.questions_visible_to_role(role, answered)
+    visible = flow.questions_visible_to_role(role, answered, instrument)
     q = None
     for candidate in visible:
         if candidate.id not in answered:
@@ -172,7 +186,7 @@ def get_next_question_context(
     return {
         "question": q,
         "partial": flow.partial_template_for_type(q.question_type),
-        "progress": flow.progress_for_role(role, answered),
+        "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
     }
 
@@ -205,10 +219,11 @@ def get_next_visible_question_context_by_position(
       - the next position would move beyond the furthest-answered index.
     """
     role = get_respondent_role(cursor, respondent_id)
+    instrument = get_respondent_instrument(cursor, respondent_id)
     if role is None:
         return None
     answered = load_answered_by_id(cursor, respondent_id)
-    visible = flow.questions_visible_to_role(role, answered)
+    visible = flow.questions_visible_to_role(role, answered, instrument)
     last_answered = _last_answered_index(visible, answered)
 
     current_idx_1based = None
@@ -239,7 +254,7 @@ def get_next_visible_question_context_by_position(
         "question": next_q,
         "partial": flow.partial_template_for_type(next_q.question_type),
         "prior_answer": answered.get(next_q.id),
-        "progress": flow.progress_for_role(role, answered),
+        "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
     }
 
@@ -257,10 +272,11 @@ def get_question_context_by_position(
     range.
     """
     role = get_respondent_role(cursor, respondent_id)
+    instrument = get_respondent_instrument(cursor, respondent_id)
     if role is None:
         return None
     answered = load_answered_by_id(cursor, respondent_id)
-    visible = flow.questions_visible_to_role(role, answered)
+    visible = flow.questions_visible_to_role(role, answered, instrument)
     last_answered = _last_answered_index(visible, answered)
 
     try:
@@ -282,7 +298,7 @@ def get_question_context_by_position(
         "question": target,
         "partial": flow.partial_template_for_type(target.question_type),
         "prior_answer": answered.get(target.id),
-        "progress": flow.progress_for_role(role, answered),
+        "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
         "last_answered_position": last_answered,
     }
@@ -305,10 +321,11 @@ def get_previous_visible_question_context(
     respondent is already on the first question).
     """
     role = get_respondent_role(cursor, respondent_id)
+    instrument = get_respondent_instrument(cursor, respondent_id)
     if role is None:
         return None
     answered = load_answered_by_id(cursor, respondent_id)
-    visible = flow.questions_visible_to_role(role, answered)
+    visible = flow.questions_visible_to_role(role, answered, instrument)
 
     prev_q = None
     if current_question_id:
@@ -332,7 +349,7 @@ def get_previous_visible_question_context(
         "question": prev_q,
         "partial": flow.partial_template_for_type(prev_q.question_type),
         "prior_answer": answered.get(prev_q.id),
-        "progress": flow.progress_for_role(role, answered),
+        "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
     }
 

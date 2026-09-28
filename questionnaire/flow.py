@@ -10,6 +10,25 @@ from typing import Any, Optional
 from types import SimpleNamespace
 
 from questionnaire.question_bank import QUESTIONS
+
+# Instruments (Part B / AIITSA spec S.13): which question bank a
+# respondent walks. Pillar I is "tier_1"; the AI IT Security Audit(TM) is
+# "aiitsa"; "combined" is both, Pillar I first. engagements.instrument
+# names it; everything below takes it as a keyword with the Pillar I
+# default, so existing callers are unchanged.
+INSTRUMENTS = ("tier_1", "aiitsa", "combined")
+
+
+def bank_for(instrument: str | None = "tier_1") -> list[dict]:
+    instrument = instrument or "tier_1"
+    if instrument == "tier_1":
+        return QUESTIONS
+    from questionnaire.aiitsa_question_bank import AIITSA_QUESTIONS
+    if instrument == "aiitsa":
+        return AIITSA_QUESTIONS
+    if instrument == "combined":
+        return list(QUESTIONS) + list(AIITSA_QUESTIONS)
+    raise ValueError(f"unknown instrument {instrument!r}")
 from questionnaire.skip_logic import filter_questions_for_session
 
 
@@ -25,20 +44,21 @@ def _as_ns(question: Any) -> SimpleNamespace:
     return SimpleNamespace(**question)
 
 
-def _all_wrapped() -> list[SimpleNamespace]:
+def _all_wrapped(instrument: str | None = "tier_1") -> list[SimpleNamespace]:
     """Return every ACTIVE question in bank order, wrapped for attribute access.
 
     Questions with is_active=False are dropped here — the single choke
     point for runtime visibility. Downstream (skip_logic, next_unanswered,
     previous/forward navigation, scoring wiring by ID) all inherit this.
     """
-    active = [q for q in QUESTIONS if q.get("is_active", True)]
+    active = [q for q in bank_for(instrument) if q.get("is_active", True)]
     return [_as_ns(q) for q in active]
 
 
 def questions_visible_to_role(
     role: str,
     answered_by_id: dict[str, Any],
+    instrument: str | None = "tier_1",
 ) -> list[SimpleNamespace]:
     """Return every question the role can see, given current answers.
 
@@ -47,7 +67,7 @@ def questions_visible_to_role(
     pass. Preserves question bank document order.
     """
     result = filter_questions_for_session(
-        _all_wrapped(), role, answered_by_id
+        _all_wrapped(instrument), role, answered_by_id
     )
     return result.visible
 
@@ -55,9 +75,10 @@ def questions_visible_to_role(
 def next_unanswered_question(
     role: str,
     answered_by_id: dict[str, Any],
+    instrument: str | None = "tier_1",
 ) -> Optional[SimpleNamespace]:
     """Return the next question the role must answer, or None if complete."""
-    visible = questions_visible_to_role(role, answered_by_id)
+    visible = questions_visible_to_role(role, answered_by_id, instrument)
     for q_ns in visible:
         if q_ns.id not in answered_by_id:
             return q_ns
@@ -67,13 +88,14 @@ def next_unanswered_question(
 def progress_for_role(
     role: str,
     answered_by_id: dict[str, Any],
+    instrument: str | None = "tier_1",
 ) -> tuple[int, int, float]:
     """Return (completed_count, visible_count, percentage).
 
     Percentage is a float in [0.0, 100.0]. Returns (0, 0, 0.0) if visible
     count is 0 to avoid ZeroDivisionError.
     """
-    visible = questions_visible_to_role(role, answered_by_id)
+    visible = questions_visible_to_role(role, answered_by_id, instrument)
     visible_count = len(visible)
     if visible_count == 0:
         return (0, 0, 0.0)
@@ -89,12 +111,12 @@ def is_terminal(question: Any) -> bool:
     predicate so PR 7's session-close logic has a stable hook.
     """
     q_ns = _as_ns(question)
-    return q_ns.id == "T1-H-006"
+    return q_ns.id in ("T1-H-006", "AIITSA-INV-003")
 
 
-def is_complete(role: str, answered_by_id: dict[str, Any]) -> bool:
+def is_complete(role: str, answered_by_id: dict[str, Any], instrument: str | None = "tier_1") -> bool:
     """Return True if the role has answered every visible question."""
-    return next_unanswered_question(role, answered_by_id) is None
+    return next_unanswered_question(role, answered_by_id, instrument) is None
 
 
 def partial_template_for_type(question_type: str) -> str:

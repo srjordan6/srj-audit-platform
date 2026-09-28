@@ -306,9 +306,19 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
     # scoring.engine aggregates the respondents (Part B-3 S.2). Later
     # completions on an already-met engagement do nothing here -- the
     # buyer regenerates from their dashboard if they want the extra data.
-    cursor.execute("SELECT tier, coverage_met_at FROM engagements WHERE id = %s", [engagement_id])
+    cursor.execute("SELECT tier, coverage_met_at, coalesce(instrument, 'tier_1') FROM engagements WHERE id = %s", [engagement_id])
     tier_row = cursor.fetchone()
     tier = (tier_row[0] if tier_row else None) or "tier_1"
+    instrument = tier_row[2] if tier_row else "tier_1"
+    if instrument == "aiitsa":
+        # The AI IT Security Audit report (Four-Page Pack, spec S.10) is not
+        # built yet: answers are scored and kept, the report is held, and
+        # the event says so. Nothing Pillar I-shaped is sent for a Pillar II
+        # engagement. Combined engagements produce the Pillar I report per
+        # the 2026-09-27 decision (same report, more questions and answers).
+        _log_event(cursor, {"engagement_id": engagement_id, "respondent_id": respondent_id,
+                            "status": "held_aiitsa_report_pending", "instrument": instrument})
+        return False
     if tier != "tier_1":
         from engagements.coverage import check_coverage
         cov = check_coverage(cursor, engagement_id)

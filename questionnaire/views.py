@@ -282,7 +282,7 @@ def ai_recommend_laws_view(request):
         # Find the T1-A-006 question object.
         from questionnaire import flow
         role = services.get_respondent_role(cursor, rid)
-        visible = flow.questions_visible_to_role(role, answered)
+        visible = flow.questions_visible_to_role(role, answered, "tier_1")
         q_target = next((q for q in visible if q.id == "T1-A-006"), None)
         if not q_target:
             return HttpResponseNotFound("T1-A-006 not visible")
@@ -314,7 +314,7 @@ def ai_recommend_laws_view(request):
         {
             "question": q_target,
             "prior_answer": display_prior,
-            "progress": _normalize_progress(flow.progress_for_role(role, answered)),
+            "progress": _normalize_progress(flow.progress_for_role(role, answered, "tier_1")),
             "submit_url": "/q/submit/",
         },
     )
