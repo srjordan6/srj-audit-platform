@@ -160,10 +160,20 @@ def _bank_value(q: dict, column: str) -> Any:
 
 
 def _db_value(row: dict, column: str) -> Any:
-    """Pull a column value off a DB row dict, normalizing for compare."""
+    """Pull a column value off a DB row dict, normalizing for compare.
+
+    Raw cursors on this platform return jsonb as text (Django registers
+    a TextLoader for jsonb; see core.dbjson). Without decoding, every
+    JSONB column compares unequal and every row is "updated" on each
+    run, which is what the 2026-09-27 dry run showed (138 to update,
+    0 unchanged).
+    """
     value = row.get(column)
     if column == "scoring_weight" and value is not None:
         return Decimal(value).quantize(Decimal("0.01"))
+    if column in JSONB_COLUMNS:
+        from core.dbjson import loads_maybe
+        return loads_maybe(value)
     return value
 
 
@@ -186,20 +196,23 @@ def _format_value_short(v: Any, max_len: int = 60) -> str:
     return s
 
 
+JSONB_COLUMNS: frozenset[str] = frozenset({
+    "options", "matrix_rows", "matrix_columns", "skip_logic", "role_visibility",
+    "framework_mappings", "scoring_overrides", "extended_metadata",
+})
+
+
 def _to_sql_value(value: Any, column: str) -> Any:
-    """Pass a Python value through to psycopg3.
+    """Adapt a Python value for psycopg3.
 
-    psycopg3 auto-adapts dict/list to JSONB and Decimal to NUMERIC; no
-    manual encoding needed. This function is kept as the indirection
-    point so a future driver switch (e.g., back to psycopg2) only
-    requires changes here, not at every call site.
-
-    Assumption: JSONB column values are JSON-serializable Python
-    (dict/list of str/int/float/bool/None). Decimal inside JSONB would
-    require a custom adapter — flag and add if a future question_bank
-    ever embeds Decimal in framework_mappings / scoring_overrides /
-    extended_metadata.
+    psycopg3 does NOT auto-adapt dict/list ("cannot adapt type 'dict'
+    using placeholder '%t'", seen 2026-09-27 on the first AIITSA load);
+    JSONB columns are wrapped in Jsonb explicitly. Decimal adapts to
+    NUMERIC on its own.
     """
+    if column in JSONB_COLUMNS and value is not None:
+        from psycopg.types.json import Jsonb
+        return Jsonb(value)
     return value
 
 
