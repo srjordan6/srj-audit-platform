@@ -490,10 +490,44 @@ def submit_response(request):
         return _dispatch_by_state(request, cursor, rid)
 
 
+# Which audit the visitor is starting. /startaiaudit/ is Pillar I; the
+# AI IT Security Audit(TM) and the combined offer (2026-09-27 decision:
+# $399 each, $699 together) are the same form with a different instrument.
+INSTRUMENT_COPY = {
+    "tier_1": {"title": "AI Audit Snapshot", "price": "$399",
+               "blurb": "A 30-minute assessment across five dimensions. Get your top-line scores immediately, plus a board-ready report.",
+               "meta": "Start your AI Audit Snapshot: answer structured questions about your company's AI use and receive a formal auditor's report with findings. $399."},
+    "aiitsa": {"title": "AI IT Security Audit\u2122", "price": "$399",
+               "blurb": "143 questions across six security domains, one answer scale. Your dated Baseline Score, the Visibility Triangle, a remediation roadmap and a framework crosswalk, in a four-page pack.",
+               "meta": "Start your AI IT Security Audit: a dated, scored Baseline of your AI exposure across six security domains, with the remediation roadmap. $399."},
+    "combined": {"title": "AI Audit Snapshot + AI IT Security Audit\u2122", "price": "$699",
+                 "blurb": "Both audits in one sitting: the five-dimension business audit and the six-domain security audit. One report set, one price.",
+                 "meta": "Start both audits together: the AI Audit Snapshot and the AI IT Security Audit. $699 for the pair."},
+}
+
+
+def _instrument_from(request) -> str:
+    v = (getattr(request, "_forced_instrument", None)
+         or request.POST.get("instrument") or request.GET.get("instrument") or "tier_1")
+    v = v.strip().lower()
+    return v if v in INSTRUMENT_COPY else "tier_1"
+
+
+def start_aiitsa(request):
+    request._forced_instrument = "aiitsa"
+    return start(request)
+
+
+def start_combined(request):
+    request._forced_instrument = "combined"
+    return start(request)
+
+
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def start(request):
     from questionnaire import bot_protection as bp
+    instrument = _instrument_from(request)
 
     # Marketing attribution: capture utm_* from the query string so we can
     # measure which channel drove each start. Carried through the form as
@@ -581,6 +615,8 @@ def start(request):
                 "code_free": code_free,
                 "code_label": code_label,
                 "utm": utm,
+                "instrument": instrument,
+                "copy": INSTRUMENT_COPY[instrument],
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
             },
@@ -615,6 +651,8 @@ def start(request):
                     "annual_revenue", "geographic_footprint",
                 ]},
                 "prefill_code": request.POST.get("access_code", ""),
+                "instrument": instrument,
+                "copy": INSTRUMENT_COPY[instrument],
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
                 "access_code_error": (
@@ -668,6 +706,8 @@ def start(request):
                 {
                     "prefill_code": submitted_code,
                     "prefill_values": values,
+                    "instrument": instrument,
+                    "copy": INSTRUMENT_COPY[instrument],
                     "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
                         "That code is not recognized, has already been "
@@ -695,6 +735,7 @@ def start(request):
                     first_name=values["first_name"],
                     middle_name=values["middle_name"],
                     last_name=values["last_name"],
+                    instrument=instrument,
                 )
     except ValueError as exc:
         # Currently the only ValueError services raises is the
@@ -707,6 +748,8 @@ def start(request):
                 "questionnaire/start.html",
                 {
                     "prefill_values": values,
+                    "instrument": instrument,
+                    "copy": INSTRUMENT_COPY[instrument],
                     "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
                         "That code was just fully redeemed by another "

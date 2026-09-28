@@ -50,7 +50,8 @@ def create_checkout(request):
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT r.engagement_id, r.email FROM respondents r WHERE r.id = %s",
+            "SELECT r.engagement_id, r.email, coalesce(e.instrument, 'tier_1') "
+            "FROM respondents r JOIN engagements e ON e.id = r.engagement_id WHERE r.id = %s",
             (rid,),
         )
         row = cursor.fetchone()
@@ -58,9 +59,10 @@ def create_checkout(request):
     if row is None:
         return HttpResponseNotFound("respondent not found")
 
-    engagement_id, buyer_email = str(row[0]), row[1]
+    engagement_id, buyer_email, instrument = str(row[0]), row[1], row[2]
     base = _base_url(request)
-    price_id = os.environ.get("STRIPE_TIER_1_PRICE_ID")
+    offer = stripe_service.OFFERS.get(instrument, stripe_service.OFFERS["tier_1"])
+    price_id = os.environ.get(offer["price_env"]) or None
 
     try:
         session = stripe_service.create_checkout_session(
@@ -69,6 +71,9 @@ def create_checkout(request):
             success_url=f"{base}/billing/success/?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{base}/q/next/",
             price_id=price_id,
+            unit_amount_cents=offer["cents"],
+            product_name=offer["name"],
+            product_description=offer["description"],
         )
     except RuntimeError as e:
         return HttpResponseBadRequest(str(e))

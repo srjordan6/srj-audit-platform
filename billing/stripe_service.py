@@ -13,6 +13,19 @@ from typing import Any, Optional
 TIER_1_UNIT_AMOUNT_CENTS = 39900  # $399 per OD-18 pricing lock
 
 
+# One offer per instrument (2026-09-27 decision: $399 each, $699 for both).
+# A pre-created Stripe Price wins when its env var is set; otherwise the
+# session carries inline price_data, so no dashboard step is needed.
+OFFERS = {
+    "tier_1": {"price_env": "STRIPE_TIER_1_PRICE_ID", "cents": 39900,
+               "name": "AI Audit Snapshot", "description": "Tier 1 AI Audit \u2014 locked PDF report"},
+    "aiitsa": {"price_env": "STRIPE_AIITSA_PRICE_ID", "cents": 39900,
+               "name": "AI IT Security Audit\u2122", "description": "Four-Page Pack \u2014 dated Baseline Score, roadmap, crosswalk"},
+    "combined": {"price_env": "STRIPE_COMBINED_PRICE_ID", "cents": 69900,
+                 "name": "AI Audit Snapshot + AI IT Security Audit\u2122", "description": "Both audits, one report set"},
+}
+
+
 def create_checkout_session(
     engagement_id: str,
     buyer_email: str,
@@ -20,6 +33,8 @@ def create_checkout_session(
     cancel_url: str,
     price_id: Optional[str] = None,
     unit_amount_cents: int = TIER_1_UNIT_AMOUNT_CENTS,
+    product_name: str = "AI Audit Snapshot",
+    product_description: str = "Tier 1 AI Audit \u2014 locked PDF report",
 ) -> dict[str, Any]:
     """Create a Stripe Checkout Session for Tier 1 snapshot purchase.
 
@@ -46,8 +61,8 @@ def create_checkout_session(
             "price_data": {
                 "currency": "usd",
                 "product_data": {
-                    "name": "AI Audit Snapshot",
-                    "description": "Tier 1 AI Audit — locked PDF report",
+                    "name": product_name,
+                    "description": product_description,
                 },
                 "unit_amount": unit_amount_cents,
             },

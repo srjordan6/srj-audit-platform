@@ -57,7 +57,7 @@
     <div class="rpt-company">{{ company.name }}</div>
     <div class="rpt-meta">
       {{ company.industry }} &middot; {{ company.size_bracket }} employees<br>
-      Generated {{ generated_at|slice:":10" }} &middot; {% if respondent_count > 1 %}Tier 2{% else %}Tier 1{% endif %} &middot; {{ respondent_basis }}
+      Generated {{ generated_at|slice:":10" }} &middot; {% if respondent_count > 1 %}Tier 2{% else %}Tier 1{% endif %} &middot; {{ respondent_basis }}{% if instrument == "combined" %} &middot; with AI IT Security Audit&trade; answers{% endif %}
     </div>
   {% endif %}
   <div class="rpt-toc">

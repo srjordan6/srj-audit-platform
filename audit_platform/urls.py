@@ -36,6 +36,9 @@ urlpatterns = [
     # Public branded start URL — aiauditforcompanies.com/startaiaudit → questionnaire.views.start.
     # Alias of /q/start/; both routes render the same view. Marketing CTAs link here.
     path('startaiaudit/', q_views.start, name='start_alias'),
+    # Pillar II and the combined offer: same view, instrument fixed by the URL.
+    path('startsecurityaudit/', q_views.start_aiitsa, name='start_aiitsa'),
+    path('startbothaudits/', q_views.start_combined, name='start_combined'),
     # Public branded funnel entry — aiauditforcompanies.com/aiscore → the
     # 5-question AI Exposure Score screener. Alias of /q/score/; both routes
     # render the same view. Paid social points here, not at /startaiaudit.

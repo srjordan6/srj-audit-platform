@@ -282,6 +282,16 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
 
     with connection.cursor() as cursor:
         responses, responses_by_question, respondent_count = _load_responses(cursor, engagement_id)
+        cursor.execute("SELECT coalesce(instrument, 'tier_1') FROM engagements WHERE id = %s", [engagement_id])
+        _irow = cursor.fetchone()
+        instrument = _irow[0] if _irow and _irow[0] else "tier_1"
+        # Combined engagement (2026-09-27 decision): the Pillar I report,
+        # unchanged, plus the AI IT Security Audit questions and answers in
+        # the appendix. Its own Four-Page Pack is not part of this document.
+        aiitsa_by_question = {}
+        if instrument == "combined":
+            from reports.aiitsa_render import load_aiitsa_responses
+            _, aiitsa_by_question, _ = load_aiitsa_responses(cursor, engagement_id)
 
     frameworks = []
     for key in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
@@ -416,11 +426,27 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
             "question": q["question_text"],
             "answer": answer,
         })
+    if aiitsa_by_question:
+        from questionnaire.aiitsa_question_bank import AIITSA_QUESTIONS
+        for q in AIITSA_QUESTIONS:
+            entries = aiitsa_by_question.get(q["id"], [])
+            if respondent_count > 1 and len(entries) > 1:
+                answer = "; ".join(f"{_ROLE_LABELS.get(role, role or 'Respondent')}: {_format_answer(resp)}"
+                                   for role, resp in entries)
+            else:
+                answer = _format_answer(entries[0][1]) if entries else _format_answer(None)
+            appendix.append({
+                "qid": q["id"],
+                "section": f"AI IT Security Audit: {q['domain_label']}",
+                "question": q["question_text"],
+                "answer": answer,
+            })
 
     context = {
         "company": (first["company"] if first else None),
         "engagement": (first["engagement"] if first else None),
         "generated_at": (first["generated_at"] if first else ""),
+        "instrument": instrument,
         "respondent_count": respondent_count,
         "respondent_basis": ("Single-respondent snapshot" if respondent_count <= 1
                              else f"{respondent_count}-respondent engagement"),

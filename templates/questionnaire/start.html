@@ -2,7 +2,7 @@
 {% block title %}Start your AI audit — SRJ AI Audit Platform{% endblock %}
 {% block extra_head %}
 <link rel="canonical" href="https://aiauditforcompanies.com/startaiaudit/">
-<meta name="description" content="Start your AI Audit Snapshot: answer structured questions about your company's AI use and receive a formal auditor's report with findings. $399.">
+<meta name="description" content="{{ copy.meta|default:"Start your AI Audit Snapshot: answer structured questions about your company's AI use and receive a formal auditor's report with findings. $399." }}">
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
 <style>
@@ -14,10 +14,9 @@
 {% endblock %}
 {% block content %}
 <div class="container py-5" style="max-width: 640px;">
-    <h1 class="mb-3">AI Audit Snapshot</h1>
+    <h1 class="mb-3">{{ copy.title|default:"AI Audit Snapshot" }}</h1>
     <p class="text-muted mb-4">
-        A 30-minute assessment across five dimensions. Get your top-line
-        scores immediately, plus a board-ready report.
+        {{ copy.blurb|default:"A 30-minute assessment across five dimensions. Get your top-line scores immediately, plus a board-ready report." }}
     </p>
 
     {% if code_free %}
@@ -26,7 +25,7 @@
             <span style="font-size:1.4rem; line-height:1; margin-right:.6rem;">✓</span>
             <div>
                 <strong>Beta access applied — your audit is free.</strong><br>
-                <span class="small">No payment required (normally $399).{% if code_label %} {{ code_label }}.{% endif %}</span>
+                <span class="small">No payment required (normally {{ copy.price|default:"$399" }}).{% if code_label %} {{ code_label }}.{% endif %}</span>
             </div>
         </div>
     {% elif code_valid %}
@@ -45,6 +44,7 @@
         {% csrf_token %}
 
         {% comment %}Marketing attribution — carried from the landing query string.{% endcomment %}
+        <input type="hidden" name="instrument" value="{{ instrument|default:'tier_1' }}">
         <input type="hidden" name="utm_source" value="{{ utm.utm_source|default:'' }}">
         <input type="hidden" name="utm_medium" value="{{ utm.utm_medium|default:'' }}">
         <input type="hidden" name="utm_campaign" value="{{ utm.utm_campaign|default:'' }}">

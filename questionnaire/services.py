@@ -546,6 +546,7 @@ def create_engagement_and_respondent(
     first_name: str = "",
     middle_name: str = "",
     last_name: str = "",
+    instrument: str = "tier_1",
 ) -> str:
     """Create/find company + user, then create engagement + respondent.
 
@@ -600,20 +601,22 @@ def create_engagement_and_respondent(
         row = cursor.fetchone()
     user_id = row[0]
 
+    if instrument not in ("tier_1", "aiitsa", "combined"):
+        instrument = "tier_1"
     if access_code_row is not None:
         # Comped engagement — no Stripe path, payment_status = 'comped'.
         cursor.execute(
             "INSERT INTO engagements "
-            "(company_id, buyer_user_id, tier, status, payment_status, price_cents) "
-            "VALUES (%s, %s, 'tier_1', 'in_progress', 'comped', 0) RETURNING id",
-            (company_id, user_id),
+            "(company_id, buyer_user_id, tier, status, payment_status, price_cents, instrument) "
+            "VALUES (%s, %s, 'tier_1', 'in_progress', 'comped', 0, %s) RETURNING id",
+            (company_id, user_id, instrument),
         )
     else:
         cursor.execute(
             "INSERT INTO engagements "
-            "(company_id, buyer_user_id, tier, status, payment_status, price_cents) "
-            "VALUES (%s, %s, 'tier_1', 'in_progress', 'free', 0) RETURNING id",
-            (company_id, user_id),
+            "(company_id, buyer_user_id, tier, status, payment_status, price_cents, instrument) "
+            "VALUES (%s, %s, 'tier_1', 'in_progress', 'free', 0, %s) RETURNING id",
+            (company_id, user_id, instrument),
         )
     engagement_id = cursor.fetchone()[0]
 
