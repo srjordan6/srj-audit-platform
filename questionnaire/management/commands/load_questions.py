@@ -42,7 +42,7 @@ serialization layer for JSONB. Raw SQL with psycopg's Json adapter
 sidesteps both and matches the pattern used elsewhere in this codebase
 (direct SQL via SRJ MCP for hotfixes).
 
-The 19 columns are pinned in COLUMNS below. If a new column is added to
+The 20 columns are pinned in COLUMNS below. If a new column is added to
 the schema, both COLUMNS and the question_bank.py dicts need to be
 updated together; the command's planning loop will silently drop any
 column not in COLUMNS, and the apply loop will refuse to write a row
@@ -76,12 +76,13 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
 from questionnaire.question_bank import QUESTIONS
+from questionnaire.aiitsa_question_bank import AIITSA_QUESTIONS
 
 
 # ----------------------------------------------------------------------------
 # Schema pinning
 # ----------------------------------------------------------------------------
-# The 19 columns of public.questions, in the order used for INSERT.
+# The 20 columns of public.questions, in the order used for INSERT.
 # Order is significant: SQL placeholders and value tuples are built from
 # this list in lockstep.
 
@@ -105,7 +106,37 @@ COLUMNS: tuple[str, ...] = (
     "is_active",
     "scoring_overrides",
     "extended_metadata",
+    "instrument",
 )
+
+# Keys the AIITSA bank carries for its own scoring that are not columns.
+# They ride inside extended_metadata so the row stays self-describing.
+_META_KEYS = ("domain", "domain_label", "baseline_area", "visibility_triangle")
+
+
+def _normalised_bank() -> list[dict]:
+    """Both instruments in one list, every record shaped to COLUMNS.
+
+    Pillar I records predate the instrument column and get 'tier_1'; the
+    AIITSA records fold their extra keys into extended_metadata. The
+    questions table is the union, and responses.question_id is a foreign
+    key to it, so a question that is not loaded here cannot be answered.
+    """
+    out = []
+    for q in QUESTIONS:
+        r = dict(q)
+        r.setdefault("instrument", "tier_1")
+        out.append(r)
+    for q in AIITSA_QUESTIONS:
+        r = dict(q)
+        meta = dict(r.get("extended_metadata") or {})
+        for k in _META_KEYS:
+            if k in r:
+                meta[k] = r.pop(k)
+        r["extended_metadata"] = meta
+        r.setdefault("instrument", "aiitsa")
+        out.append(r)
+    return out
 
 # Columns that participate in the comparison between bank and DB.
 # id is excluded because it's the join key, not a comparable field.
@@ -314,14 +345,14 @@ class Command(BaseCommand):
 
         # ---- 1. Validate bank --------------------------------------------
         bank_questions = [
-            q for q in QUESTIONS
+            q for q in _normalised_bank()
             if tier_filter is None or q.get("tier") == tier_filter
         ]
         _assert_unique_bank_ids(bank_questions)
         _assert_known_columns_only(bank_questions)
 
         self.stdout.write(
-            f"Loaded {len(bank_questions)} questions from question_bank.py"
+            f"Loaded {len(bank_questions)} questions from question_bank.py + aiitsa_question_bank.py"
             + (f" (tier={tier_filter})" if tier_filter else "")
         )
 
