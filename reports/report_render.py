@@ -408,6 +408,53 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
     # --- Section 5 ---
     opinion = _build_opinion(frameworks)
 
+    # --- Divergence panel (Part B-3 S.2.2, S.2.4): multi-respondent only ---
+    # Where leadership and the workforce disagree by 20+ points, and the
+    # single questions they answered most differently. Aggregation data is
+    # attached to each framework context by scoring.engine; absent for a
+    # single respondent, so the panel does not exist for Tier 1.
+    divergence = None
+    _agg_frameworks = [f for f in frameworks if not f.get("error") and f.get("aggregation")]
+    if respondent_count > 1 and _agg_frameworks:
+        _agg = _agg_frameworks[0]["aggregation"]
+        _dim_label = {}
+        for f in _agg_frameworks:
+            for item in (f.get("items") or []):
+                if isinstance(item, dict) and item.get("name"):
+                    _dim_label[(f["framework"]["key"], item["name"])] = item.get("label") or item.get("display_name") or item["name"].replace("_", " ").title()
+        _fw_name = {f["framework"]["key"]: f["framework"].get("display_name", f["framework"]["key"]) for f in _agg_frameworks}
+        rows = []
+        for d in _agg.get("dimensions", []):
+            if d.get("leadership_mean") is None or d.get("workforce_mean") is None:
+                continue
+            rows.append({
+                "framework": _fw_name.get(d["framework"], d["framework"]),
+                "dimension": _dim_label.get((d["framework"], d["dimension"]), d["dimension"].replace("_", " ").title()),
+                "leadership": round(d["leadership_mean"]),
+                "workforce": round(d["workforce_mean"]),
+                "gap": round(d["divergence"]),
+                "flagged": bool(d.get("flagged")),
+            })
+        rows.sort(key=lambda r: -abs(r["gap"]))
+        contested = []
+        for c in _agg.get("contested", [])[:5]:
+            if c.get("stdev_0_1", 0) <= 0:
+                continue
+            q = qindex.get(c["question_id"], {})
+            entries = responses_by_question.get(c["question_id"], [])
+            contested.append({
+                "qid": c["question_id"], "question": q.get("question_text", c["question_id"]),
+                "answers": "; ".join(f"{_ROLE_LABELS.get(role, role or 'Respondent')}: {_format_answer(resp)}"
+                                     for role, resp in entries),
+                "spread": round(c["stdev_0_1"] * 100),
+            })
+        divergence = {
+            "respondent_count": _agg.get("respondent_count", respondent_count),
+            "roles": [_ROLE_LABELS.get(r, r) for r in _agg.get("roles", [])],
+            "threshold": int(_agg.get("divergence_threshold", 20)),
+            "rows": rows, "flagged": [r for r in rows if r["flagged"]], "contested": contested,
+        }
+
     # --- Appendix A ---
     appendix = []
     for q in QUESTIONS:
@@ -465,6 +512,7 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         "eff_scorecard": eff_scorecard,
         "ninety_day": ninety_day,
         "opinion": opinion,
+        "divergence": divergence,
         "appendix": appendix,
         "methodology": (first["methodology"] if first else ""),
         "trademark_notice": (first["trademark_notice"] if first else ""),

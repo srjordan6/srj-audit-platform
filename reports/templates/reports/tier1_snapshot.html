@@ -67,6 +67,7 @@
     3. AI Risk &amp; Governance Review&trade;<br>
     4. AI Efficiency &amp; Process Optimization<br>
     5. Summary of Findings<br>
+    {% if divergence %}6. Where Leadership and the Workforce Disagree<br>{% endif %}
     Appendix A. Questions and Responses
   </div>
 </div>
@@ -437,6 +438,42 @@
     </p>
   </div>
 </div>
+
+{% if divergence %}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>6. Where Leadership and the Workforce Disagree</h2></div>
+  <p class="rpt-intro">{{ divergence.respondent_count }} respondents ({{ divergence.roles|join:", " }}) were scored independently and combined by role-weighted mean. Before averaging, each dimension was scored twice: once from leadership answers, once from the workforce. A gap of {{ divergence.threshold }} points or more is flagged and lowers the dimension's confidence, because a score that leadership and the people doing the work do not both recognise is not yet a defensible finding.</p>
+
+  {% if divergence.flagged %}
+  <div class="rpt-note"><b>{{ divergence.flagged|length }} dimension{{ divergence.flagged|length|pluralize }} flagged.</b>
+    {% for r in divergence.flagged %}{{ r.dimension }} ({% if r.gap > 0 %}leadership +{{ r.gap }}{% else %}workforce +{{ r.gap|slice:"1:" }}{% endif %}){% if not forloop.last %}; {% endif %}{% endfor %}.
+    Where leadership scores higher, the control likely exists on paper and is not felt on the floor. Where the workforce scores higher, leadership may be underestimating what its teams have already put in place.</div>
+  {% endif %}
+
+  <table class="rpt-qa">
+    <tr><th>Framework</th><th>Dimension</th><th>Leadership</th><th>Workforce</th><th>Gap</th></tr>
+    {% for r in divergence.rows %}
+    <tr{% if r.flagged %} style="background:#FEF3E4;"{% endif %}>
+      <td>{{ r.framework }}</td><td class="rpt-q">{{ r.dimension }}</td>
+      <td>{{ r.leadership }}</td><td>{{ r.workforce }}</td>
+      <td>{% if r.flagged %}<span class="rpt-cond-score">{% if r.gap > 0 %}+{% endif %}{{ r.gap }}</span>{% else %}{% if r.gap > 0 %}+{% endif %}{{ r.gap }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="rpt-intro">Dimensions answered by only one group are not shown: there is nothing to compare.</p>
+
+  {% if divergence.contested %}
+  <h3>Most contested questions</h3>
+  <p class="rpt-intro">The single questions respondents answered most differently. These are the first things to put on the table in the readout.</p>
+  <table class="rpt-qa">
+    <tr><th>Question</th><th>Answers by role</th></tr>
+    {% for c in divergence.contested %}
+    <tr><td class="rpt-q">{{ c.qid }} &middot; {{ c.question }}</td><td>{{ c.answers }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>Appendix A. Questions and Responses</h2></div>
