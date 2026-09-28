@@ -264,3 +264,77 @@ def remove_respondent(cursor, engagement_id: str, respondent_id: str) -> None:
     )
     if cursor.rowcount == 0:
         raise InvitationError("respondent not found, or already completed (completed respondents cannot be removed)")
+
+
+# ----------------------------------------------------------------------------
+# Buyer notification on each respondent completion (Part B-1 S.4.5)
+# ----------------------------------------------------------------------------
+
+BUYER_PROGRESS_SUBJECT = "{company} AI audit: {done} of {total} respondents complete"
+BUYER_PROGRESS_BODY = """Hi {buyer},
+
+{respondent_name} ({role}) has just completed their part of the {company} AI audit.
+
+Progress: {done} of {total} invited respondents complete.
+{coverage_line}
+
+Manage respondents, nudge stragglers or add people here:
+{url}
+
+This link is private to you and stays valid for 180 days.
+
+SRJ Consulting & Services
+"""
+
+
+def build_buyer_link(engagement_id: str) -> str:
+    base = os.environ.get("BASE_URL", "https://aiauditforcompanies.com").rstrip("/")
+    return f"{base}/e/link/{session_module.make_resume_token(str(engagement_id))}/"
+
+
+def notify_buyer_progress(cursor, engagement_id: str, respondent_id: str, cov) -> tuple[bool, str]:
+    """Tell the buyer one more respondent finished and what coverage still
+    needs. Called from the completion path for Tier 2/3 when coverage is
+    not yet met (the report email itself covers the met case)."""
+    cursor.execute(
+        """
+        SELECT u.email, coalesce(nullif(u.name, ''), u.email), c.name,
+               r.name, r.role,
+               (SELECT count(*) FROM respondents x WHERE x.engagement_id = e.id
+                   AND coalesce(x.status,'invited') <> 'removed'),
+               (SELECT count(*) FROM respondents x WHERE x.engagement_id = e.id
+                   AND x.status = 'completed')
+        FROM engagements e
+        JOIN users u ON u.id = e.buyer_user_id
+        LEFT JOIN companies c ON c.id = e.company_id
+        JOIN respondents r ON r.id = %s
+        WHERE e.id = %s
+        """,
+        [respondent_id, engagement_id],
+    )
+    row = cursor.fetchone()
+    if not row or not row[0]:
+        return False, "no buyer email"
+    buyer_email, buyer_name, company, rname, role, total, done = row
+    if cov.is_met:
+        coverage_line = "Coverage is met: the compiled report is being generated now."
+    else:
+        needs = "; ".join(cov.missing_items[:4]) if cov.missing_items else "more respondents"
+        coverage_line = f"Still needed before the report can be compiled: {needs}."
+    ctx = {"buyer": buyer_name, "company": company or "your company", "respondent_name": rname,
+           "role": role, "done": done, "total": total, "coverage_line": coverage_line,
+           "url": build_buyer_link(engagement_id)}
+    ok, msg = _postmark({
+        "From": os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM),
+        "To": buyer_email,
+        "Subject": BUYER_PROGRESS_SUBJECT.format(**ctx),
+        "TextBody": BUYER_PROGRESS_BODY.format(**ctx),
+        "MessageStream": "outbound",
+    })
+    cursor.execute(
+        "INSERT INTO events (event_type, payload) VALUES ('buyer_progress_notice', %s::jsonb)",
+        [json.dumps({"engagement_id": str(engagement_id), "respondent_id": str(respondent_id),
+                     "to": buyer_email, "done": done, "total": total, "coverage_met": cov.is_met,
+                     "status": "delivered" if ok else "failed", "postmark": msg[:300]})],
+    )
+    return ok, msg

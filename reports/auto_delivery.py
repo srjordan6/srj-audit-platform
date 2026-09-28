@@ -319,6 +319,13 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
             "missing": cov.missing_items[:10],
         })
         if not cov.is_met or tier_row[1] is not None:
+            # Coverage still short: the buyer hears about the progress and
+            # what is missing (Part B-1 S.4.5). Never breaks the completion.
+            try:
+                from engagements.invitations import notify_buyer_progress
+                notify_buyer_progress(cursor, engagement_id, respondent_id, cov)
+            except Exception:  # noqa: BLE001
+                logger.exception("buyer progress notice failed for %s", engagement_id)
             return False
         cursor.execute(
             "UPDATE engagements SET coverage_met_at = NOW() "
