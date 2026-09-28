@@ -23,17 +23,18 @@ from reports import generator
 logger = logging.getLogger(__name__)
 
 
-def _get_engagement(cursor, engagement_id: str) -> tuple[str, str, int]:
-    """Return (snapshot_state, company_id, generation_count) or raise."""
+def _get_engagement(cursor, engagement_id: str) -> tuple[str, str, int, str]:
+    """Return (snapshot_state, company_id, generation_count, instrument) or raise."""
     cursor.execute(
-        "SELECT snapshot_state, company_id, generation_count "
+        "SELECT snapshot_state, company_id, generation_count, coalesce(instrument, 'tier_1') "
         "FROM engagements WHERE id = %s",
         (engagement_id,),
     )
     row = cursor.fetchone()
     if row is None:
         raise ValueError(f"engagement {engagement_id} not found")
-    return row[0], str(row[1]), int(row[2] or 0)
+    instrument = row[3] if len(row) > 3 and row[3] else "tier_1"
+    return row[0], str(row[1]), int(row[2] or 0), instrument
 
 
 def _count_responses(cursor, engagement_id: str) -> int:
@@ -58,9 +59,14 @@ def _render_placeholder_content(engagement_id: str, response_count: int) -> str:
     )
 
 
-def _render_content(cursor, engagement_id: str) -> str:
-    """Real snapshot content via scoring engine; placeholder on failure."""
+def _render_content(cursor, engagement_id: str, instrument: str = "tier_1") -> str:
+    """Report body by instrument: the Four-Page Pack for the AI IT Security
+    Audit, the Tier 1 snapshot for Pillar I and, per the 2026-09-27
+    decision, for combined engagements too. Placeholder on failure."""
     try:
+        if instrument == "aiitsa":
+            from reports.aiitsa_render import render_aiitsa_pack_html
+            return render_aiitsa_pack_html(engagement_id)
         from reports.report_render import render_tier1_snapshot_html
         return render_tier1_snapshot_html(engagement_id)
     except Exception:
@@ -165,13 +171,13 @@ def generate_and_lock(
     if now is None:
         now = datetime.now(timezone.utc)
 
-    state, company_id, _gen_count = _get_engagement(cursor, engagement_id)
+    state, company_id, _gen_count, instrument = _get_engagement(cursor, engagement_id)
     if state in (lifecycle.LOCKED, lifecycle.EXPIRED):
         raise ValueError(
             f"cannot generate report in state {state} — snapshot is terminal"
         )
 
-    content_html = _render_content(cursor, engagement_id)
+    content_html = _render_content(cursor, engagement_id, instrument)
 
     pdf_bytes, pdf_hash = generator.generate_locked_report(
         content_html=content_html,
@@ -193,14 +199,21 @@ def generate_and_lock(
         from reports.context import build_snapshot_context
         from scoring.persistence import persist_snapshot_scores
         payloads = {}
-        for fw in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
-            ctx = build_snapshot_context(engagement_id, fw)
-            payloads[fw] = {
-                "overall": ctx.get("overall"),
-                "items": ctx.get("items"),
-                "gaps": ctx.get("priority_gaps"),
-                "aggregation": ctx.get("aggregation"),
-            }
+        if instrument in ("tier_1", "combined"):
+            for fw in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
+                ctx = build_snapshot_context(engagement_id, fw)
+                payloads[fw] = {
+                    "overall": ctx.get("overall"),
+                    "items": ctx.get("items"),
+                    "gaps": ctx.get("priority_gaps"),
+                    "aggregation": ctx.get("aggregation"),
+                }
+        if instrument in ("aiitsa", "combined"):
+            # The dated Baseline Score is the trend line the Four-Page Pack
+            # reads back on its "compared to what?" line.
+            from reports.aiitsa_render import aiitsa_score_payload, build_aiitsa_context
+            payloads["aiitsa"] = aiitsa_score_payload(
+                build_aiitsa_context(engagement_id, exclude_report_id=report_id))
         persist_snapshot_scores(
             cursor,
             company_id=company_id,

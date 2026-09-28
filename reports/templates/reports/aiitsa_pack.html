@@ -1,0 +1,155 @@
+{% include "reports/_aiitsa_css.html" %}
+
+<div class="rpt-cover">
+  <h1>AI IT Security Audit&trade;</h1>
+  <div class="rpt-rule"></div>
+  {% if company %}
+    <div class="rpt-company">{{ company.name }}</div>
+    <div class="rpt-meta">
+      {{ company.industry }} &middot; {{ company.size_bracket }} employees<br>
+      Baseline dated {{ assessed_on|date:"Y-m-d" }} &middot; Snapshot tier (self-reported) &middot;
+      {% if respondent_count > 1 %}{{ respondent_count }} respondents{% else %}single respondent{% endif %}
+    </div>
+  {% endif %}
+  <div class="rpt-toc">
+    <p><b>The Four-Page Pack</b></p>
+    <p>1. Executive Summary</p>
+    <p>2. Remediation Roadmap</p>
+    <p>3. Framework Crosswalk</p>
+    <p>4. Baseline Score</p>
+    <p>Appendix A. Questions and answers</p>
+  </div>
+  <p class="rpt-meta" style="margin-top:30pt;">Pillar II &middot; AI Risk Governance &amp; Security&trade;<br>SRJ Consulting &amp; Services LLC</p>
+</div>
+
+{# ---------------------------------------------------------------- page 1 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>1. Executive Summary</h2></div>
+
+  <div class="rpt-ai">
+    <h3>Exposure statement</h3>
+    <p>{{ exposure }}</p>
+  </div>
+
+  <div class="rpt-score-line">
+    <span class="rpt-score-num">{{ baseline.score|floatformat:0 }}</span> / 100 &nbsp;
+    <b>{{ baseline.level_label }}</b> &nbsp;
+    <span style="font-size:9pt;color:#6B7280;">dated {{ assessed_on|date:"Y-m-d" }} &middot; {{ baseline.answered }} of {{ baseline.expected }} answered &middot; unknown zone {{ baseline.unknown_zone_pct }}%</span>
+  </div>
+  <div class="rpt-bar-track"><div class="rpt-bar-fill" style="width:{{ baseline.score|floatformat:0 }}%;"></div></div>
+
+  <div class="rpt-note">
+    Self-reported answers cap every area at <b>Partial</b> (gate rule, spec &sect;3). Defensible and Mature
+    need the named artefact produced, dated and verified at the analyst tier.
+  </div>
+
+  <h3>Visibility Triangle</h3>
+  <p class="rpt-intro">Six questions, one per domain. A "Don't know" is the unknown zone: dashboards read green because they were never built to see it.</p>
+  <table class="rpt-qa">
+    <tr><th>Domain</th><th>Question</th><th>Answer</th><th>Zone</th></tr>
+    {% for v in visibility %}
+    <tr><td><b>{{ v.domain }}</b></td><td class="rpt-q">{{ v.question }}</td><td>{{ v.answer }}</td>
+      <td>{% if v.zone == "unknown" %}<span class="rpt-cond-score">{{ v.zone_label }}</span>{% else %}{{ v.zone_label }}{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+
+  <h3>Headline findings</h3>
+  {% for w in weakest %}
+  <div class="rpt-gap">
+    <h4>{{ w.area }}: {{ w.score|floatformat:0 }} / 100, {{ w.level_label }}</h4>
+    <p><span class="rpt-label">Minimum defensible standard:</span> {{ w.standard }}</p>
+    <p><span class="rpt-label">Gap:</span> {{ w.gap_count }} of {{ w.answered }} answered questions in this area fell short{% if w.dont_know %}, {{ w.dont_know }} of them "Don't know"{% endif %}.</p>
+  </div>
+  {% endfor %}
+</div>
+
+{# ---------------------------------------------------------------- page 2 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>2. Remediation Roadmap</h2></div>
+  <p class="rpt-intro">Gap-to-standard for each of the seven Baseline areas. Every line pairs the score with the artefact the standard names; where the artefact is missing, the questions answered No or Don't know are the gap statement.</p>
+
+  {% for a in areas %}
+  <div class="rpt-artifact">
+    <h3>{{ a.area }} &nbsp; <span style="font-size:10pt;color:#6B7280;">{{ a.score|floatformat:0 }} / 100 &middot; {{ a.level_label }}{% if a.capped %} (capped: evidence not yet verified){% endif %}</span></h3>
+    <div class="rpt-bar-track" style="width:60%;"><div class="rpt-bar-fill" style="width:{{ a.bar }}%;"></div></div>
+    <p class="rpt-intro" style="margin-top:4pt;"><span class="rpt-label">Standard:</span> {{ a.standard }}</p>
+    {% if a.gaps %}
+    <table class="rpt-qa">
+      <tr><th>Question</th><th>Answer</th></tr>
+      {% for g in a.gaps %}<tr><td class="rpt-q">{{ g.id }} &middot; {{ g.text }}</td><td>{{ g.answer }}</td></tr>{% endfor %}
+    </table>
+    {% if a.gap_count > a.gaps|length %}<p class="rpt-intro">and {{ a.gap_count|add:"-6" }} more in Appendix A.</p>{% endif %}
+    {% else %}
+    <p class="rpt-intro">No gaps in the self-reported answers. Next step: produce and date the artefact so the analyst tier can lift the cap.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <h3>90-day roadmap</h3>
+  <p class="rpt-intro">Fixed sequence from the method. Do not reorder the workstreams: wrong sequencing stalls the engagement around week four. The solo audit always fails; the coalition is a deliverable, not an assumption.</p>
+  <table class="rpt-qa">
+    <tr><th>When</th><th>Workstream</th></tr>
+    {% for when, what in roadmap %}<tr><td style="width:14%;"><b>{{ when }}</b></td><td>{{ what }}</td></tr>{% endfor %}
+  </table>
+</div>
+
+{# ---------------------------------------------------------------- page 3 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>3. Framework Crosswalk</h2></div>
+  <p class="rpt-intro">One-page external reference: where each Baseline area lands in the frameworks a regulator, insurer, enterprise customer or board is most likely to cite. Rows are references, not certifications.</p>
+  <table class="rpt-qa">
+    <tr><th>Area</th><th>AI-specific</th><th>Management systems</th><th>Threat and assurance</th><th>Regulatory</th></tr>
+    {% for area, ai, ms, threat, reg in crosswalk %}
+    <tr><td><b>{{ area }}</b></td><td style="font-size:7.5pt;">{{ ai }}</td><td style="font-size:7.5pt;">{{ ms }}</td><td style="font-size:7.5pt;">{{ threat }}</td><td style="font-size:7.5pt;">{{ reg }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{# ---------------------------------------------------------------- page 4 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>4. Baseline Score</h2></div>
+  <div class="rpt-score-line">
+    <span class="rpt-score-num">{{ baseline.score|floatformat:0 }}</span> / 100 &nbsp; <b>{{ baseline.level_label }}</b>
+    &nbsp; <span style="font-size:9pt;color:#6B7280;">dated {{ assessed_on|date:"Y-m-d" }}</span>
+  </div>
+  <table class="rpt-qa">
+    <tr><th>Area</th><th>Score</th><th>Level</th><th>Answered</th><th>Don't know</th><th>Gaps</th></tr>
+    {% for a in areas %}
+    <tr><td><b>{{ a.area }}</b></td><td>{{ a.score|floatformat:1 }}</td><td>{{ a.level_label }}{% if a.capped %}*{% endif %}</td>
+      <td>{{ a.answered }} / {{ a.expected }}</td><td>{{ a.dont_know }}</td><td>{{ a.gap_count }}</td></tr>
+    {% endfor %}
+  </table>
+  <p class="rpt-intro">Scale: {% for l in level_scale %}{{ forloop.counter0 }} {{ l }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}. * capped at Partial pending evidence verification.</p>
+
+  <h3>Compared to what?</h3>
+  {% if history %}
+  <table class="rpt-qa">
+    <tr><th>Dated Baseline</th><th>Score</th></tr>
+    <tr><td><b>{{ assessed_on|date:"Y-m-d" }} (this report)</b></td><td><b>{{ baseline.score|floatformat:1 }}</b></td></tr>
+    {% for h in history %}<tr><td>{{ h.date|date:"Y-m-d" }}</td><td>{{ h.score|floatformat:1 }}</td></tr>{% endfor %}
+  </table>
+  {% else %}
+  <p class="rpt-intro">This is the first dated Baseline for {{ company.name }}. A re-assessment produces the trend line; an undated score is indefensible by the method's own standard.</p>
+  {% endif %}
+
+  <div class="rpt-opinion">
+    <h3>Basis of this Baseline</h3>
+    <p style="font-size:9.5pt;">Self-reported answers to {{ baseline.answered }} of {{ baseline.expected }} questions across the Six-Domain Operating View, scored against the seven areas of the Defensible AI Security Baseline. Yes counts 1, Partially 0.5, No and Don't know 0; Don't know is also reported as unknown-zone exposure. Areas are weighted equally. No artefact was inspected, so every level is capped at Partial; the analyst tier verifies the named artefacts and lifts the cap to Defensible or Mature.</p>
+  </div>
+</div>
+
+{# ------------------------------------------------------------- appendix #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>Appendix A. Questions and answers</h2></div>
+  <table class="rpt-qa rpt-appendix">
+    <tr><th>ID</th><th>Domain</th><th>Area</th><th>Question</th><th>Answer</th></tr>
+    {% for row in appendix %}
+    <tr><td>{{ row.qid }}</td><td>{{ row.domain }}</td><td>{{ row.area }}</td><td class="rpt-q">{{ row.question }}</td><td>{{ row.answer }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="rpt-legal">
+  <h2>Notice</h2>
+  <p>This AI IT Security Audit&trade; Snapshot is a self-reported assessment prepared by SRJ Consulting &amp; Services LLC from questionnaire answers supplied by the company. It is not an attestation, certification, penetration test or legal opinion, and no artefact was independently inspected. The Visibility Triangle, Six-Domain Operating View, Defensible AI Security Baseline, Four-Page Pack and AI Red Button are descriptive names of the method. Framework references are provided for orientation and do not represent compliance with any framework or regulation.</p>
+</div>

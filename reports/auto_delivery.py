@@ -94,8 +94,22 @@ def _mark_complete(cursor, respondent_id: str):
     return engagement_id, email, name, company_name
 
 
+AIITSA_EMAIL_SUBJECT = "Your AI IT Security Audit report is ready"
+AIITSA_EMAIL_BODY = (
+    "Hello {name},\n\n"
+    "Thank you for completing the AI IT Security Audit questionnaire for {company}.\n\n"
+    "Your Four-Page Pack is attached as a PDF: the executive summary with the "
+    "Visibility Triangle, the remediation roadmap and 90-day plan, the framework "
+    "crosswalk, and your dated Baseline Score.\n\n"
+    "This is a self-reported snapshot, so every area is capped at Partial. The "
+    "analyst tier verifies the artefacts and lifts the cap to Defensible or Mature.\n\n"
+    "SRJ Consulting & Services\n"
+)
+
+
 def _send_postmark(to_email: str, name: str, company: str,
-                   pdf_bytes: bytes, engagement_id: str) -> tuple[bool, str]:
+                   pdf_bytes: bytes, engagement_id: str,
+                   instrument: str = "tier_1") -> tuple[bool, str]:
     token = os.environ.get("POSTMARK_SERVER_TOKEN", "")
     if not token:
         return False, "POSTMARK_SERVER_TOKEN not set - email skipped"
@@ -103,12 +117,13 @@ def _send_postmark(to_email: str, name: str, company: str,
     payload = {
         "From": from_email,
         "To": to_email,
-        "Subject": EMAIL_SUBJECT,
-        "TextBody": EMAIL_BODY.format(name=name or "there",
-                                      company=company or "your company"),
+        "Subject": (AIITSA_EMAIL_SUBJECT if instrument == "aiitsa" else EMAIL_SUBJECT),
+        "TextBody": (AIITSA_EMAIL_BODY if instrument == "aiitsa" else EMAIL_BODY).format(
+            name=name or "there", company=company or "your company"),
         "MessageStream": "outbound",
         "Attachments": [{
-            "Name": f"AI_Audit_Snapshot_{str(engagement_id)[:8]}.pdf",
+            "Name": (f"AI_IT_Security_Audit_{str(engagement_id)[:8]}.pdf" if instrument == "aiitsa"
+                     else f"AI_Audit_Snapshot_{str(engagement_id)[:8]}.pdf"),
             "Content": base64.b64encode(pdf_bytes).decode(),
             "ContentType": "application/pdf",
         }],
@@ -138,7 +153,8 @@ def _owner_password() -> str:
             or settings.SECRET_KEY[:32])
 
 
-def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
+def _worker(engagement_id: str, email: str, name: str, company: str,
+            instrument: str = "tier_1") -> None:
     """Background thread: generate report, mark delivered, email PDF.
 
     Two-phase logging: emit an event at EACH major step so a crash mid-
@@ -182,7 +198,8 @@ def _worker(engagement_id: str, email: str, name: str, company: str) -> None:
         _log_step("pdf_generated", {"report_id": report_id, "pdf_bytes": len(pdf_bytes)})
 
         sent, detail = _send_postmark(email, name, company,
-                                      pdf_bytes, engagement_id)
+                                      pdf_bytes, engagement_id,
+                                      instrument=instrument)
         result["email_sent"] = sent
         result["email_detail"] = detail
         _log_step("postmark_return", {"email_sent": sent, "email_detail": detail[:200] if detail else None})
@@ -226,7 +243,7 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     """
     try:
         cursor.execute(
-            "SELECT e.id, r.email, r.name, c.name, e.snapshot_state "
+            "SELECT e.id, r.email, r.name, c.name, e.snapshot_state, coalesce(e.instrument, 'tier_1') "
             "FROM respondents r "
             "JOIN engagements e ON e.id = r.engagement_id "
             "JOIN companies c ON c.id = e.company_id "
@@ -240,7 +257,7 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
         return False
     if not row:
         return False
-    engagement_id, email, name, company, state = row
+    engagement_id, email, name, company, state, instrument = row
     # e.id comes back as a Python UUID; downstream (_send_postmark filename)
     # slices with [:8] which fails on UUID. Cast to str at the boundary.
     engagement_id = str(engagement_id)
@@ -260,7 +277,7 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     # Flip back to daemon thread so edits feel snappy again.
     thread = threading.Thread(
         target=_worker,
-        args=(engagement_id, email, name, company),
+        args=(engagement_id, email, name, company, instrument),
         daemon=True,
         name=f"report-regen-{engagement_id[:8]}",
     )
@@ -310,15 +327,6 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
     tier_row = cursor.fetchone()
     tier = (tier_row[0] if tier_row else None) or "tier_1"
     instrument = tier_row[2] if tier_row else "tier_1"
-    if instrument == "aiitsa":
-        # The AI IT Security Audit report (Four-Page Pack, spec S.10) is not
-        # built yet: answers are scored and kept, the report is held, and
-        # the event says so. Nothing Pillar I-shaped is sent for a Pillar II
-        # engagement. Combined engagements produce the Pillar I report per
-        # the 2026-09-27 decision (same report, more questions and answers).
-        _log_event(cursor, {"engagement_id": engagement_id, "respondent_id": respondent_id,
-                            "status": "held_aiitsa_report_pending", "instrument": instrument})
-        return False
     if tier != "tier_1":
         from engagements.coverage import check_coverage
         cov = check_coverage(cursor, engagement_id)
@@ -359,7 +367,7 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
     })
     thread = threading.Thread(
         target=_worker,
-        args=(engagement_id, email, name, company),
+        args=(engagement_id, email, name, company, instrument),
         daemon=True,
         name=f"report-delivery-{engagement_id[:8]}",
     )
