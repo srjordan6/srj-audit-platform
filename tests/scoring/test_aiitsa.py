@@ -12,9 +12,11 @@ def _all(answer):
 
 
 def test_bank_shape():
-    assert len(AIITSA_QUESTIONS) == 143
+    assert len(AIITSA_QUESTIONS) == 191   # 143 Tier 1 + 48 Tier 2 (OD-20)
+    from questionnaire.aiitsa_question_bank import AIITSA_TIER_1_QUESTIONS
+    assert len(AIITSA_TIER_1_QUESTIONS) == 143
     assert all(q["id"].startswith("AIITSA-") for q in AIITSA_QUESTIONS)
-    assert len({q["id"] for q in AIITSA_QUESTIONS}) == 143
+    assert len({q["id"] for q in AIITSA_QUESTIONS}) == 191
     assert all(q["options"] == ["Yes", "Partially", "No", "Don't know"] for q in AIITSA_QUESTIONS)
     assert all(q["baseline_area"] in BASELINE_AREAS for q in AIITSA_QUESTIONS)
     assert sum(1 for q in AIITSA_QUESTIONS if q["visibility_triangle"]) == 6

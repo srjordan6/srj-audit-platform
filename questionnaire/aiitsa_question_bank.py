@@ -265,5 +265,111 @@ def _build() -> list[dict]:
     return out
 
 
-AIITSA_QUESTIONS: list[dict] = _build()
+# ---------------------------------------------------------------------------
+# OD-20 (2026-10-01): Tier 2 extension. Forty-five conditions Volumes VI to IX
+# treat as material that the Volume V bank did not ask, behind three gates so
+# a buyer only sees the sets that apply. Tier 2 engagements only; the $399
+# audit stays at 143. A gate answered No or Don't know skips its set, and the
+# skipped questions are excluded from the denominator. Source chapters are
+# in claude_aiitsa_gap_review_vol6_9.md.
+# ---------------------------------------------------------------------------
+
+_GATE_SHIPS = "SCR-008"
+_GATE_BUILT = "SCR-009"
+_GATE_INFRA = "SCR-010"
+
+# (short, area, gate or None, text)
+TIER_2_ROWS: list[tuple[str, str, str | None, str]] = [
+    # gates (not scored; weight 0)
+    ("SCR-008", "Governance", None, "Do you sell or ship software, devices or services with AI features to customers?"),
+    ("SCR-009", "Governance", None, "Have your own staff or contractors built applications, integrations or agents that call a model, including prototypes and departmental tools?"),
+    ("SCR-010", "Governance", None, "Do you run AI workloads in cloud accounts you administer or on hardware you control, including rented GPU capacity?"),
+    # Volume VI: operating the program (no gate)
+    ("GOV-019", "Governance", None, "Is there a documented pathway for an employee to request an AI tool and have it sanctioned, so shadow use has a legitimate route rather than going underground?"),
+    ("GOV-020", "Governance", None, "Is the AI risk register updated continuously from live signals (new tools, new identities, vendor feature changes) with humans adjudicating, rather than refreshed on an annual cycle?"),
+    ("GOV-021", "Governance", None, "Are decision rights for AI security written as a RACI (who may approve autonomy, who may suspend a system, who accepts residual risk), not left to a committee without authority?"),
+    ("GOV-022", "Evidence", None, "Is AI security reported to the board on a fixed cadence as a small set of measured numbers, the Baseline Score, the unknown-zone percentage and the seven area scores from this audit, rather than control counts?"),
+    ("GOV-023", "Governance", None, "Do you track AI Security Debt: findings, exceptions and unbounded systems that have been accepted rather than fixed, with an owner and an age for each?"),
+    ("SOC-024", "Access", None, "For business AI systems (not just defensive tooling), is there a Human Supervision Matrix stating which actions a machine may take alone, which need a human to confirm, and what evidence is required before autonomy is expanded?"),
+    ("SOC-025", "Incidents", None, "Do agents run inside machine-enforced envelopes (spend, call rate, scope, time) that trip automatically, because human intervention is too slow?"),
+    ("SOC-026", "Incidents", None, "Can you detect corruption of an AI system's reasoning or data (poisoned retrieval, manipulated instructions, drifted outputs) when nothing was breached and no alert fired?"),
+    ("TPR-021", "Vendors", None, "Do you require an AI bill of materials from vendors (models, model providers, training data sources, tool servers) so the fourth-party chain is disclosable?"),
+    ("TPR-022", "Vendors", None, "Have you assessed foundation model concentration: how many critical processes depend on one model provider, and what the switching path is?"),
+    ("TPR-023", "Vendors", None, "Do you monitor vendors continuously for AI feature changes, model swaps and terms changes between annual reviews?"),
+    ("DAT-024", "Data", None, "Is there a standard for what AI assistants and agents are allowed to remember across sessions (enterprise memory), who can read it, and how it is purged?"),
+    ("DAT-025", "Data", None, "Is purpose limitation enforced in the pipeline (consent and permitted purpose travel with the data into prompts, retrieval and training), not only stated in a notice?"),
+    ("DAT-026", "Data", None, "Have you assessed whether AI inference creates regulated data from unregulated inputs, and whether cross-border inference breaks a residency commitment?"),
+    # Volume VII: the company that ships AI products (gate SCR-008)
+    ("APP-026", "Evidence", _GATE_SHIPS, "Do you measure what share of AI-assisted code changes merge with no recorded human review (review capacity), and is that number reported?"),
+    ("APP-027", "Governance", _GATE_SHIPS, "Is every AI-enabled feature tiered by data reach, write authority, autonomy, exposure and consequence, so human review goes where the blast radius is?"),
+    ("APP-028", "Governance", _GATE_SHIPS, "Is there a written list of stop conditions under which an AI feature is refused because it cannot be bounded?"),
+    ("APP-029", "Evidence", _GATE_SHIPS, "Does each release carry a Ship Decision Record naming the executive who accepted the residual risk, with evidence current at the release time?"),
+    ("APP-030", "Evidence", _GATE_SHIPS, "Are models, datasets and tool or protocol servers admitted into the product under a written admission standard with an exception form?"),
+    ("APP-031", "Evidence", _GATE_SHIPS, "Is the threat model updated as a delta on defined triggers (new model, new tool, new data source) rather than rewritten annually?"),
+    ("APP-032", "Incidents", _GATE_SHIPS, "Do you publish a vulnerability disclosure policy that covers AI behaviour (not only code defects), with a safe harbour and a report form?"),
+    ("APP-033", "Incidents", _GATE_SHIPS, "Is there a procedure for a behavioural vulnerability, a harmful model behaviour with no code defect, including how it is triaged, fixed, communicated and, if needed, how the product is retired with a support period?"),
+    ("APP-034", "Evidence", _GATE_SHIPS, "Can you hand a customer an attestation pack (security case, bill of materials, known limitations, telemetry specification) for the last release from one source?"),
+    # Volume VIII: AI applications the company built for itself (gate SCR-009)
+    ("INV-004", "Inventory", _GATE_BUILT, "Do you maintain a register of internally built AI applications with one row per application (owner, tier, what it can reach), found by sweeping model API keys, network egress, spend and code repositories, not by asking?"),
+    ("INV-005", "Inventory", _GATE_BUILT, "Do you know your coverage ratio: registered AI applications divided by the number the sweep found?"),
+    ("APP-035", "Data", _GATE_BUILT, "For each AI application, are the five trust boundaries drawn (model, retrieval, tool, output, state) with the rule that untrusted content may inform the model but never authorise an action?"),
+    ("APP-036", "Data", _GATE_BUILT, "Are image, audio and file inputs treated as untrusted instruction channels, not only text?"),
+    ("APP-037", "Access", _GATE_BUILT, "Does each application distinguish its three identities (the user, the application, the model) and act with a downscoped token on the user's behalf, with an expiry?"),
+    ("APP-038", "Access", _GATE_BUILT, "Is there a runtime authority plane outside the application that bounds what any AI application can cause, which the application cannot bypass, and is it in enforce mode (not report-only)?"),
+    ("APP-039", "Data", _GATE_BUILT, "Is retrieval filtered by the user's authorisation before ranking, so an application cannot retrieve what the user could not read?"),
+    ("APP-040", "Incidents", _GATE_BUILT, "Is there a runtime behaviour baseline for each tiered application, with alerts when what it actually does departs from it?"),
+    ("APP-041", "Governance", _GATE_BUILT, "Is there a budget ceiling per AI application owned by a named person, with alerts, treating cost and availability as a security class?"),
+    ("APP-042", "Evidence", _GATE_BUILT, "Is there an exception register for AI findings that cannot close, with a re-review date, and is escape rate (findings that reach production) measured?"),
+    ("APP-043", "Evidence", _GATE_BUILT, "Can you assemble a Control Evidence Pack for internal audit, the external auditor, the insurer and the board from one source?"),
+    # Volume IX: cloud and infrastructure (gate SCR-010)
+    ("ARC-025", "Governance", _GATE_INFRA, "Have you measured the sovereign gap: the volume of machine-initiated changes against the human capacity to review them, and the window in which an action stays reversible?"),
+    ("ARC-026", "Inventory", _GATE_INFRA, "Does your asset inventory include model artefacts, vector stores, inference endpoints, accelerator fleets, notebooks and GPU capacity rented outside corporate accounts?"),
+    ("ARC-027", "Access", _GATE_INFRA, "Is agent and workload egress allowlisted, with the cloud metadata endpoint and DNS treated as controls an agent can modify?"),
+    ("ARC-028", "Access", _GATE_INFRA, "Where accelerators are shared between workloads or tenants, has the isolation mode been chosen as a trust decision and documented?"),
+    ("ARC-029", "Incidents", _GATE_INFRA, "Are model artefacts backed up immutably, with restore tested by blast radius, and is recovery time stated as retraining time where no backup exists?"),
+    ("ARC-030", "Access", _GATE_INFRA, "For hardware you own or colocate: is physical access to GPUs controlled as intellectual property exposure, and is sanitisation proven for storage that was never encrypted?"),
+    ("ARC-031", "Access", _GATE_INFRA, "Does the non-human identity register record for each identity its origin, parent, delegation depth, third-party holder and used-versus-granted permissions?"),
+    ("ARC-032", "Access", _GATE_INFRA, "Does revocation of a machine credential complete to the last derived token, and is decommissioning proven by a reach test that fails?"),
+    ("ARC-033", "Governance", _GATE_INFRA, "Is infrastructure policy enforced at the plan and API (policy as code), with enforcement drift (the share of change that bypassed the policy engine) measured and exceptions carrying expiry dates?"),
+    ("ARC-034", "Access", _GATE_INFRA, "Does your blast radius method score reversibility alongside privilege, reach and velocity, with a budget per identity or action?"),
+    ("ARC-035", "Evidence", _GATE_INFRA, "Is the delegation chain (principal type, agent identifier, originating trigger, authority reference) bound into the log at execution, and does legal hold extend to agent memory?"),
+]
+
+TIER_2_GATES = {_GATE_SHIPS, _GATE_BUILT, _GATE_INFRA}
+
+
+def _build_tier_2(start_seq: int) -> list[dict]:
+    out = []
+    for i, (short, area, gate, text) in enumerate(TIER_2_ROWS):
+        sec = short[:3]
+        domain, label, _ = SECTIONS[sec]
+        is_gate = short in TIER_2_GATES
+        out.append({
+            "id": f"AIITSA-{short}", "tier": "tier_2", "instrument": INSTRUMENT,
+            "section": sec, "sequence_number": start_seq + i,
+            "domain": domain, "domain_label": label, "baseline_area": area,
+            "visibility_triangle": False,
+            "question_text": text, "question_type": "SS", "options": list(ANSWER_OPTIONS),
+            "matrix_rows": None, "matrix_columns": None,
+            "skip_logic": ({"combine": "any", "conditions": [{"type": "answer_equals", "question_id": f"AIITSA-{gate}",
+                                                               "answer_value": ["No", "Don't know"]}]} if gate else None),
+            "role_visibility": ["all"], "required": True,
+            "scoring_weight": (0.0 if is_gate else 1.0),
+            "framework_mappings": [], "notes": ("gate: not scored" if is_gate else None), "is_active": True,
+            "scoring_overrides": None,
+            "extended_metadata": ({"gate": True} if is_gate else {"gated_by": f"AIITSA-{gate}"} if gate else None),
+        })
+    return out
+
+
+_TIER_1 = _build()
+AIITSA_QUESTIONS: list[dict] = _TIER_1 + _build_tier_2(len(_TIER_1) + 1)
+AIITSA_TIER_1_QUESTIONS: list[dict] = _TIER_1
 DOMAINS = [v[0] for v in SECTIONS.values()]
+
+
+def questions_for_tier(tier: str | None) -> list[dict]:
+    """The bank a given engagement tier walks: Tier 1 sees the 143 Volume V
+    questions; Tier 2 also sees the OD-20 extension."""
+    return AIITSA_QUESTIONS if tier == "tier_2" else AIITSA_TIER_1_QUESTIONS
+

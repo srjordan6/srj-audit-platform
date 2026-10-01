@@ -111,11 +111,33 @@ def _value(resp: Any) -> tuple[float | None, bool]:
     return ANSWER_VALUE[key], dk
 
 
+def questions_in_scope(responses: dict[str, Any], tier: str | None = "tier_1") -> list[dict]:
+    """The questions an engagement is scored against: the Tier 1 bank, or at
+    Tier 2 the extended bank minus any gated set whose gate was answered
+    No or Don't know, or not answered at all (OD-20: a skipped set never
+    counts against the company)."""
+    from questionnaire.aiitsa_question_bank import questions_for_tier
+    out = []
+    for q in questions_for_tier(tier):
+        gate = (q.get("extended_metadata") or {}).get("gated_by")
+        if gate:
+            g = responses.get(gate)
+            raw = g.get("value") if isinstance(g, dict) else None
+            ans = raw.get("selected") if isinstance(raw, dict) else raw
+            if ans is None or str(ans).lower() not in ("yes", "partially"):
+                continue
+        out.append(q)
+    return out
+
+
 def score_aiitsa(responses: dict[str, Any], *, questions: list[dict] | None = None,
-                 assessed_on: date | None = None) -> AIITSAResult:
+                 assessed_on: date | None = None, tier: str | None = None) -> AIITSAResult:
     """responses: {question_id: {"value": ..., "dont_know": bool}} as the
-    platform loads them. Questions default to the full active bank."""
-    questions = [q for q in (questions or AIITSA_QUESTIONS) if q.get("is_active", True)]
+    platform loads them. Questions default to the Tier 1 bank, or to the
+    in-scope Tier 2 bank when tier is given."""
+    if questions is None:
+        questions = questions_in_scope(responses, tier or "tier_1")
+    questions = [q for q in questions if q.get("is_active", True)]
     assessed_on = assessed_on or date.today()
 
     per_area: dict[str, dict[str, Any]] = {a: {"vals": [], "dk": 0, "expected": 0, "gaps": []} for a in BASELINE_AREAS}
@@ -123,6 +145,8 @@ def score_aiitsa(responses: dict[str, Any], *, questions: list[dict] | None = No
     total_answered = total_dk = 0
 
     for q in questions:
+        if not (q.get("scoring_weight", 1.0) or 0):
+            continue                          # OD-20 gates: asked, never scored
         area = per_area[q["baseline_area"]]
         area["expected"] += 1
         resp = responses.get(q["id"])

@@ -19,15 +19,18 @@ from questionnaire.question_bank import QUESTIONS
 INSTRUMENTS = ("tier_1", "aiitsa", "combined")
 
 
-def bank_for(instrument: str | None = "tier_1") -> list[dict]:
+def bank_for(instrument: str | None = "tier_1", tier: str | None = "tier_1") -> list[dict]:
+    """The questions an engagement walks. The security bank depends on the
+    engagement tier (OD-20: the Tier 2 extension is Tier 2 only); the
+    governance bank does not."""
     instrument = instrument or "tier_1"
     if instrument == "tier_1":
         return QUESTIONS
-    from questionnaire.aiitsa_question_bank import AIITSA_QUESTIONS
+    from questionnaire.aiitsa_question_bank import questions_for_tier
     if instrument == "aiitsa":
-        return AIITSA_QUESTIONS
+        return questions_for_tier(tier)
     if instrument == "combined":
-        return list(QUESTIONS) + list(AIITSA_QUESTIONS)
+        return list(QUESTIONS) + list(questions_for_tier(tier))
     raise ValueError(f"unknown instrument {instrument!r}")
 from questionnaire.skip_logic import filter_questions_for_session
 
@@ -44,14 +47,14 @@ def _as_ns(question: Any) -> SimpleNamespace:
     return SimpleNamespace(**question)
 
 
-def _all_wrapped(instrument: str | None = "tier_1") -> list[SimpleNamespace]:
+def _all_wrapped(instrument: str | None = "tier_1", tier: str | None = "tier_1") -> list[SimpleNamespace]:
     """Return every ACTIVE question in bank order, wrapped for attribute access.
 
     Questions with is_active=False are dropped here — the single choke
     point for runtime visibility. Downstream (skip_logic, next_unanswered,
     previous/forward navigation, scoring wiring by ID) all inherit this.
     """
-    active = [q for q in bank_for(instrument) if q.get("is_active", True)]
+    active = [q for q in bank_for(instrument, tier) if q.get("is_active", True)]
     return [_as_ns(q) for q in active]
 
 
@@ -59,6 +62,7 @@ def questions_visible_to_role(
     role: str,
     answered_by_id: dict[str, Any],
     instrument: str | None = "tier_1",
+    tier: str | None = "tier_1",
 ) -> list[SimpleNamespace]:
     """Return every question the role can see, given current answers.
 
@@ -67,7 +71,7 @@ def questions_visible_to_role(
     pass. Preserves question bank document order.
     """
     result = filter_questions_for_session(
-        _all_wrapped(instrument), role, answered_by_id
+        _all_wrapped(instrument, tier), role, answered_by_id
     )
     if instrument != "combined":
         return result.visible
@@ -83,9 +87,10 @@ def next_unanswered_question(
     role: str,
     answered_by_id: dict[str, Any],
     instrument: str | None = "tier_1",
+    tier: str | None = "tier_1",
 ) -> Optional[SimpleNamespace]:
     """Return the next question the role must answer, or None if complete."""
-    visible = questions_visible_to_role(role, answered_by_id, instrument)
+    visible = questions_visible_to_role(role, answered_by_id, instrument, tier)
     for q_ns in visible:
         if q_ns.id not in answered_by_id:
             return q_ns
@@ -96,13 +101,14 @@ def progress_for_role(
     role: str,
     answered_by_id: dict[str, Any],
     instrument: str | None = "tier_1",
+    tier: str | None = "tier_1",
 ) -> tuple[int, int, float]:
     """Return (completed_count, visible_count, percentage).
 
     Percentage is a float in [0.0, 100.0]. Returns (0, 0, 0.0) if visible
     count is 0 to avoid ZeroDivisionError.
     """
-    visible = questions_visible_to_role(role, answered_by_id, instrument)
+    visible = questions_visible_to_role(role, answered_by_id, instrument, tier)
     visible_count = len(visible)
     if visible_count == 0:
         return (0, 0, 0.0)
@@ -121,9 +127,10 @@ def is_terminal(question: Any) -> bool:
     return q_ns.id in ("T1-H-006", "AIITSA-INV-003")
 
 
-def is_complete(role: str, answered_by_id: dict[str, Any], instrument: str | None = "tier_1") -> bool:
+def is_complete(role: str, answered_by_id: dict[str, Any], instrument: str | None = "tier_1",
+                tier: str | None = "tier_1") -> bool:
     """Return True if the role has answered every visible question."""
-    return next_unanswered_question(role, answered_by_id, instrument) is None
+    return next_unanswered_question(role, answered_by_id, instrument, tier) is None
 
 
 def partial_template_for(question: Any) -> str:

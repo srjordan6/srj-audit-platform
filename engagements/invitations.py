@@ -88,10 +88,10 @@ class InvitationError(Exception):
     pass
 
 
-def _estimate(role: str, instrument: str = "tier_1") -> tuple[int, int]:
+def _estimate(role: str, instrument: str = "tier_1", tier: str = "tier_1") -> tuple[int, int]:
     """Question count and minutes for a role, from the live bank."""
     try:
-        n = len(flow.questions_visible_to_role(role, {}, instrument))
+        n = len(flow.questions_visible_to_role(role, {}, instrument, tier))
     except Exception:  # noqa: BLE001
         n = 100
     return n, max(10, round(n * 0.33))
@@ -188,7 +188,7 @@ def _context(cursor, respondent_id: str) -> dict:
         """
         SELECT r.email, r.name, r.role, r.buyer_personal_note, r.engagement_id::text,
                c.name, coalesce(nullif(u.name, ''), u.email),
-               e.extension_count, coalesce(r.audits, e.instrument, 'tier_1')
+               e.extension_count, coalesce(r.audits, e.instrument, 'tier_1'), coalesce(e.tier, 'tier_1')
         FROM respondents r
         JOIN engagements e ON e.id = r.engagement_id
         LEFT JOIN companies c ON c.id = e.company_id
@@ -200,8 +200,8 @@ def _context(cursor, respondent_id: str) -> dict:
     row = cursor.fetchone()
     if row is None:
         raise InvitationError("respondent not found")
-    email, name, role, note, engagement_id, company, buyer, ext, instrument = row
-    count, minutes = _estimate(role, instrument)
+    email, name, role, note, engagement_id, company, buyer, ext, instrument, tier = row
+    count, minutes = _estimate(role, instrument, tier)
     return {
         "email": email, "name": name or "there", "role": role,
         "role_label": ROLE_LABELS.get(role, role), "note": note,

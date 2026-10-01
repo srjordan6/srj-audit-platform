@@ -184,7 +184,7 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT c.id::text, c.name, c.industry, c.size_bracket, e.instrument
+            SELECT c.id::text, c.name, c.industry, c.size_bracket, e.instrument, coalesce(e.tier, 'tier_1')
             FROM engagements e JOIN companies c ON c.id = e.company_id WHERE e.id = %s
             """,
             [engagement_id],
@@ -192,6 +192,7 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
         row = cursor.fetchone()
         company = {"id": row[0], "name": row[1], "industry": row[2], "size_bracket": row[3]} if row else {}
         instrument = row[4] if row else "aiitsa"
+        tier = (row[5] if row and len(row) > 5 else "tier_1")
         primary, by_q, n = load_aiitsa_responses(cursor, engagement_id)
         per_resp = load_aiitsa_per_respondent(cursor, engagement_id)
         history = _prior_scores(cursor, company["id"], exclude_report_id) if company else []
@@ -199,10 +200,10 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
     from scoring.aiitsa import aggregate_aiitsa
     if len(per_resp) > 1:
         result, aggregation = aggregate_aiitsa(
-            [(role, score_aiitsa(answers, assessed_on=assessed_on)) for role, answers in per_resp],
+            [(role, score_aiitsa(answers, assessed_on=assessed_on, tier=tier)) for role, answers in per_resp],
             assessed_on=assessed_on)
     else:
-        result = score_aiitsa(primary, assessed_on=assessed_on)
+        result = score_aiitsa(primary, assessed_on=assessed_on, tier=tier)
         aggregation = None
 
     areas = []
@@ -240,8 +241,18 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
             exposure += (" The Visibility Triangle places " + ", ".join(unknown_domains) +
                          " in the unknown zone: the respondent could not say whether a blind spot exists there.")
 
-    appendix = []
+    # Appendix lists the questions this engagement was asked: the Tier 1
+    # bank, or at Tier 2 the extension too, with gates shown and a gated set
+    # listed when its gate opened for any respondent (OD-20).
+    from scoring.aiitsa import questions_in_scope
+    appendix_qs = questions_in_scope(primary, tier)
+    gates_seen = {q["id"] for q in appendix_qs}
     for q in AIITSA_QUESTIONS:
+        if q["tier"] == "tier_2" and tier == "tier_2" and (q.get("extended_metadata") or {}).get("gate") and q["id"] not in gates_seen:
+            appendix_qs.append(q)
+    appendix_qs.sort(key=lambda q: q["sequence_number"])
+    appendix = []
+    for q in appendix_qs:
         entries = by_q.get(q["id"], [])
         if n > 1 and len(entries) > 1:
             answer = "; ".join(f"{_ROLE_LABELS.get(r, r or 'Respondent')}: {_selected(x) or 'not answered'}{_carried(x)}" for r, x in entries)
