@@ -252,9 +252,9 @@ def parts_for(instrument: str | None) -> tuple[str, ...]:
 
 def _part_queued(cursor, engagement_id: str, part: str) -> bool:
     cursor.execute(
-        "SELECT 1 FROM events WHERE event_type = %s AND payload->>'engagement_id' = %s "
+        "SELECT 1 FROM events WHERE event_type = 'report_delivery' AND payload->>'engagement_id' = %s "
         "AND payload->>'status' = 'queued' AND payload->>'part' = %s LIMIT 1",
-        [EVENT_TYPE, str(engagement_id), part])
+        [str(engagement_id), part])
     return cursor.fetchone() is not None
 
 
