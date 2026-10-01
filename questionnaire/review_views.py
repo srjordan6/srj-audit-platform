@@ -95,7 +95,10 @@ def review(request):
             "answer": _format_answer(value, dont_know),
         })
 
+    with connection.cursor() as cursor:
+        instrument = services.get_respondent_instrument(cursor, rid)
     return render(request, "questionnaire/review.html", {
+        "instrument": instrument,
         "rows": rows,
         "editable": editable,
         "state": state,

@@ -31,6 +31,21 @@ LOCKED_TEMPLATE = "questionnaire/partials/_locked.html"
 EXPIRED_TEMPLATE = "questionnaire/partials/_expired.html"
 
 
+def _maybe_deliver_part(cursor, rid: str, question_id: str) -> None:
+    """OD-19: on a combined engagement the governance questions come first.
+    The moment the last Pillar I question this respondent sees is answered,
+    the governance report is delivered; the security report follows when
+    the security questions are done. Only Pillar I ids can finish the
+    governance part, so other saves cost nothing here."""
+    if not str(question_id).startswith("T1-"):
+        return
+    if services.get_respondent_instrument(cursor, rid) != "combined":
+        return
+    if services.part_complete(cursor, rid, "tier_1"):
+        from reports.auto_delivery import on_part_complete
+        on_part_complete(cursor, rid, "tier_1")
+
+
 def _resolve_respondent_id(request) -> str | None:
     # Identity comes ONLY from the session (set by start / signed resume
     # token / aiscore). Never trust a respondent_id query parameter --
@@ -416,6 +431,8 @@ def submit_response(request):
                 if services.get_next_question_context(cursor, rid) is None:
                     from reports.auto_delivery import on_respondent_complete
                     on_respondent_complete(cursor, rid)
+                else:
+                    _maybe_deliver_part(cursor, rid, question_id)
             except Exception:  # noqa: BLE001
                 import logging
                 logging.getLogger(__name__).exception(
@@ -479,6 +496,8 @@ def submit_response(request):
             if not more_ahead:
                 from reports.auto_delivery import on_respondent_complete
                 on_respondent_complete(cursor, rid)
+            else:
+                _maybe_deliver_part(cursor, rid, question_id)
         except Exception:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).exception(

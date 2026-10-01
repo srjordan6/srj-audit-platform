@@ -285,24 +285,13 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         cursor.execute("SELECT coalesce(instrument, 'tier_1') FROM engagements WHERE id = %s", [engagement_id])
         _irow = cursor.fetchone()
         instrument = _irow[0] if _irow and _irow[0] else "tier_1"
-        # Combined engagement (2026-09-27 decision): the Pillar I report,
-        # unchanged, plus the AI IT Security Audit questions and answers in
-        # the appendix. Its own Four-Page Pack is not part of this document.
+        # OD-19 (2026-10-01): a combined engagement produces two completely
+        # separate reports. This document is the governance report only;
+        # the AI IT Security Audit has its own pack, its own appendix and
+        # its own opinion. Nothing from the security questionnaire renders
+        # here.
         aiitsa_by_question = {}
-        if instrument == "combined":
-            from reports.aiitsa_render import load_aiitsa_responses
-            _, aiitsa_by_question, _ = load_aiitsa_responses(cursor, engagement_id)
-
-    # Combined engagement: the AI IT Security Audit's four pages render as
-    # Part II of this document, between the Pillar I findings and the
-    # appendix, so the buyer sees governance and security in one report.
     aiitsa_body = ""
-    if instrument == "combined":
-        try:
-            from reports.aiitsa_render import render_aiitsa_body_html
-            aiitsa_body = render_aiitsa_body_html(engagement_id)
-        except Exception:  # noqa: BLE001
-            logger.exception("combined report: AIITSA part failed; rendering Pillar I only")
 
     frameworks = []
     for key in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):

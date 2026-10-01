@@ -165,6 +165,17 @@ def _update_progress(cursor, respondent_id: str) -> None:
         logger.exception("progress update failed for %s", respondent_id)
 
 
+def part_complete(cursor, respondent_id: str, part: str) -> bool:
+    """True when every question of one audit's bank that this respondent
+    sees is answered. Used on combined engagements to deliver the
+    governance report before the security questions begin (OD-19)."""
+    role = get_respondent_role(cursor, respondent_id)
+    if role is None:
+        return False
+    answered = load_answered_by_id(cursor, respondent_id)
+    return flow.is_complete(role, answered, part)
+
+
 def get_next_question_context(
     cursor,
     respondent_id: str,

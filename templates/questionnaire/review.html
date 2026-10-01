@@ -35,12 +35,27 @@
   <p class="sub">{{ answered_count }} answered question{{ answered_count|pluralize }}.</p>
 
   <p style="margin:0 0 18px 0;">
+    {% if instrument == "combined" %}
+    <a href="/reports/mine/download/?part=tier_1"
+       style="display:inline-block;background:#F07800;color:#fff;
+              text-decoration:none;font-weight:600;font-size:14px;
+              padding:11px 22px;border-radius:6px;margin-right:8px;">
+      &#8681; AI Audit Snapshot (PDF)
+    </a>
+    <a href="/reports/mine/download/?part=aiitsa"
+       style="display:inline-block;background:#201868;color:#fff;
+              text-decoration:none;font-weight:600;font-size:14px;
+              padding:11px 22px;border-radius:6px;">
+      &#8681; AI IT Security Audit (PDF)
+    </a>
+    {% else %}
     <a href="/reports/mine/download/"
        style="display:inline-block;background:#F07800;color:#fff;
               text-decoration:none;font-weight:600;font-size:14px;
               padding:11px 22px;border-radius:6px;">
       &#8681; Download my report (PDF)
     </a>
+    {% endif %}
   </p>
 
   {% if editable %}

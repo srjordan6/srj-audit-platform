@@ -171,6 +171,7 @@ def _worker(engagement_id: str, email: str, name: str, company: str,
     result = {
         "engagement_id": engagement_id,
         "to": email,
+        "part": instrument,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -193,6 +194,7 @@ def _worker(engagement_id: str, email: str, name: str, company: str,
                     engagement_id,
                     buyer_email=email,
                     owner_password=_owner_password(),
+                    part=instrument,
                 )
         result["report_id"] = report_id
         result["pdf_bytes"] = len(pdf_bytes)
@@ -232,6 +234,65 @@ def _worker(engagement_id: str, email: str, name: str, company: str,
             pass
 
 
+# ---------------------------------------------------------------------------
+# OD-19 (2026-10-01): one engagement, one or two separate reports.
+# "tier_1" and "aiitsa" engagements produce one document each. A
+# "combined" engagement produces BOTH, as separate PDFs with separate
+# opinions, each delivered as soon as its own questionnaire is finished
+# (the governance part may land first). The part name doubles as the
+# worker's "instrument" argument, which selects the document, the
+# email subject and the attachment name.
+# ---------------------------------------------------------------------------
+
+def parts_for(instrument: str | None) -> tuple[str, ...]:
+    if instrument == "combined":
+        return ("tier_1", "aiitsa")
+    return ("aiitsa",) if instrument == "aiitsa" else ("tier_1",)
+
+
+def _part_queued(cursor, engagement_id: str, part: str) -> bool:
+    cursor.execute(
+        "SELECT 1 FROM events WHERE event_type = %s AND payload->>'engagement_id' = %s "
+        "AND payload->>'status' = 'queued' AND payload->>'part' = %s LIMIT 1",
+        [EVENT_TYPE, str(engagement_id), part])
+    return cursor.fetchone() is not None
+
+
+def _start_part(cursor, engagement_id: str, email: str, name: str, company: str,
+                part: str, respondent_id: str | None = None) -> bool:
+    """Queue one document's generation and delivery, once per engagement
+    and part. Returns True if this call started it."""
+    if _part_queued(cursor, engagement_id, part):
+        return False
+    _log_event(cursor, {
+        "engagement_id": engagement_id, "to": email, "status": "queued",
+        "part": part, "respondent_id": respondent_id,
+    })
+    thread = threading.Thread(
+        target=_worker, args=(engagement_id, email, name, company, part),
+        daemon=True, name=f"report-delivery-{part}-{engagement_id[:8]}",
+    )
+    thread.start()
+    return True
+
+
+def on_part_complete(cursor, respondent_id: str, part: str) -> bool:
+    """A Tier 1 combined respondent has finished one questionnaire's
+    questions (the governance part first). Deliver that report now rather
+    than waiting for the other part (OD-19 question 5, answer B)."""
+    cursor.execute(
+        "SELECT e.id, r.email, r.name, c.name, e.tier, coalesce(e.instrument, 'tier_1') "
+        "FROM respondents r JOIN engagements e ON e.id = r.engagement_id "
+        "JOIN companies c ON c.id = e.company_id WHERE r.id = %s", [respondent_id])
+    row = cursor.fetchone()
+    if not row:
+        return False
+    engagement_id, email, name, company, tier, instrument = row
+    if instrument != "combined" or (tier or "tier_1") != "tier_1":
+        return False
+    return _start_part(cursor, str(engagement_id), email, name, company, part, respondent_id)
+
+
 def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     """Regenerate the locked PDF after an in-window answer edit.
 
@@ -269,21 +330,18 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     if state != "Editable":
         return False
 
-    _log_event(cursor, {
-        "engagement_id": engagement_id,
-        "to": email,
-        "status": "queued_regeneration",
-        "respondent_id": respondent_id,
-    })
-    # Bug fixed 2026-07-15 — UUID subscript in _send_postmark filename.
-    # Flip back to daemon thread so edits feel snappy again.
-    thread = threading.Thread(
-        target=_worker,
-        args=(engagement_id, email, name, company, instrument),
-        daemon=True,
-        name=f"report-regen-{engagement_id[:8]}",
-    )
-    thread.start()
+    for part in parts_for(instrument):
+        _log_event(cursor, {
+            "engagement_id": engagement_id, "to": email,
+            "status": "queued_regeneration", "part": part,
+            "respondent_id": respondent_id,
+        })
+        # Bug fixed 2026-07-15 — UUID subscript in _send_postmark filename.
+        # Flip back to daemon thread so edits feel snappy again.
+        threading.Thread(
+            target=_worker, args=(engagement_id, email, name, company, part),
+            daemon=True, name=f"report-regen-{part}-{engagement_id[:8]}",
+        ).start()
     return True
 
 
@@ -361,17 +419,7 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
         })
         email, name = buyer_email, buyer_name
 
-    _log_event(cursor, {
-        "engagement_id": engagement_id,
-        "to": email,
-        "status": "queued",
-        "respondent_id": respondent_id,
-    })
-    thread = threading.Thread(
-        target=_worker,
-        args=(engagement_id, email, name, company, instrument),
-        daemon=True,
-        name=f"report-delivery-{engagement_id[:8]}",
-    )
-    thread.start()
-    return True
+    started = False
+    for part in parts_for(instrument):
+        started = _start_part(cursor, engagement_id, email, name, company, part, respondent_id) or started
+    return started

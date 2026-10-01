@@ -59,10 +59,20 @@ def _render_placeholder_content(engagement_id: str, response_count: int) -> str:
     )
 
 
+def report_kind(instrument: str, part: str | None = None) -> str:
+    """Which document to produce: "tier_1" (AI Audit Snapshot, governance)
+    or "aiitsa" (AI IT Security Audit). A combined engagement (OD-19,
+    2026-10-01) produces two completely separate reports, so the caller
+    names the part; with no part named it produces the governance report."""
+    if part in ("tier_1", "aiitsa"):
+        return part
+    return "aiitsa" if instrument == "aiitsa" else "tier_1"
+
+
 def _render_content(cursor, engagement_id: str, instrument: str = "tier_1") -> str:
-    """Report body by instrument: the Four-Page Pack for the AI IT Security
-    Audit, the Tier 1 snapshot for Pillar I and, per the 2026-09-27
-    decision, for combined engagements too. Placeholder on failure."""
+    """Report body by kind: the Four-Page Pack with analysis and opinion for
+    the AI IT Security Audit, the Tier 1 snapshot for Pillar I. Placeholder
+    on failure."""
     try:
         if instrument == "aiitsa":
             from reports.aiitsa_render import render_aiitsa_pack_html
@@ -156,6 +166,7 @@ def generate_and_lock(
     owner_password: str,
     framework: str = "tier_1",
     now: Optional[datetime] = None,
+    part: str | None = None,
 ) -> tuple[str, bytes, str]:
     """Generate PDF report + apply lifecycle transition.
 
@@ -177,7 +188,9 @@ def generate_and_lock(
             f"cannot generate report in state {state} — snapshot is terminal"
         )
 
-    content_html = _render_content(cursor, engagement_id, instrument)
+    kind = report_kind(instrument, part)
+    framework = "aiitsa" if kind == "aiitsa" else framework
+    content_html = _render_content(cursor, engagement_id, kind)
 
     pdf_bytes, pdf_hash = generator.generate_locked_report(
         content_html=content_html,
@@ -199,7 +212,7 @@ def generate_and_lock(
         from reports.context import build_snapshot_context
         from scoring.persistence import persist_snapshot_scores
         payloads = {}
-        if instrument in ("tier_1", "combined"):
+        if kind == "tier_1":
             for fw in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
                 ctx = build_snapshot_context(engagement_id, fw)
                 payloads[fw] = {
@@ -208,7 +221,7 @@ def generate_and_lock(
                     "gaps": ctx.get("priority_gaps"),
                     "aggregation": ctx.get("aggregation"),
                 }
-        if instrument in ("aiitsa", "combined"):
+        if kind == "aiitsa":
             # The dated Baseline Score is the trend line the Four-Page Pack
             # reads back on its "compared to what?" line.
             from reports.aiitsa_render import aiitsa_score_payload, build_aiitsa_context

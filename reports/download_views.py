@@ -43,14 +43,23 @@ def download_my_report(request):
     if not rid:
         return HttpResponseNotFound("respondent_id required")
 
+    # OD-19: a combined engagement has two separate reports. ?part=aiitsa
+    # fetches the AI IT Security Audit, ?part=tier_1 the AI Audit Snapshot;
+    # no part means the most recent of either.
+    part = request.GET.get("part")
+    part_sql = ""
+    args = [rid]
+    if part in ("tier_1", "aiitsa"):
+        part_sql = "AND rp.framework = %s "
+        args.append(part)
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT rp.id, rp.file_path, rp.engagement_id "
             "FROM reports rp "
             "JOIN respondents rs ON rs.engagement_id = rp.engagement_id "
-            "WHERE rs.id = %s "
+            "WHERE rs.id = %s " + part_sql +
             "ORDER BY rp.generated_at DESC LIMIT 1",
-            (rid,),
+            args,
         )
         row = cursor.fetchone()
         if row is None:
