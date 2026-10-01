@@ -38,12 +38,13 @@
   </div>
 
   <table class="table align-middle">
-    <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Progress</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Role</th>{% if instrument == "combined" %}<th>Audit</th>{% endif %}<th>Status</th><th>Progress</th><th></th></tr></thead>
     <tbody>
     {% for r in respondents %}
       <tr>
         <td>{{ r.name }}<br><span class="small text-muted">{{ r.email }}</span></td>
         <td>{{ r.role_label }}{% if r.title %}<br><span class="small text-muted">{{ r.title }}</span>{% endif %}</td>
+        {% if instrument == "combined" %}<td class="small">{{ r.audits_label }}</td>{% endif %}
         <td>
           {% if r.status == "completed" %}<span class="badge bg-success">Completed</span>
           {% elif r.status == "in_progress" %}<span class="badge bg-primary">In progress</span>
@@ -83,6 +84,13 @@
             <option value="">Choose...</option>
             {% for code, label in roles.items %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
           </select></div>
+        {% if instrument == "combined" %}
+        <div class="col-md-6"><label class="form-label">Which audit</label>
+          <select name="audits" class="form-select">
+            {% for code, label in audit_choices.items %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+          </select>
+          <div class="form-text">Board and executives usually take the governance audit, the CISO and IT the security audit; a person on both answers each question once.</div></div>
+        {% endif %}
         <div class="col-md-6"><label class="form-label">Title <span class="text-muted">(optional, appears in the report)</span></label><input name="title" class="form-control" maxlength="120"></div>
         <div class="col-md-6"><label class="form-label">Personal note <span class="text-muted">(optional, 500 chars, included in the email)</span></label><input name="note" class="form-control" maxlength="500"></div>
         <div class="col-12"><button class="btn btn-primary">Send invitation</button></div>

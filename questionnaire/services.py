@@ -82,10 +82,12 @@ def get_respondent_role(cursor, respondent_id: str) -> Optional[str]:
 
 
 def get_respondent_instrument(cursor, respondent_id: str) -> str:
-    """Which question bank this respondent walks: engagements.instrument
-    (tier_1 | aiitsa | combined). Pillar I when unset."""
+    """Which question bank this respondent walks: the respondent's own
+    audits (OD-19 Tier 2 routing: tier_1 | aiitsa | combined, set by the
+    buyer at invitation), else the engagement's instrument. Pillar I when
+    unset."""
     cursor.execute(
-        "SELECT coalesce(e.instrument, 'tier_1') FROM respondents r "
+        "SELECT coalesce(r.audits, e.instrument, 'tier_1') FROM respondents r "
         "JOIN engagements e ON e.id = r.engagement_id WHERE r.id = %s",
         [respondent_id],
     )

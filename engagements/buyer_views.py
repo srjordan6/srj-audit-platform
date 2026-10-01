@@ -59,7 +59,7 @@ def respondents(request, engagement_id):
             """
             SELECT e.tier, e.snapshot_state::text, e.coverage_met_at, e.extension_count,
                    c.name, c.size_bracket, e.payment_status, e.price_cents,
-                   lower(coalesce(u.email, ''))
+                   lower(coalesce(u.email, '')), coalesce(e.instrument, 'tier_1')
             FROM engagements e LEFT JOIN companies c ON c.id = e.company_id
             LEFT JOIN users u ON u.id = e.buyer_user_id
             WHERE e.id = %s
@@ -69,13 +69,13 @@ def respondents(request, engagement_id):
         row = cursor.fetchone()
         if row is None:
             raise Http404
-        tier, state, met_at, ext, company, bracket, payment_status, price_cents, buyer_email = row
+        tier, state, met_at, ext, company, bracket, payment_status, price_cents, buyer_email, instrument = row
         cov = coverage.check_coverage(cursor, str(engagement_id))
         cursor.execute(
             """
             SELECT id::text, name, email, role, title, status,
                    coalesce(completion_percentage, 0), attestation_signed_at IS NOT NULL,
-                   invitation_sent_at, last_activity_at, last_nudged_at
+                   invitation_sent_at, last_activity_at, last_nudged_at, audits
             FROM respondents
             WHERE engagement_id = %s AND status <> 'removed'
             ORDER BY created_at
@@ -88,6 +88,7 @@ def respondents(request, engagement_id):
             "status": r[5], "percent": int(float(r[6]) * 100), "attested": r[7],
             "invited_at": r[8], "last_activity": r[9], "last_nudged": r[10],
             "counts": float(r[6]) >= coverage.MIN_COMPLETION and r[7],
+            "audits_label": invitations.AUDIT_LABELS.get(r[11] or instrument, ""),
             # the buyer's own row gets a direct link to answer for their role
             "own_link": (invitations.build_magic_link(r[0])
                          if buyer_email and (r[2] or "").lower() == buyer_email and r[5] != "completed" else None),
@@ -98,6 +99,7 @@ def respondents(request, engagement_id):
         "company": company, "size_bracket": bracket, "coverage": cov,
         "coverage_met_at": met_at, "extension_count": ext or 0,
         "respondents": rows, "roles": invitations.ROLE_LABELS,
+        "instrument": instrument, "audit_choices": invitations.AUDIT_LABELS,
         "payment_status": payment_status, "paid": payment_status in ("paid", "comped"),
         "price_label": (f"${(price_cents or 0) / 100:,.0f}" if price_cents else ""),
         "just_paid": request.GET.get("paid") == "1",
@@ -123,6 +125,7 @@ def add_respondent(request, engagement_id):
                 email=request.POST.get("email", ""), name=request.POST.get("name", ""),
                 role=request.POST.get("role", ""), title=request.POST.get("title", ""),
                 personal_note=request.POST.get("note", ""),
+                audits=request.POST.get("audits", ""),
             )
             ok, detail = invitations.send_invitation(cursor, rid)
         if ok:

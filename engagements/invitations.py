@@ -107,9 +107,17 @@ def token_max_age_seconds(extension_count: int) -> int:
     return days * 24 * 3600
 
 
+AUDIT_LABELS = {"combined": "Both audits", "tier_1": "AI Audit Snapshot (governance)",
+                "aiitsa": "AI IT Security Audit"}
+
+
 def create_respondent(cursor, engagement_id: str, *, email: str, name: str,
                       role: str, title: str | None = None,
-                      personal_note: str | None = None) -> str:
+                      personal_note: str | None = None,
+                      audits: str | None = None) -> str:
+    """audits (OD-19 Tier 2 routing): on a combined engagement the buyer
+    invites each person to tier_1, aiitsa or combined; on a single-audit
+    engagement it is always the engagement's instrument."""
     role = (role or "").upper().strip()
     if role not in ROLE_LABELS:
         raise InvitationError(f"unknown role {role!r}")
@@ -120,11 +128,16 @@ def create_respondent(cursor, engagement_id: str, *, email: str, name: str,
     if not name:
         raise InvitationError("a name is required")
 
-    cursor.execute("SELECT company_id FROM engagements WHERE id = %s", [engagement_id])
+    cursor.execute("SELECT company_id, coalesce(instrument, 'tier_1') FROM engagements WHERE id = %s", [engagement_id])
     row = cursor.fetchone()
     if row is None:
         raise InvitationError("engagement not found")
-    company_id = row[0]
+    company_id, instrument = row
+    audits = (audits or "").strip().lower() or None
+    if instrument != "combined":
+        audits = None                      # single audit: nothing to route
+    elif audits not in (None, "combined", "tier_1", "aiitsa"):
+        raise InvitationError(f"unknown audit selection {audits!r}")
 
     cursor.execute(
         """
@@ -140,12 +153,12 @@ def create_respondent(cursor, engagement_id: str, *, email: str, name: str,
         """
         INSERT INTO respondents
             (engagement_id, company_id, email, name, role, title,
-             buyer_personal_note, status, invitation_sent_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 'invited', NULL)
+             buyer_personal_note, status, invitation_sent_at, audits)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'invited', NULL, %s)
         RETURNING id::text
         """,
         [engagement_id, company_id, email, name, role, title or None,
-         (personal_note or "")[:500] or None],
+         (personal_note or "")[:500] or None, audits],
     )
     return cursor.fetchone()[0]
 
@@ -175,7 +188,7 @@ def _context(cursor, respondent_id: str) -> dict:
         """
         SELECT r.email, r.name, r.role, r.buyer_personal_note, r.engagement_id::text,
                c.name, coalesce(nullif(u.name, ''), u.email),
-               e.extension_count, coalesce(e.instrument, 'tier_1')
+               e.extension_count, coalesce(r.audits, e.instrument, 'tier_1')
         FROM respondents r
         JOIN engagements e ON e.id = r.engagement_id
         LEFT JOIN companies c ON c.id = e.company_id
