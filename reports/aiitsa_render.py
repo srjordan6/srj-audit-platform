@@ -76,6 +76,24 @@ def _rank(role: str) -> int:
     return _ROLE_PRECEDENCE.index(role) if role in _ROLE_PRECEDENCE else len(_ROLE_PRECEDENCE)
 
 
+def _t1_sources(cursor, engagement_id: str) -> dict[str, tuple[str, dict]]:
+    """{respondent_id: (role, {t1_id: response})} for the governance answers
+    that stand in for overlapping security questions (OD-19)."""
+    from questionnaire.overlap import SOURCE_IDS
+    cursor.execute(
+        """
+        SELECT rs.id::text, coalesce(rs.role, ''), r.question_id, r.answer_value, r.is_dont_know
+        FROM responses r JOIN respondents rs ON rs.id = r.respondent_id
+        WHERE rs.engagement_id = %s AND rs.status <> 'removed' AND r.question_id = ANY(%s)
+        """,
+        [engagement_id, list(SOURCE_IDS)],
+    )
+    out: dict[str, tuple[str, dict]] = {}
+    for rid, role, qid, av, dk in cursor.fetchall():
+        out.setdefault(rid, (role, {}))[1][qid] = {"value": loads_maybe(av), "dont_know": bool(dk)}
+    return out
+
+
 def load_aiitsa_responses(cursor, engagement_id: str) -> tuple[dict, dict, int]:
     """(primary, by_question, respondent_count) over the AIITSA questions of
     this engagement. Primary answer is the most senior security role's.
@@ -93,9 +111,17 @@ def load_aiitsa_responses(cursor, engagement_id: str) -> tuple[dict, dict, int]:
     )
     by_q: dict[str, list] = {}
     who: set[str] = set()
+    have: dict[str, set] = {}
     for qid, av, dk, role, rid in cursor.fetchall():
         who.add(rid)
+        have.setdefault(rid, set()).add(qid)
         by_q.setdefault(qid, []).append((role, {"value": loads_maybe(av), "dont_know": bool(dk)}))
+    from questionnaire.overlap import derive_for_respondent
+    for rid, (role, t1) in _t1_sources(cursor, engagement_id).items():
+        if rid not in who:
+            continue  # governance-only respondent: not part of this audit
+        for qid, resp in derive_for_respondent(t1, have.get(rid, set())).items():
+            by_q.setdefault(qid, []).append((role, resp))
     primary = {}
     for qid, entries in by_q.items():
         entries.sort(key=lambda e: _rank(e[0]))
@@ -117,7 +143,17 @@ def load_aiitsa_per_respondent(cursor, engagement_id: str) -> list[tuple[str, di
     per: dict[str, tuple[str, dict]] = {}
     for rid, role, qid, av, dk in cursor.fetchall():
         per.setdefault(rid, (role, {}))[1][qid] = {"value": loads_maybe(av), "dont_know": bool(dk)}
+    from questionnaire.overlap import derive_for_respondent
+    for rid, (_role, t1) in _t1_sources(cursor, engagement_id).items():
+        if rid in per:
+            per[rid][1].update(derive_for_respondent(t1, set(per[rid][1])))
     return sorted(per.values(), key=lambda x: _rank(x[0]))
+
+
+def _carried(resp) -> str:
+    """Appendix note for an answer carried from the governance questionnaire."""
+    src = resp.get("derived_from") if isinstance(resp, dict) else None
+    return f" (answered once, in the governance questionnaire as {src})" if src else ""
 
 
 def _selected(resp) -> str:
@@ -208,9 +244,9 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
     for q in AIITSA_QUESTIONS:
         entries = by_q.get(q["id"], [])
         if n > 1 and len(entries) > 1:
-            answer = "; ".join(f"{_ROLE_LABELS.get(r, r or 'Respondent')}: {_selected(x) or 'not answered'}" for r, x in entries)
+            answer = "; ".join(f"{_ROLE_LABELS.get(r, r or 'Respondent')}: {_selected(x) or 'not answered'}{_carried(x)}" for r, x in entries)
         else:
-            answer = _selected(primary.get(q["id"])) or "not answered"
+            answer = (_selected(primary.get(q["id"])) or "not answered") + _carried(primary.get(q["id"]))
         appendix.append({"qid": q["id"], "domain": q["domain_label"], "area": q["baseline_area"],
                          "question": q["question_text"], "answer": answer})
 

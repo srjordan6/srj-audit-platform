@@ -69,7 +69,14 @@ def questions_visible_to_role(
     result = filter_questions_for_session(
         _all_wrapped(instrument), role, answered_by_id
     )
-    return result.visible
+    if instrument != "combined":
+        return result.visible
+    # OD-19: a security question that asks what a governance question this
+    # respondent sees already asked is not asked twice (questionnaire.overlap).
+    from questionnaire.overlap import skipped_for
+    ids = {q.id for q in result.visible}
+    drop = skipped_for(ids)
+    return [q for q in result.visible if q.id not in drop] if drop else result.visible
 
 
 def next_unanswered_question(
