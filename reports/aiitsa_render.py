@@ -285,6 +285,9 @@ def _with_analysis(engagement_id: str, ctx: dict) -> dict:
         logger.exception("AIITSA analysis failed; rendering without narratives")
         ctx["ai"] = {}
     ctx["opinion"] = build_opinion(ctx, (ctx["ai"] or {}).get("opinion_basis"))
+    from reports.report_render import _opinion_elsewhere
+    with connection.cursor() as cursor:
+        ctx["opinion_elsewhere"] = _opinion_elsewhere(cursor, engagement_id)
     return ctx
 
 

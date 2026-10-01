@@ -95,6 +95,16 @@ def _mark_complete(cursor, respondent_id: str):
     return engagement_id, email, name, company_name
 
 
+BOARD_EMAIL_SUBJECT = "Your Combined Board Analysis is ready"
+BOARD_EMAIL_BODY = (
+    "Hi {name},\n\n"
+    "Your Combined Board Analysis for {company} is attached. It reads the AI Audit "
+    "Snapshot and the AI IT Security Audit together for the board, gives one roadmap "
+    "across both, lists the decisions only the board can take, and carries the one "
+    "signed opinion on this engagement. The two separate reports arrive alongside it.\n\n"
+    "Reply to this email with any question; a person answers.\n\n"
+    "Stephen Jordan\nSRJ Consulting & Services LLC\n"
+)
 AIITSA_EMAIL_SUBJECT = "Your AI IT Security Audit report is ready"
 AIITSA_EMAIL_BODY = (
     "Hello {name},\n\n"
@@ -119,13 +129,14 @@ def _send_postmark(to_email: str, name: str, company: str,
         "From": from_email,
         "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": to_email,
-        "Subject": (AIITSA_EMAIL_SUBJECT if instrument == "aiitsa" else EMAIL_SUBJECT),
-        "TextBody": (AIITSA_EMAIL_BODY if instrument == "aiitsa" else EMAIL_BODY).format(
+        "Subject": {"aiitsa": AIITSA_EMAIL_SUBJECT, "board": BOARD_EMAIL_SUBJECT}.get(instrument, EMAIL_SUBJECT),
+        "TextBody": {"aiitsa": AIITSA_EMAIL_BODY, "board": BOARD_EMAIL_BODY}.get(instrument, EMAIL_BODY).format(
             name=name or "there", company=company or "your company"),
         "MessageStream": "outbound",
         "Attachments": [{
-            "Name": (f"AI_IT_Security_Audit_{str(engagement_id)[:8]}.pdf" if instrument == "aiitsa"
-                     else f"AI_Audit_Snapshot_{str(engagement_id)[:8]}.pdf"),
+            "Name": {"aiitsa": f"AI_IT_Security_Audit_{str(engagement_id)[:8]}.pdf",
+                     "board": f"Combined_Board_Analysis_{str(engagement_id)[:8]}.pdf"}.get(
+                         instrument, f"AI_Audit_Snapshot_{str(engagement_id)[:8]}.pdf"),
             "Content": base64.b64encode(pdf_bytes).decode(),
             "ContentType": "application/pdf",
         }],
@@ -244,9 +255,12 @@ def _worker(engagement_id: str, email: str, name: str, company: str,
 # email subject and the attachment name.
 # ---------------------------------------------------------------------------
 
-def parts_for(instrument: str | None) -> tuple[str, ...]:
+def parts_for(instrument: str | None, tier: str | None = "tier_1") -> tuple[str, ...]:
+    """Documents an engagement produces. Tier 2 both audits adds the
+    Combined Board Analysis, the document that carries the engagement's
+    one opinion (OD-19 Q3, answer A)."""
     if instrument == "combined":
-        return ("tier_1", "aiitsa")
+        return ("tier_1", "aiitsa", "board") if tier == "tier_2" else ("tier_1", "aiitsa")
     return ("aiitsa",) if instrument == "aiitsa" else ("tier_1",)
 
 
@@ -306,7 +320,7 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     """
     try:
         cursor.execute(
-            "SELECT e.id, r.email, r.name, c.name, e.snapshot_state, coalesce(e.instrument, 'tier_1') "
+            "SELECT e.id, r.email, r.name, c.name, e.snapshot_state, coalesce(e.instrument, 'tier_1'), coalesce(e.tier, 'tier_1') "
             "FROM respondents r "
             "JOIN engagements e ON e.id = r.engagement_id "
             "JOIN companies c ON c.id = e.company_id "
@@ -320,7 +334,7 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
         return False
     if not row:
         return False
-    engagement_id, email, name, company, state, instrument = row
+    engagement_id, email, name, company, state, instrument, tier = row
     # e.id comes back as a Python UUID; downstream (_send_postmark filename)
     # slices with [:8] which fails on UUID. Cast to str at the boundary.
     engagement_id = str(engagement_id)
@@ -330,7 +344,7 @@ def regenerate_after_edit(cursor, respondent_id: str) -> bool:
     if state != "Editable":
         return False
 
-    for part in parts_for(instrument):
+    for part in parts_for(instrument, tier):
         _log_event(cursor, {
             "engagement_id": engagement_id, "to": email,
             "status": "queued_regeneration", "part": part,
@@ -420,6 +434,6 @@ def on_respondent_complete(cursor, respondent_id: str) -> bool:
         email, name = buyer_email, buyer_name
 
     started = False
-    for part in parts_for(instrument):
+    for part in parts_for(instrument, tier):
         started = _start_part(cursor, engagement_id, email, name, company, part, respondent_id) or started
     return started

@@ -277,7 +277,24 @@ def _build_opinion(frameworks):
 # Public entry point
 # ---------------------------------------------------------------------------
 
+def _opinion_elsewhere(cursor, engagement_id: str) -> bool:
+    """OD-19: when both audits are bought at Tier 2, neither separate report
+    carries an opinion; the one opinion is issued in the combined board
+    document (reports.board_render)."""
+    cursor.execute("SELECT coalesce(tier, 'tier_1'), coalesce(instrument, 'tier_1') FROM engagements WHERE id = %s",
+                   [engagement_id])
+    row = cursor.fetchone()
+    return bool(row) and row[0] == "tier_2" and row[1] == "combined"
+
+
 def render_tier1_snapshot_html(engagement_id: str) -> str:
+    return render_to_string("reports/tier1_snapshot.html", build_tier1_context(engagement_id))
+
+
+def build_tier1_context(engagement_id: str) -> dict:
+    """The AI Audit Snapshot's full template context: scored frameworks,
+    sections, divergence, AI narrative and the opinion. Also read by the
+    combined board document."""
     qindex = _question_index()
 
     with connection.cursor() as cursor:
@@ -285,6 +302,7 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         cursor.execute("SELECT coalesce(instrument, 'tier_1') FROM engagements WHERE id = %s", [engagement_id])
         _irow = cursor.fetchone()
         instrument = _irow[0] if _irow and _irow[0] else "tier_1"
+        opinion_elsewhere = _opinion_elsewhere(cursor, engagement_id)
         # OD-19 (2026-10-01): a combined engagement produces two completely
         # separate reports. This document is the governance report only;
         # the AI IT Security Audit has its own pack, its own appendix and
@@ -512,6 +530,7 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         "eff_scorecard": eff_scorecard,
         "ninety_day": ninety_day,
         "opinion": opinion,
+        "opinion_elsewhere": opinion_elsewhere,
         "divergence": divergence,
         "aiitsa_body": aiitsa_body,
         "appendix": appendix,
@@ -560,4 +579,4 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
     opinion["scope_limitations"] = basis.get("scope_limitations") or []
     opinion["statement"] = basis.get("opinion_statement") or ""
 
-    return render_to_string("reports/tier1_snapshot.html", context)
+    return context

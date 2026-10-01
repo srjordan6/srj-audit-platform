@@ -64,7 +64,7 @@ def report_kind(instrument: str, part: str | None = None) -> str:
     or "aiitsa" (AI IT Security Audit). A combined engagement (OD-19,
     2026-10-01) produces two completely separate reports, so the caller
     names the part; with no part named it produces the governance report."""
-    if part in ("tier_1", "aiitsa"):
+    if part in ("tier_1", "aiitsa", "board"):
         return part
     return "aiitsa" if instrument == "aiitsa" else "tier_1"
 
@@ -77,6 +77,9 @@ def _render_content(cursor, engagement_id: str, instrument: str = "tier_1") -> s
         if instrument == "aiitsa":
             from reports.aiitsa_render import render_aiitsa_pack_html
             return render_aiitsa_pack_html(engagement_id)
+        if instrument == "board":
+            from reports.board_render import render_board_html
+            return render_board_html(engagement_id)
         from reports.report_render import render_tier1_snapshot_html
         return render_tier1_snapshot_html(engagement_id)
     except Exception:
@@ -189,7 +192,7 @@ def generate_and_lock(
         )
 
     kind = report_kind(instrument, part)
-    framework = "aiitsa" if kind == "aiitsa" else framework
+    framework = kind if kind in ("aiitsa", "board") else framework
     content_html = _render_content(cursor, engagement_id, kind)
 
     pdf_bytes, pdf_hash = generator.generate_locked_report(

@@ -164,7 +164,10 @@
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>5. Auditor's Opinion</h2></div>
   <div class="rpt-opinion">
-    {% if opinion.kind == "unqualified" %}
+    {% if opinion_elsewhere %}
+    <h3>Opinion issued in the Combined Board Analysis</h3>
+    <p style="font-size: 9.5pt;">This company purchased both audits at Tier 2. By the method's rule, no opinion is expressed on the security audit alone; the auditor's one opinion, on the total outcome of both audits together, is issued in the Combined Board Analysis that accompanies this report.</p>
+    {% elif opinion.kind == "unqualified" %}
     <h3>Unqualified Opinion</h3>
     <p style="font-size: 9.5pt;">The company's AI security posture, as self-reported on {{ assessed_on|date:"Y-m-d" }}, supports an unqualified opinion at the snapshot tier: no Baseline area is Absent, the Baseline Score is at or above 50, unknown-zone exposure is below 25%, and no Visibility Triangle domain is in the unknown zone.</p>
     {% elif opinion.kind == "disclaimer" %}
@@ -174,16 +177,16 @@
     <h3>Qualified Opinion</h3>
     {% endif %}
 
-    {% if opinion.statement %}
+    {% if opinion.statement and not opinion_elsewhere %}
     <p style="font-size: 10pt; font-style: italic; line-height: 1.55;">{{ opinion.statement }}</p>
     {% endif %}
 
-    {% if opinion.drivers %}
+    {% if opinion.drivers and not opinion_elsewhere %}
     <h4 style="margin-bottom: 3pt;">Basis for Qualified Opinion</h4>
     <ul style="font-size: 9pt;">{% for d in opinion.drivers %}<li>{{ d }}</li>{% endfor %}</ul>
     {% endif %}
 
-    {% if opinion.exceptions %}
+    {% if opinion.exceptions and not opinion_elsewhere %}
     <h4 style="margin-bottom: 3pt;">Exceptions</h4>
     <table class="rpt-qa">
       <tr><th>Area</th><th>Finding</th><th>Evidence</th><th>Materiality</th></tr>
@@ -194,7 +197,7 @@
     </table>
     {% endif %}
 
-    {% if opinion.scope_limitations %}
+    {% if opinion.scope_limitations and not opinion_elsewhere %}
     <h4 style="margin-bottom: 3pt;">Scope Limitations</h4>
     <ul style="font-size: 8.5pt;">{% for s in opinion.scope_limitations %}<li>{{ s }}</li>{% endfor %}</ul>
     {% endif %}

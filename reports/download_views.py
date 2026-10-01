@@ -49,7 +49,7 @@ def download_my_report(request):
     part = request.GET.get("part")
     part_sql = ""
     args = [rid]
-    if part in ("tier_1", "aiitsa"):
+    if part in ("tier_1", "aiitsa", "board"):
         part_sql = "AND rp.framework = %s "
         args.append(part)
     with connection.cursor() as cursor:

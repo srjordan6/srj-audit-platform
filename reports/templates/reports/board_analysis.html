@@ -1,0 +1,137 @@
+{% include "reports/_aiitsa_css.html" %}
+
+<div class="rpt-cover">
+  <h1>Combined Board Analysis</h1>
+  <div class="rpt-rule"></div>
+  {% if company %}
+    <div class="rpt-company">{{ company.name }}</div>
+    <div class="rpt-meta">
+      {{ company.industry }} &middot; {{ company.size_bracket }} employees<br>
+      AI Audit Snapshot&trade; and AI IT Security Audit&trade;, read together for the board<br>
+      {{ gov.respondent_count }} governance and {{ sec.respondent_count }} security respondents &middot; dated {{ assessed_on|date:"Y-m-d" }}
+    </div>
+  {% endif %}
+  <div class="rpt-toc">
+    <p>1. The two audits at a glance</p>
+    <p>2. Where governance and security compound</p>
+    <p>3. One roadmap</p>
+    <p>4. Decisions for the board</p>
+    <p>5. Auditor's Opinion</p>
+  </div>
+  <p class="rpt-meta" style="margin-top:30pt;">SRJ Consulting &amp; Services LLC</p>
+</div>
+
+{# ---------------------------------------------------------------- 1 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>1. The two audits at a glance</h2></div>
+  <p class="rpt-intro">Each audit stands on its own and is delivered as its own report with its findings and appendix. This document reads them together. Scores below are the headline numbers from each; the detail, and the questions behind them, are in the two reports.</p>
+
+  <h3>AI Audit Snapshot (governance)</h3>
+  <table class="rpt-qa">
+    <tr><th>Framework</th><th>Score</th><th>Level</th><th>Don't know</th></tr>
+    {% for f in gov.frameworks %}
+    <tr><td><b>{{ f.framework.display_name }}</b></td><td>{{ f.overall.score_0_100|floatformat:1 }}</td><td>{{ f.overall.maturity_label }}</td><td>{{ f.overall.dk_ratio|floatformat:2 }}</td></tr>
+    {% endfor %}
+  </table>
+  {% if gov.divergence.flagged %}
+  <p class="rpt-intro">Leadership and workforce disagree by {{ gov.divergence.threshold }} points or more on: {% for r in gov.divergence.flagged %}{{ r.dimension }} ({{ r.leadership }} vs {{ r.workforce }}){% if not forloop.last %}; {% endif %}{% endfor %}.</p>
+  {% endif %}
+
+  <h3>AI IT Security Audit</h3>
+  <div class="rpt-score-line"><span class="rpt-score-num">{{ sec.baseline.score|floatformat:0 }}</span> / 100 &nbsp; <b>{{ sec.baseline.level_label }}</b> &nbsp; <span style="font-size:9pt;color:#6B7280;">unknown zone {{ sec.baseline.unknown_zone_pct }}%</span></div>
+  <table class="rpt-qa">
+    <tr><th>Area</th><th>Score</th><th>Level</th><th>Gaps</th></tr>
+    {% for a in sec.areas %}<tr><td><b>{{ a.area }}</b></td><td>{{ a.score|floatformat:1 }}</td><td>{{ a.level_label }}</td><td>{{ a.gap_count }}</td></tr>{% endfor %}
+  </table>
+  <p class="rpt-intro">Visibility Triangle: {% for v in sec.visibility %}{{ v.domain }} {{ v.zone_label|lower }}{% if not forloop.last %}; {% endif %}{% endfor %}.</p>
+</div>
+
+{# ---------------------------------------------------------------- 2 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>2. Where governance and security compound</h2></div>
+  {% if ai.compound %}
+  <div class="rpt-ai">
+    <h3>Auditor's analysis</h3>
+    <p>{{ ai.compound.narrative|linebreaksbr }}</p>
+    {% if ai.compound.key_findings %}<div class="rpt-ai-sub">Key findings</div><ul>{% for k in ai.compound.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if ai.compound.recommendations %}<div class="rpt-ai-sub">Recommended actions</div><ul>{% for r in ai.compound.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% else %}
+  <p class="rpt-intro">The analysis for this section could not be produced at generation time and will be added on regeneration.</p>
+  {% endif %}
+</div>
+
+{# ---------------------------------------------------------------- 3 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>3. One roadmap</h2></div>
+  {% if ai.roadmap %}
+  <div class="rpt-ai">
+    <h3>Auditor's analysis</h3>
+    <p>{{ ai.roadmap.narrative|linebreaksbr }}</p>
+    {% if ai.roadmap.key_findings %}<div class="rpt-ai-sub">Key findings</div><ul>{% for k in ai.roadmap.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if ai.roadmap.recommendations %}<div class="rpt-ai-sub">Recommended actions</div><ul>{% for r in ai.roadmap.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% else %}
+  <p class="rpt-intro">The analysis for this section could not be produced at generation time and will be added on regeneration.</p>
+  {% endif %}
+</div>
+
+{# ---------------------------------------------------------------- 4 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>4. Decisions for the board</h2></div>
+  {% if ai.decisions %}
+  <div class="rpt-ai">
+    <h3>Auditor's analysis</h3>
+    <p>{{ ai.decisions.narrative|linebreaksbr }}</p>
+    {% if ai.decisions.key_findings %}<div class="rpt-ai-sub">Key findings</div><ul>{% for k in ai.decisions.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if ai.decisions.recommendations %}<div class="rpt-ai-sub">Decisions</div><ul>{% for r in ai.decisions.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% else %}
+  <p class="rpt-intro">The analysis for this section could not be produced at generation time and will be added on regeneration.</p>
+  {% endif %}
+</div>
+
+{# ---------------------------------------------------------------- 5 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>5. Auditor's Opinion</h2></div>
+  <div class="rpt-opinion">
+    {% if opinion.kind == "unqualified" %}
+    <h3>Unqualified Opinion</h3>
+    <p style="font-size: 9.5pt;">Read together, the governance audit and the security audit support an unqualified opinion on the company's overall AI posture at the self-reported tier: no framework falls below the qualification thresholds, no Baseline area is Absent, and no material exception survives consolidation.</p>
+    {% elif opinion.kind == "disclaimer" %}
+    <h3>Disclaimer of Opinion</h3>
+    <p style="font-size: 9.5pt;">Neither audit recorded enough answers to score, so no opinion is expressed.</p>
+    {% else %}
+    <h3>Qualified Opinion</h3>
+    {% endif %}
+    {% if opinion.statement %}<p style="font-size: 10pt; font-style: italic; line-height: 1.55;">{{ opinion.statement }}</p>{% endif %}
+    {% if opinion.drivers %}
+    <h4 style="margin-bottom: 3pt;">Basis for Qualified Opinion</h4>
+    <ul style="font-size: 9pt;">{% for d in opinion.drivers %}<li>{{ d }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if opinion.exceptions %}
+    <h4 style="margin-bottom: 3pt;">Exceptions, both audits consolidated</h4>
+    <table class="rpt-qa">
+      <tr><th>Area</th><th>Finding</th><th>Evidence</th><th>Materiality</th></tr>
+      {% for e in opinion.exceptions %}<tr><td>{{ e.area }}</td><td class="rpt-q" style="width:40%;">{{ e.finding }}</td><td style="font-size:7.5pt;">{{ e.evidence }}</td><td>{% if e.materiality == "material" %}<strong>Material</strong>{% else %}Notable{% endif %}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+    {% if opinion.scope_limitations %}
+    <h4 style="margin-bottom: 3pt;">Scope Limitations</h4>
+    <ul style="font-size: 8.5pt;">{% for s in opinion.scope_limitations %}<li>{{ s }}</li>{% endfor %}</ul>
+    {% endif %}
+    <h4 style="margin-bottom: 3pt;">Basis of this opinion</h4>
+    <p style="font-size: 9pt;">This is the one opinion issued on this engagement. The AI Audit Snapshot and the AI IT Security Audit delivered alongside it carry their findings without an opinion of their own, by the method's rule for a company that commissions both. Both audits are self-reported by {{ gov.respondent_count|add:sec.respondent_count }} respondent answers in total; no artefact was inspected; the analyst tier verifies the named artefacts and lifts the self-reported caps.</p>
+    <div class="rpt-sign" style="margin-top:16pt; border-top:0.75pt solid #D8D6E4; padding-top:8pt;">
+      <p style="margin:0; font-size:10pt;"><b>Stephen Jordan</b>, Founder and CEO<br>
+      SRJ Consulting &amp; Services LLC, Frisco, Texas<br>
+      <a href="mailto:srj@srjconsultingservices.com">srj@srjconsultingservices.com</a> &middot; 415-413-7772</p>
+      <p style="margin:4pt 0 0 0; font-size:8pt; color:#6B7280;">Issued {{ assessed_on|date:"Y-m-d" }}. Questions about this opinion go to the address above and are answered by a person.</p>
+    </div>
+  </div>
+</div>
+
+<div class="rpt-legal">
+  <h2>Notice</h2>
+  <p>This Combined Board Analysis reads two self-reported assessments prepared by SRJ Consulting &amp; Services LLC from questionnaire answers supplied by the company's respondents. It is not an attestation, certification, penetration test or legal opinion, and no artefact was independently inspected. Framework references are provided for orientation and do not represent compliance with any framework or regulation.</p>
+</div>

@@ -379,6 +379,12 @@
     {% endfor %}
   </table>
 
+  {% if opinion_elsewhere %}
+  <div class="rpt-opinion">
+    <h3>Opinion issued in the Combined Board Analysis</h3>
+    <p style="font-size: 9.5pt;">This company purchased both the AI Audit Snapshot and the AI IT Security Audit at Tier 2. By the method's rule, no opinion is expressed on either audit alone; the auditor's one opinion, on the total outcome of both audits together, is issued in the Combined Board Analysis that accompanies this report.</p>
+  </div>
+  {% else %}
   <div class="rpt-opinion">
     {% if opinion.kind == "unqualified" %}
     <h3>Unqualified Opinion</h3>
@@ -444,6 +450,7 @@
       <p style="margin:4pt 0 0 0; font-size:8pt; color:#6B7280;">Issued {{ generated_at|slice:":10" }}. Questions about this opinion go to the address above and are answered by a person.</p>
     </div>
   </div>
+  {% endif %}
 </div>
 
 {% if divergence %}
