@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 EVENT_TYPE = "aiitsa_analysis_v1"
 MAX_TOKENS_SECTION = 1500
-MAX_TOKENS_OPINION = 3000
+MAX_TOKENS_OPINION = 6000
 
 SYSTEM_PROMPT = (
     "You are the analysis engine for the SRJ AI Audit Platform, writing the "
@@ -109,7 +109,8 @@ OPINION_SYSTEM_PROMPT = (
     "hold production credentials has an exposure, not a gap in the audit). "
     "Classify each exception as \"material\" (would reasonably prevent an "
     "unqualified opinion on its own or with related exceptions) or "
-    "\"notable\". Report at most 12 exceptions, most material first. "
+    "\"notable\". Report at most 8 exceptions, most material first; keep "
+    "evidence to the question ids and the one-word answers. "
     "Separately list scope limitations. Do not invent evidence.\n\n"
     "Also write opinion_statement: a formal two-sentence auditor's opinion "
     "in EXACTLY this structure. Sentence 1: 'In our opinion, except for the "
@@ -215,7 +216,7 @@ def _chat(client, model, system, prompt, max_tokens, validator):
         out = validator(_parse_json_object(last))
         if out is not None:
             return out
-    return None
+    raise ValueError("model output failed validation twice: " + (last or "")[:200].replace("\n", " "))
 
 
 # ---------------------------------------------------------------------------
@@ -286,8 +287,9 @@ def analyze_aiitsa(engagement_id, ctx: dict) -> dict[str, Any]:
     whatever subset succeeded; {} when the layer is off or unreachable."""
     if not getattr(settings, "AI_ANALYSIS_ENABLED", True):
         return {}
-    stored = _load_stored(engagement_id)
-    if stored:
+    stored = _load_stored(engagement_id) or {}
+    missing = [k for k in (*SECTION_PROMPTS, "opinion_basis") if k not in stored]
+    if not missing:
         return stored
     provider = (os.environ.get("AI_ANALYSIS_PROVIDER") or "ollama").strip().lower()
     if provider == "anthropic":
@@ -302,9 +304,11 @@ def analyze_aiitsa(engagement_id, ctx: dict) -> dict[str, Any]:
         client = OllamaClient(os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_BASE_URL") or "http://127.0.0.1:11434",
                               os.environ.get("OLLAMA_API_KEY", ""))
 
-    sections: dict[str, Any] = {}
+    sections: dict[str, Any] = dict(stored)
     failures = []
     for key, instruction in SECTION_PROMPTS.items():
+        if key in sections:
+            continue
         try:
             prompt = instruction + "\n\nDATA:\n" + json.dumps(_payload(key, ctx), default=str)
             out = _chat(client, model, SYSTEM_PROMPT, prompt, MAX_TOKENS_SECTION, _validate_section)
@@ -315,7 +319,7 @@ def analyze_aiitsa(engagement_id, ctx: dict) -> dict[str, Any]:
             failures.append((key, str(exc)[:300]))
             if _is_hard_stop(exc):
                 break
-    if not any(_is_hard_stop_text(f[1]) for f in failures):
+    if "opinion_basis" not in sections and not any(_is_hard_stop_text(f[1]) for f in failures):
         try:
             prompt = "COMPANY DATA:\n" + json.dumps(_payload("opinion", ctx), default=str)
             out = _chat(client, model, OPINION_SYSTEM_PROMPT, prompt, MAX_TOKENS_OPINION, _validate_opinion)
@@ -326,6 +330,6 @@ def analyze_aiitsa(engagement_id, ctx: dict) -> dict[str, Any]:
             failures.append(("opinion_basis", str(exc)[:300]))
     if failures:
         _record_failure(engagement_id, model, failures, len(sections))
-    if sections:
+    if any(k in sections for k in missing):
         _store(engagement_id, sections, model)
     return sections
