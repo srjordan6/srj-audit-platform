@@ -198,7 +198,7 @@ def score_aiitsa(responses: dict[str, Any], *, questions: list[dict] | None = No
         baseline_level=b_level, baseline_level_label=LEVEL_LABEL[b_level],
         areas=areas, visibility=visibility,
         unknown_zone_ratio=(total_dk / total_answered) if total_answered else 0.0,
-        answered=total_answered, expected=len(questions),
+        answered=total_answered, expected=sum(1 for q in questions if (q.get("scoring_weight", 1.0) or 0)),
         top_gaps=[x.area for x in sorted(scored, key=lambda x: x.mean_0_1)],
     )
 
