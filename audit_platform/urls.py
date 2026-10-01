@@ -18,6 +18,7 @@ from django.urls import include, path
 
 from core.content_sync import content_sync_view
 from questionnaire import views as q_views
+from questionnaire import prepare
 from engagements.buyer_views import buyer_link
 
 
@@ -41,6 +42,9 @@ urlpatterns = [
     path('startbothaudits/', q_views.start_combined, name='start_combined'),
     # Tier 2, the Self-Service Audit: same form, lands on the respondents dashboard.
     path('starttier2/', q_views.start_tier2, name='start_tier2'),
+    # Preparation checklists, one per role and instrument (Glenn Holman review, 2026-09-29).
+    path('prepare/', prepare.index, name='prepare_index'),
+    path('prepare/<slug:instrument_slug>/<str:role>.pdf', prepare.checklist_pdf, name='prepare_pdf'),
     # Public branded funnel entry — aiauditforcompanies.com/aiscore → the
     # 5-question AI Exposure Score screener. Alias of /q/score/; both routes
     # render the same view. Paid social points here, not at /startaiaudit.

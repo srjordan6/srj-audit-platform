@@ -474,7 +474,12 @@ def _score_matrix(
         )
 
     extended = question.extended_metadata or {}
-    pattern = extended.get("matrix_pattern", "yes_no_dontknow_grid")
+    # The bank writes matrix_input_pattern; matrix_pattern is the older
+    # key this scorer was written against. Reading only the old one sent
+    # T1-F-002 down the grid branch (defect D12 "1/4 attributes").
+    pattern = (extended.get("matrix_input_pattern")
+               or extended.get("matrix_pattern")
+               or "yes_no_dontknow_grid")
     overrides = question.scoring_overrides or {}
 
     cell_values: list[float] = []

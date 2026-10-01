@@ -84,11 +84,14 @@ def test_empty_engagement_returns_canonical_five_dimensions(make_question):
     # No responses → no answered sub-components → no diagnostic gaps
     assert result.top_gaps == []
 
-    # Inverted dimension with no signal is the "best risk" floor: 100
+    # An inverted dimension with no answers is NOT the "best risk" floor
+    # (that read an unanswered questionnaire as a clean bill of health,
+    # defect D3 2026-09-28): it is simply not assessed.
     risk = _dim(result, "risk_exposure")
     assert risk.inverted is True
-    assert risk.final_score_0_100 == 100.0
-    assert risk.bracket == "Mature"
+    assert risk.bracket == "Not assessed"
+    assert risk.confidence_level == "none"
+    assert result.composite_score_0_100 == 0.0
 
     # Non-inverted dimension with no signal is at the "no maturity" floor: 0
     inv = _dim(result, "tool_inventory")

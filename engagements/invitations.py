@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 POSTMARK_API_URL = "https://api.postmarkapp.com/email"
 DEFAULT_FROM = "reports@srjconsultingservices.com"
+DEFAULT_REPLY_TO = "srj@srjconsultingservices.com"   # a mailbox a human reads; reports@ bounces (defect B7)
 BASE_DAYS = 30
 EXTENSION_DAYS = 30
 MAX_EXTENSIONS = 2
@@ -203,6 +204,7 @@ def send_invitation(cursor, respondent_id: str) -> tuple[bool, str]:
     note_block = f"\nA note from {ctx['buyer']}:\n\n    {ctx['note']}\n" if ctx["note"] else ""
     ok, detail = _postmark({
         "From": os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM),
+        "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": ctx["email"],
         "Subject": INVITE_SUBJECT.format(buyer=ctx["buyer"]),
         "TextBody": INVITE_BODY.format(url=url, note_block=note_block, **ctx),
@@ -237,6 +239,7 @@ def nudge(cursor, respondent_id: str) -> tuple[bool, str]:
     ctx = _context(cursor, respondent_id)
     ok, detail = _postmark({
         "From": os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM),
+        "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": ctx["email"],
         "Subject": NUDGE_SUBJECT.format(buyer=ctx["buyer"]),
         "TextBody": NUDGE_BODY.format(url=build_magic_link(respondent_id), **ctx),
@@ -326,6 +329,7 @@ def notify_buyer_progress(cursor, engagement_id: str, respondent_id: str, cov) -
            "url": build_buyer_link(engagement_id)}
     ok, msg = _postmark({
         "From": os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM),
+        "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": buyer_email,
         "Subject": BUYER_PROGRESS_SUBJECT.format(**ctx),
         "TextBody": BUYER_PROGRESS_BODY.format(**ctx),
@@ -373,6 +377,7 @@ def send_buyer_dashboard_link(cursor, engagement_id: str) -> tuple[bool, str]:
     ctx = {"buyer": buyer, "company": company or "your company", "url": build_buyer_link(engagement_id)}
     ok, msg = _postmark({
         "From": os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM),
+        "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": email,
         "Subject": BUYER_LINK_SUBJECT.format(**ctx),
         "TextBody": BUYER_LINK_BODY.format(**ctx),

@@ -133,7 +133,7 @@ def edit_question(request, question_id: str):
     services._decorate_question(q, answered, visible=None, respondent_ctx=respondent_ctx)
 
     prior = answered.get(question_id)
-    partial = flow.partial_template_for_type(q.question_type)
+    partial = flow.partial_template_for(q)
     return render(request, "questionnaire/question_shell.html", {
         "question": q,
         "prior_answer": prior,

@@ -15,9 +15,19 @@
 {% block content %}
 <div class="container py-5" style="max-width: 640px;">
     <h1 class="mb-3">{{ copy.title|default:"AI Audit Snapshot" }}</h1>
-    <p class="text-muted mb-4">
+    <p class="text-muted mb-2">
         {{ copy.blurb|default:"A 30-minute assessment across five dimensions. Get your top-line scores immediately, plus a board-ready report." }}
     </p>
+    <div class="alert alert-light border mb-4" style="font-size:.95rem;">
+      <b>Want to prepare first?</b> Download the checklist for your role, with every question you will be asked and what to have at hand:
+      <a href="/prepare/{{ prep_slug|default:'ai-audit-snapshot' }}/CEO.pdf">CEO or owner</a> &middot;
+      <a href="/prepare/{{ prep_slug|default:'ai-audit-snapshot' }}/CFO.pdf">CFO</a> &middot;
+      <a href="/prepare/{{ prep_slug|default:'ai-audit-snapshot' }}/CIO.pdf">CIO</a> &middot;
+      <a href="/prepare/{{ prep_slug|default:'ai-audit-snapshot' }}/CISO.pdf">CISO</a> &middot;
+      <a href="/prepare/{{ prep_slug|default:'ai-audit-snapshot' }}/COO.pdf">COO</a> &middot;
+      <a href="/prepare/?instrument={{ prep_slug|default:'ai-audit-snapshot' }}">all roles</a>.
+      You do not have to finish in one sitting: leave at any point and the resume link in your email brings you back with everything saved.
+    </div>
 
     {% if code_free %}
         <div class="alert alert-success d-flex align-items-center" role="alert"

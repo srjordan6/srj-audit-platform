@@ -37,6 +37,7 @@ from questionnaire.session import make_resume_token
 
 POSTMARK_API_URL = "https://api.postmarkapp.com/email"
 DEFAULT_FROM = "reports@srjconsultingservices.com"
+DEFAULT_REPLY_TO = "srj@srjconsultingservices.com"   # a mailbox a human reads; reports@ bounces (defect B7)
 
 EMAIL_SUBJECT = "Your AI Audit resume link - come back any time in the next 30 days"
 
@@ -49,7 +50,7 @@ EMAIL_BODY = (
     "{resume_url}\n\n"
     "The link is unique to you. If you close your browser or switch devices,\n"
     "just open this email and click the link.\n\n"
-    "Questions? Reply to this email.\n\n"
+    "Questions? Reply to this email and a person at SRJ answers.\n\n"
     "- SRJ Consulting & Services LLC\n"
     "  aiauditforcompanies.com\n"
 )
@@ -113,6 +114,7 @@ def send_resume_email(
     from_email = os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM)
     payload = {
         "From": from_email,
+        "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": email,
         "Subject": EMAIL_SUBJECT,
         "TextBody": EMAIL_BODY.format(

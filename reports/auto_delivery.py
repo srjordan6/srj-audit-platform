@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 POSTMARK_API_URL = "https://api.postmarkapp.com/email"
 DEFAULT_FROM = "reports@aiauditforcompanies.com"
+DEFAULT_REPLY_TO = "srj@srjconsultingservices.com"   # a mailbox a human reads; reports@ bounces (defect B7)
 
 EMAIL_SUBJECT = "Your AI Audit Snapshot report is ready"
 EMAIL_BODY = (
@@ -116,6 +117,7 @@ def _send_postmark(to_email: str, name: str, company: str,
     from_email = os.environ.get("REPORT_FROM_EMAIL", DEFAULT_FROM)
     payload = {
         "From": from_email,
+        "ReplyTo": os.environ.get("REPLY_TO_EMAIL", DEFAULT_REPLY_TO),
         "To": to_email,
         "Subject": (AIITSA_EMAIL_SUBJECT if instrument == "aiitsa" else EMAIL_SUBJECT),
         "TextBody": (AIITSA_EMAIL_BODY if instrument == "aiitsa" else EMAIL_BODY).format(

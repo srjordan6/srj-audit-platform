@@ -98,7 +98,11 @@ class AggregationSummary:
 # ----------------------------------------------------------------------------
 
 def _v1_composite(items):
-    return sum(d.final_score_0_100 * v1_audit.COMPOSITE_WEIGHTS[d.name] for d in items)
+    # Same renormalised formula as v1_audit.score_framework: only the
+    # dimensions that were assessed carry weight.
+    assessed = [d for d in items if d.answered_count > 0]
+    w = sum(v1_audit.COMPOSITE_WEIGHTS[d.name] for d in assessed) or 1.0
+    return sum(d.final_score_0_100 * v1_audit.COMPOSITE_WEIGHTS[d.name] / w for d in assessed)
 
 
 def _eff_composite(items):

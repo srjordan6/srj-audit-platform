@@ -307,7 +307,7 @@ def ai_recommend_laws_view(request):
         "other": existing_prior.get("other", "") if isinstance(existing_prior, dict) else "",
     }
 
-    template = flow.partial_template_for_type(q_target.question_type)
+    template = flow.partial_template_for(q_target)
     return render(
         request,
         template,
@@ -637,6 +637,7 @@ def start(request):
                 "utm": utm,
                 "instrument": instrument,
                 "tier": tier,
+                "prep_slug": {"tier_1": "ai-audit-snapshot", "aiitsa": "ai-it-security-audit", "combined": "both-audits"}[instrument],
                 "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
@@ -674,6 +675,7 @@ def start(request):
                 "prefill_code": request.POST.get("access_code", ""),
                 "instrument": instrument,
                 "tier": tier,
+                "prep_slug": {"tier_1": "ai-audit-snapshot", "aiitsa": "ai-it-security-audit", "combined": "both-audits"}[instrument],
                 "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                 "naics_sectors": NAICS_SECTORS,
                 "turnstile_site_key": bp.turnstile_site_key(),
@@ -730,6 +732,7 @@ def start(request):
                     "prefill_values": values,
                     "instrument": instrument,
                     "tier": tier,
+                "prep_slug": {"tier_1": "ai-audit-snapshot", "aiitsa": "ai-it-security-audit", "combined": "both-audits"}[instrument],
                     "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                     "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (
@@ -774,6 +777,7 @@ def start(request):
                     "prefill_values": values,
                     "instrument": instrument,
                     "tier": tier,
+                "prep_slug": {"tier_1": "ai-audit-snapshot", "aiitsa": "ai-it-security-audit", "combined": "both-audits"}[instrument],
                     "copy": (TIER_2_COPY if tier == "tier_2" else INSTRUMENT_COPY[instrument]),
                     "naics_sectors": NAICS_SECTORS,
                     "access_code_error": (

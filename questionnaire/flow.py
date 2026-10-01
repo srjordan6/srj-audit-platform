@@ -119,6 +119,23 @@ def is_complete(role: str, answered_by_id: dict[str, Any], instrument: str | Non
     return next_unanswered_question(role, answered_by_id, instrument) is None
 
 
+def partial_template_for(question: Any) -> str:
+    """Partial for a question object. Same as partial_template_for_type
+    except that a MATRIX whose extended_metadata.matrix_input_pattern is
+    single_selection_per_row (T1-F-002) renders the choice partial: one
+    radio group per row across the columns. Routing by type alone sent it
+    to the grid partial, which drew two radios (selected / not_selected)
+    in every one of the 28 cells (defect C2, 2026-09-28)."""
+    qtype = getattr(question, "question_type", None) or (question.get("question_type") if isinstance(question, dict) else "")
+    ext = getattr(question, "extended_metadata", None)
+    if ext is None and isinstance(question, dict):
+        ext = question.get("extended_metadata")
+    ext = ext or {}
+    if qtype == "MATRIX" and ext.get("matrix_input_pattern") == "single_selection_per_row":
+        return "questionnaire/partials/_question_matrix_choice.html"
+    return partial_template_for_type(qtype)
+
+
 def partial_template_for_type(question_type: str) -> str:
     """Return the partial template path for a question type.
 

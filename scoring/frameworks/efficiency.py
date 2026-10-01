@@ -363,9 +363,9 @@ def _score_component(
             contributions=[],
             weighted_mean_0_1=0.0,
             score_0_100=0.0,
-            bracket="Critical",
+            bracket="Not assessed",     # no answers is not a Critical finding (defect D3)
             dk_ratio=0.0,
-            confidence_level="low",
+            confidence_level="none",
             expected_count=expected,
             answered_count=0,
             explicit_contribution_count=0,

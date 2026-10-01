@@ -449,14 +449,18 @@ def _aggregate_dimension(
     total_answered = sum(s.answered_question_count for s in active)
 
     if not active:
+        # Nothing answered in this dimension, most often because the
+        # branch never served its questions. That is "not assessed", not
+        # "Critical" (defect D3, 2026-09-28): the composite below skips it
+        # and the report says so instead of printing 0.0.
         return V1DimensionScore(
             name=dimension,
             inverted=inverted,
             sub_components=sub_component_scores,
             raw_score_0_100=0.0,
-            final_score_0_100=100.0 if inverted else 0.0,  # no risk signal = best risk score
-            bracket=_BRACKET_TOP_LABEL if inverted else "Critical",
-            confidence_level="low",
+            final_score_0_100=0.0,
+            bracket="Not assessed",
+            confidence_level="none",
             dk_ratio=0.0,
             answered_count=0,
             expected_count=total_expected,
@@ -564,9 +568,15 @@ def score_v1_audit(
         ]
         dimensions.append(_aggregate_dimension(dim_name, sub_scores))
 
+    # Composite over the dimensions that were actually assessed, with the
+    # weights renormalised over them. A dimension with no answers used to
+    # contribute 0 x its weight, which pulled every thin questionnaire
+    # toward the same low number (defects D1 and D3).
+    assessed = [d for d in dimensions if d.answered_count > 0]
+    weight_sum = sum(COMPOSITE_WEIGHTS[d.name] for d in assessed) or 1.0
     composite = sum(
-        d.final_score_0_100 * COMPOSITE_WEIGHTS[d.name]
-        for d in dimensions
+        d.final_score_0_100 * COMPOSITE_WEIGHTS[d.name] / weight_sum
+        for d in assessed
     )
 
     total_answered = sum(d.answered_count for d in dimensions)

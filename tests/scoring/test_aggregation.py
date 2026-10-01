@@ -107,8 +107,8 @@ def test_zero_weight_role_is_excluded_not_averaged(two_respondents):
 def test_composites_are_recomputed_from_aggregated_items(two_respondents):
     _, ceo, ic = two_respondents
     (v1, v2, v3, eff), _ = aggregation.aggregate([("CEO", ceo), ("IC", ic)])
-    assert v1.composite_score_0_100 == pytest.approx(
-        sum(d.final_score_0_100 * v1_audit.COMPOSITE_WEIGHTS[d.name] for d in v1.dimensions))
+    # renormalised over assessed dimensions, same as v1_audit.score_framework
+    assert v1.composite_score_0_100 == pytest.approx(aggregation._v1_composite(v1.dimensions))
     assert v3.composite_score_0_100 == pytest.approx(v3_governance._compute_composite(v3.steps))
     assert 0.0 <= v2.cri_score_0_100 <= 100.0
     assert eff.composite_bracket == efficiency.bracket_for_score(eff.composite_score_0_100)

@@ -185,7 +185,7 @@ def get_next_question_context(
     _decorate_question(q, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": q,
-        "partial": flow.partial_template_for_type(q.question_type),
+        "partial": flow.partial_template_for(q),
         "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
     }
@@ -252,7 +252,7 @@ def get_next_visible_question_context_by_position(
     _decorate_question(next_q, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": next_q,
-        "partial": flow.partial_template_for_type(next_q.question_type),
+        "partial": flow.partial_template_for(next_q),
         "prior_answer": answered.get(next_q.id),
         "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
@@ -296,7 +296,7 @@ def get_question_context_by_position(
     _decorate_question(target, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": target,
-        "partial": flow.partial_template_for_type(target.question_type),
+        "partial": flow.partial_template_for(target),
         "prior_answer": answered.get(target.id),
         "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,
@@ -347,7 +347,7 @@ def get_previous_visible_question_context(
     _decorate_question(prev_q, answered, visible=visible, respondent_ctx=_load_respondent_context(cursor, respondent_id))
     return {
         "question": prev_q,
-        "partial": flow.partial_template_for_type(prev_q.question_type),
+        "partial": flow.partial_template_for(prev_q),
         "prior_answer": answered.get(prev_q.id),
         "progress": flow.progress_for_role(role, answered, instrument),
         "role": role,

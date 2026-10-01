@@ -50,3 +50,33 @@ _SECTION_NAMES = {
 def section_name(letter: str) -> str:
     """Map a section letter (A-H) to its human-readable topic name."""
     return _SECTION_NAMES.get((letter or "").upper(), str(letter or ""))
+
+
+@register.filter(name="glossary_link")
+def glossary_link(value):
+    """Only the info-icon link(s) for the framework terms in an option, as
+    a trailing fragment to place AFTER the option's <label>.
+
+    Putting the <a> inside the <label> broke the checkbox's accessible
+    name and made the option read as unlabeled to assistive technology
+    and automated review (defects C1 and C25, 2026-09-28). The label is
+    now plain text; the link stands beside it.
+    """
+    from django.utils.html import escape
+    from django.utils.safestring import mark_safe
+    from questionnaire.glossary import _COMPILED, _wrap
+    text = value if value is not None else ""
+    links = []
+    for term, url, pattern in _COMPILED:
+        m = pattern.search(text)
+        if m and url not in [u for _, u in links]:
+            links.append((m.group(0), url))
+    if not links:
+        return ""
+    parts = []
+    for matched, url in links:
+        parts.append(
+            f'<a class="glossary-info" href="{escape(url)}" target="_blank" rel="noopener" '
+            f'aria-label="Learn about {escape(matched)}" title="Learn about {escape(matched)}">&#9432;</a>'
+        )
+    return mark_safe(" " + " ".join(parts))
