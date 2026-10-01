@@ -193,21 +193,33 @@ def ai_recommend_laws(
             cached_out["ok"] = True
             return cached_out
 
-    api_key = getattr(settings, "ANTHROPIC_API_KEY", "")
-    if not api_key:
-        result_base["error"] = "ANTHROPIC_API_KEY not configured"
-        return result_base
     if not getattr(settings, "AI_ANALYSIS_ENABLED", True):
         result_base["error"] = "AI analysis disabled"
         return result_base
 
-    try:
-        import anthropic
-    except ImportError:
-        result_base["error"] = "anthropic package not installed"
-        return result_base
-
-    client = anthropic.Anthropic(api_key=api_key)
+    # Questionnaire-time AI runs on the flash model through Ollama
+    # (2026-10-01 decision); Anthropic only with AI_ANALYSIS_PROVIDER=anthropic.
+    import os
+    provider = (os.environ.get("AI_ANALYSIS_PROVIDER") or "ollama").strip().lower()
+    if provider == "anthropic":
+        api_key = getattr(settings, "ANTHROPIC_API_KEY", "")
+        if not api_key:
+            result_base["error"] = "ANTHROPIC_API_KEY not configured"
+            return result_base
+        try:
+            import anthropic
+        except ImportError:
+            result_base["error"] = "anthropic package not installed"
+            return result_base
+        client = anthropic.Anthropic(api_key=api_key)
+        model = DEFAULT_MODEL
+    else:
+        from reports.ai_analysis import OllamaClient
+        client = OllamaClient(
+            os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_BASE_URL") or "http://127.0.0.1:11434",
+            os.environ.get("OLLAMA_API_KEY", ""),
+        )
+        model = os.environ.get("OLLAMA_MODEL") or "deepseek-v4.1-flash"
 
     payload = {
         "company_profile": profile,
@@ -217,7 +229,7 @@ def ai_recommend_laws(
 
     try:
         message = client.messages.create(
-            model=DEFAULT_MODEL,
+            model=model,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
@@ -241,6 +253,6 @@ def ai_recommend_laws(
         "selected": parsed["selected"],
         "reasoning": parsed["reasoning"],
         "summary": parsed["summary"],
-        "model": DEFAULT_MODEL,
+        "model": model,
     })
     return result_base
