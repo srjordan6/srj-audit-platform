@@ -2,10 +2,17 @@
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>{% if embedded %}Part II. AI IT Security Audit&trade; &middot; {% endif %}1. Executive Summary</h2></div>
 
+  <div class="rpt-note"><b>Exposure statement.</b> {{ exposure }}</div>
+{% with sec=ai.summary %}{% if sec %}
   <div class="rpt-ai">
-    <h3>Exposure statement</h3>
-    <p>{{ exposure }}</p>
+    <h3>Auditor's analysis</h3>
+    <p>{{ sec.narrative|linebreaksbr }}</p>
+    {% if sec.key_findings %}<div class="rpt-ai-sub">Key findings</div>
+    <ul>{% for k in sec.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if sec.recommendations %}<div class="rpt-ai-sub">Recommended actions</div>
+    <ul>{% for r in sec.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
   </div>
+{% endif %}{% endwith %}
 
   <div class="rpt-score-line">
     <span class="rpt-score-num">{{ baseline.score|floatformat:0 }}</span> / 100 &nbsp;
@@ -55,6 +62,16 @@
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>2. Remediation Roadmap</h2></div>
   <p class="rpt-intro">Gap-to-standard for each of the seven Baseline areas. Every line pairs the score with the artefact the standard names; where the artefact is missing, the questions answered No or Don't know are the gap statement.</p>
+{% with sec=ai.remediation %}{% if sec %}
+  <div class="rpt-ai">
+    <h3>Auditor's analysis</h3>
+    <p>{{ sec.narrative|linebreaksbr }}</p>
+    {% if sec.key_findings %}<div class="rpt-ai-sub">Key findings</div>
+    <ul>{% for k in sec.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if sec.recommendations %}<div class="rpt-ai-sub">Recommended actions</div>
+    <ul>{% for r in sec.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+{% endif %}{% endwith %}
 
   {% for a in areas %}
   <div class="rpt-artifact">
@@ -85,6 +102,16 @@
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>3. Framework Crosswalk</h2></div>
   <p class="rpt-intro">One-page external reference: where each Baseline area lands in the frameworks a regulator, insurer, enterprise customer or board is most likely to cite. Rows are references, not certifications.</p>
+{% with sec=ai.crosswalk %}{% if sec %}
+  <div class="rpt-ai">
+    <h3>Auditor's analysis</h3>
+    <p>{{ sec.narrative|linebreaksbr }}</p>
+    {% if sec.key_findings %}<div class="rpt-ai-sub">Key findings</div>
+    <ul>{% for k in sec.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if sec.recommendations %}<div class="rpt-ai-sub">Recommended actions</div>
+    <ul>{% for r in sec.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+{% endif %}{% endwith %}
   <table class="rpt-qa">
     <tr><th>Area</th><th>AI-specific</th><th>Management systems</th><th>Threat and assurance</th><th>Regulatory</th></tr>
     {% for area, ai, ms, threat, reg in crosswalk %}
@@ -109,6 +136,16 @@
   </table>
   <p class="rpt-intro">Scale: {% for l in level_scale %}{{ forloop.counter0 }} {{ l }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}. * capped at Partial pending evidence verification.</p>
 
+{% with sec=ai.baseline %}{% if sec %}
+  <div class="rpt-ai">
+    <h3>Auditor's analysis</h3>
+    <p>{{ sec.narrative|linebreaksbr }}</p>
+    {% if sec.key_findings %}<div class="rpt-ai-sub">Key findings</div>
+    <ul>{% for k in sec.key_findings %}<li>{{ k }}</li>{% endfor %}</ul>{% endif %}
+    {% if sec.recommendations %}<div class="rpt-ai-sub">Recommended actions</div>
+    <ul>{% for r in sec.recommendations %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+{% endif %}{% endwith %}
   <h3>Compared to what?</h3>
   {% if history %}
   <table class="rpt-qa">
@@ -120,9 +157,50 @@
   <p class="rpt-intro">This is the first dated Baseline for {{ company.name }}. A re-assessment produces the trend line; an undated score is indefensible by the method's own standard.</p>
   {% endif %}
 
+</div>
+
+
+{# ---------------------------------------------------------------- page 5 #}
+<div class="rpt-section">
+  <div class="rpt-sec-head"><h2>5. Auditor's Opinion</h2></div>
   <div class="rpt-opinion">
-    <h3>Basis of this Baseline</h3>
-    <p style="font-size:9.5pt;">Self-reported answers to {{ baseline.answered }} of {{ baseline.expected }} questions across the Six-Domain Operating View, scored against the seven areas of the Defensible AI Security Baseline. Yes counts 1, Partially 0.5, No and Don't know 0; Don't know is also reported as unknown-zone exposure. Areas are weighted equally. No artefact was inspected, so every level is capped at Partial; the analyst tier verifies the named artefacts and lifts the cap to Defensible or Mature.</p>
+    {% if opinion.kind == "unqualified" %}
+    <h3>Unqualified Opinion</h3>
+    <p style="font-size: 9.5pt;">The company's AI security posture, as self-reported on {{ assessed_on|date:"Y-m-d" }}, supports an unqualified opinion at the snapshot tier: no Baseline area is Absent, the Baseline Score is at or above 50, unknown-zone exposure is below 25%, and no Visibility Triangle domain is in the unknown zone.</p>
+    {% elif opinion.kind == "disclaimer" %}
+    <h3>Disclaimer of Opinion</h3>
+    <p style="font-size: 9.5pt;">No answers were recorded for this engagement, so no opinion is expressed.</p>
+    {% else %}
+    <h3>Qualified Opinion</h3>
+    {% endif %}
+
+    {% if opinion.statement %}
+    <p style="font-size: 10pt; font-style: italic; line-height: 1.55;">{{ opinion.statement }}</p>
+    {% endif %}
+
+    {% if opinion.drivers %}
+    <h4 style="margin-bottom: 3pt;">Basis for Qualified Opinion</h4>
+    <ul style="font-size: 9pt;">{% for d in opinion.drivers %}<li>{{ d }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    {% if opinion.exceptions %}
+    <h4 style="margin-bottom: 3pt;">Exceptions</h4>
+    <table class="rpt-qa">
+      <tr><th>Area</th><th>Finding</th><th>Evidence</th><th>Materiality</th></tr>
+      {% for e in opinion.exceptions %}
+      <tr><td>{{ e.area }}</td><td class="rpt-q" style="width: 40%;">{{ e.finding }}</td><td style="font-size: 7.5pt;">{{ e.evidence }}</td>
+        <td>{% if e.materiality == "material" %}<strong>Material</strong>{% else %}Notable{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if opinion.scope_limitations %}
+    <h4 style="margin-bottom: 3pt;">Scope Limitations</h4>
+    <ul style="font-size: 8.5pt;">{% for s in opinion.scope_limitations %}<li>{{ s }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    <h4 style="margin-bottom: 3pt;">Basis of this Baseline</h4>
+    <p style="font-size: 9pt;">Self-reported answers to {{ baseline.answered }} of {{ baseline.expected }} questions across the Six-Domain Operating View, scored against the seven areas of the Defensible AI Security Baseline. Yes counts 1, Partially 0.5, No and Don't know 0; Don't know is also reported as unknown-zone exposure. Areas are weighted equally. No artefact was inspected, so every level is capped at Partial; the analyst tier verifies the named artefacts and lifts the cap to Defensible or Mature.{% if respondent_count > 1 %} {{ respondent_count }} respondents were scored independently and combined by area mean, with leadership and workforce divergence measured before averaging.{% endif %}</p>
     <div class="rpt-sign" style="margin-top:16pt; border-top:0.75pt solid #D8D6E4; padding-top:8pt;">
       <p style="margin:0; font-size:10pt;"><b>Stephen Jordan</b>, Founder and CEO<br>
       SRJ Consulting &amp; Services LLC, Frisco, Texas<br>

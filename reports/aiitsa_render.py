@@ -20,6 +20,7 @@ the product is "AI IT Security Audit" with (TM).
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Any
 
@@ -29,6 +30,8 @@ from django.template.loader import render_to_string
 from core.dbjson import loads_maybe
 from questionnaire.aiitsa_question_bank import AIITSA_QUESTIONS
 from scoring.aiitsa import AIITSAResult, score_aiitsa
+
+logger = logging.getLogger(__name__)
 
 _ROLE_LABELS = {"BOARD": "Board", "CEO": "CEO", "CFO": "CFO", "CIO": "CIO", "CISO": "CISO",
                 "COO": "COO", "VP": "VP", "DIR": "Director", "MGR": "Manager",
@@ -237,14 +240,26 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
     }
 
 
+def _with_analysis(engagement_id: str, ctx: dict) -> dict:
+    """Auditor's analysis per page and the formal opinion (never fatal)."""
+    from reports.aiitsa_analysis import analyze_aiitsa, build_opinion
+    try:
+        ctx["ai"] = analyze_aiitsa(engagement_id, ctx)
+    except Exception:  # noqa: BLE001
+        logger.exception("AIITSA analysis failed; rendering without narratives")
+        ctx["ai"] = {}
+    ctx["opinion"] = build_opinion(ctx, (ctx["ai"] or {}).get("opinion_basis"))
+    return ctx
+
+
 def render_aiitsa_pack_html(engagement_id: str, **kw) -> str:
-    return render_to_string("reports/aiitsa_pack.html", build_aiitsa_context(engagement_id, **kw))
+    return render_to_string("reports/aiitsa_pack.html", _with_analysis(engagement_id, build_aiitsa_context(engagement_id, **kw)))
 
 
 def render_aiitsa_body_html(engagement_id: str, **kw) -> str:
-    """The four pages without cover or CSS, for embedding as Part II of a
+    """The pages without cover or CSS, for embedding as Part II of a
     combined report."""
-    ctx = build_aiitsa_context(engagement_id, **kw)
+    ctx = _with_analysis(engagement_id, build_aiitsa_context(engagement_id, **kw))
     ctx["embedded"] = True
     return render_to_string("reports/_aiitsa_body.html", ctx)
 
