@@ -68,6 +68,7 @@
     4. AI Efficiency &amp; Process Optimization<br>
     5. Summary of Findings<br>
     {% if divergence %}6. Where Leadership and the Workforce Disagree<br>{% endif %}
+    {% if aiitsa_body %}Part II. AI IT Security Audit&trade; (Four-Page Pack)<br>{% endif %}
     Appendix A. Questions and Responses
   </div>
 </div>
@@ -474,6 +475,8 @@
   {% endif %}
 </div>
 {% endif %}
+
+{% if aiitsa_body %}{{ aiitsa_body|safe }}{% endif %}
 
 <div class="rpt-section">
   <div class="rpt-sec-head"><h2>Appendix A. Questions and Responses</h2></div>

@@ -293,6 +293,17 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
             from reports.aiitsa_render import load_aiitsa_responses
             _, aiitsa_by_question, _ = load_aiitsa_responses(cursor, engagement_id)
 
+    # Combined engagement: the AI IT Security Audit's four pages render as
+    # Part II of this document, between the Pillar I findings and the
+    # appendix, so the buyer sees governance and security in one report.
+    aiitsa_body = ""
+    if instrument == "combined":
+        try:
+            from reports.aiitsa_render import render_aiitsa_body_html
+            aiitsa_body = render_aiitsa_body_html(engagement_id)
+        except Exception:  # noqa: BLE001
+            logger.exception("combined report: AIITSA part failed; rendering Pillar I only")
+
     frameworks = []
     for key in ("v1_audit", "v2_readiness", "v3_governance", "efficiency"):
         try:
@@ -513,6 +524,7 @@ def render_tier1_snapshot_html(engagement_id: str) -> str:
         "ninety_day": ninety_day,
         "opinion": opinion,
         "divergence": divergence,
+        "aiitsa_body": aiitsa_body,
         "appendix": appendix,
         "methodology": (first["methodology"] if first else ""),
         "trademark_notice": (first["trademark_notice"] if first else ""),

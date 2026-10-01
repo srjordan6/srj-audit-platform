@@ -177,3 +177,88 @@ def score_aiitsa(responses: dict[str, Any], *, questions: list[dict] | None = No
         answered=total_answered, expected=len(questions),
         top_gaps=[x.area for x in sorted(scored, key=lambda x: x.mean_0_1)],
     )
+
+
+# ----------------------------------------------------------------------------
+# Multi-respondent aggregation (Tier 2 on the security instrument)
+# ----------------------------------------------------------------------------
+# The Baseline is a company-level fact, so N respondents are scored one at
+# a time and their AREA means are averaged with the same leadership /
+# workforce split Pillar I uses (scoring.tier_2_role_weights). Divergence
+# per area at the same 20-point threshold. Don't-know exposure is the
+# average share. Visibility Triangle zones take the most severe answer any
+# respondent gave: one person who cannot say whether a blind spot exists
+# means the company cannot say.
+
+from statistics import fmean
+
+_ZONE_SEVERITY = {"unknown": 4, "suspected": 3, "known": 2, "clear": 1, "unanswered": 0}
+_DIVERGENCE_THRESHOLD = 20.0
+
+
+def aggregate_aiitsa(per_respondent: list[tuple[str, AIITSAResult]], *,
+                     assessed_on: date | None = None) -> tuple[AIITSAResult, dict[str, Any]]:
+    """per_respondent: [(role, AIITSAResult), ...]. Returns the combined
+    result and a summary dict {dimensions: [...], contested: [], roles}."""
+    from scoring.tier_2_role_weights import LEADERSHIP, WORKFORCE
+    if not per_respondent:
+        raise ValueError("no respondents to aggregate")
+    if len(per_respondent) == 1:
+        r = per_respondent[0][1]
+        return r, {"respondent_count": 1, "roles": [per_respondent[0][0]], "dimensions": [], "contested": []}
+
+    assessed_on = assessed_on or max(r.assessed_on for _, r in per_respondent)
+    roles = [role for role, _ in per_respondent]
+    areas: list[AreaScore] = []
+    dims: list[dict[str, Any]] = []
+    for name in BASELINE_AREAS:
+        per = [(role, next(a for a in r.areas if a.area == name)) for role, r in per_respondent]
+        scored = [(role, a) for role, a in per if a.answered]
+        if not scored:
+            areas.append(per[0][1]); continue
+        mean = fmean(a.mean_0_1 for _, a in scored)
+        lead = [a.mean_0_1 for role, a in scored if role in LEADERSHIP]
+        work = [a.mean_0_1 for role, a in scored if role in WORKFORCE]
+        lm = fmean(lead) * 100 if lead else None
+        wm = fmean(work) * 100 if work else None
+        div = (lm - wm) if (lm is not None and wm is not None) else None
+        flagged = div is not None and abs(div) >= _DIVERGENCE_THRESHOLD
+        natural = 0 if mean < ABSENT_BELOW else 1 if mean < 0.7 else 2 if mean < 0.9 else 3
+        level = min(natural, SELF_SERVE_CAP)
+        gaps = sorted({g for _, a in scored for g in a.gaps})
+        areas.append(AreaScore(
+            area=name, mean_0_1=mean, score_0_100=round(mean * 100, 1),
+            level=level, level_label=LEVEL_LABEL[level], capped=natural > level,
+            answered=sum(a.answered for _, a in scored), expected=max(a.expected for _, a in scored),
+            dont_know=sum(a.dont_know for _, a in scored),
+            minimum_standard=MINIMUM_STANDARD[name], gaps=gaps,
+        ))
+        dims.append({"framework": "aiitsa", "dimension": name, "score_0_100": round(mean * 100, 1),
+                     "contributing": len(scored), "excluded": len(per) - len(scored),
+                     "leadership_mean": lm, "workforce_mean": wm, "divergence": div, "flagged": flagged})
+
+    # Visibility Triangle: most severe zone per domain across respondents
+    by_domain: dict[str, VisibilityZone] = {}
+    for _, r in per_respondent:
+        for v in r.visibility:
+            cur = by_domain.get(v.domain)
+            if cur is None or _ZONE_SEVERITY[v.zone] > _ZONE_SEVERITY[cur.zone]:
+                by_domain[v.domain] = v
+    visibility = [by_domain[d] for d in DOMAIN_OF_VT.values() if d in by_domain]
+
+    scored_areas = [a for a in areas if a.answered]
+    baseline = fmean(a.mean_0_1 for a in scored_areas) * 100 if scored_areas else 0.0
+    b_level = min(0 if baseline < ABSENT_BELOW * 100 else 1, SELF_SERVE_CAP)
+    answered = sum(r.answered for _, r in per_respondent)
+    dk = sum(round(r.unknown_zone_ratio * r.answered) for _, r in per_respondent)
+    combined = AIITSAResult(
+        instrument="aiitsa", assessed_on=assessed_on,
+        baseline_score_0_100=round(baseline, 1),
+        baseline_level=b_level, baseline_level_label=LEVEL_LABEL[b_level],
+        areas=areas, visibility=visibility,
+        unknown_zone_ratio=(dk / answered) if answered else 0.0,
+        answered=answered, expected=per_respondent[0][1].expected,
+        top_gaps=[a.area for a in sorted(scored_areas, key=lambda a: a.mean_0_1)],
+    )
+    return combined, {"respondent_count": len(per_respondent), "roles": roles,
+                      "divergence_threshold": _DIVERGENCE_THRESHOLD, "dimensions": dims, "contested": []}

@@ -27,6 +27,8 @@ class _Cur:
     def fetchone(self):
         return ("c1", "Pack Test Co", "Software", "26-100", "aiitsa")
     def fetchall(self):
+        if "rs.id::text, coalesce(rs.role" in self._last:      # per-respondent loader
+            return [(rid, role, qid, av, dk) for qid, av, dk, role, rid in self.rows_by_call["responses"]]
         if "FROM responses" in self._last:
             return self.rows_by_call["responses"]
         return self.rows_by_call.get("history", [])
@@ -73,3 +75,20 @@ def test_score_payload_shape(ctx):
     assert p["overall"]["maturity_label"] in ("Absent", "Partial")
     assert len(p["items"]) == 7 and all("score_0_100" in i and "maturity_level" in i for i in p["items"])
     assert 1 <= len(p["gaps"]) <= 3
+
+
+def test_two_respondents_aggregate_and_diverge():
+    rows = _answers(["No", "No", "Don't know"])                       # IC: poor
+    rows += [(q, {"selected": "Yes"}, False, "CISO", "r2") for q, *_ in _answers(["Yes"])]  # CISO: good
+    cur = _Cur({"responses": rows})
+    with mock.patch.object(aiitsa_render, "connection") as conn:
+        conn.cursor.return_value = cur
+        # the IC rows in _answers carry role CISO; relabel the first set as IC
+        cur.rows_by_call["responses"] = [(q, av, dk, "IC", "r1") for q, av, dk, _, rid in rows if rid == "r1"] + \
+                                        [r for r in rows if r[4] == "r2"]
+        ctx = aiitsa_render.build_aiitsa_context("e1", assessed_on=date(2026, 9, 28))
+    assert ctx["respondent_count"] == 2
+    assert ctx["divergence"] and ctx["divergence"]["respondent_count"] == 2
+    assert all(r["flagged"] for r in ctx["divergence"]["rows"])       # 100 vs ~17: every area flagged
+    assert 40 <= ctx["baseline"]["score"] <= 70                         # mean of the two
+    assert all(v["zone"] in ("unknown", "known") for v in ctx["visibility"])   # most severe answer wins

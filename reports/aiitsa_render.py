@@ -75,7 +75,8 @@ def _rank(role: str) -> int:
 
 def load_aiitsa_responses(cursor, engagement_id: str) -> tuple[dict, dict, int]:
     """(primary, by_question, respondent_count) over the AIITSA questions of
-    this engagement. Primary answer is the most senior security role's."""
+    this engagement. Primary answer is the most senior security role's.
+    For scoring N respondents use load_aiitsa_per_respondent()."""
     cursor.execute(
         """
         SELECT r.question_id, r.answer_value, r.is_dont_know, coalesce(rs.role, ''), rs.id::text
@@ -97,6 +98,23 @@ def load_aiitsa_responses(cursor, engagement_id: str) -> tuple[dict, dict, int]:
         entries.sort(key=lambda e: _rank(e[0]))
         primary[qid] = entries[0][1]
     return primary, by_q, len(who)
+
+
+def load_aiitsa_per_respondent(cursor, engagement_id: str) -> list[tuple[str, dict]]:
+    """[(role, {qid: resp}), ...] for every non-removed respondent with
+    AIITSA answers, most senior role first."""
+    cursor.execute(
+        """
+        SELECT rs.id::text, coalesce(rs.role, ''), r.question_id, r.answer_value, r.is_dont_know
+        FROM responses r JOIN respondents rs ON rs.id = r.respondent_id
+        WHERE rs.engagement_id = %s AND rs.status <> 'removed' AND r.question_id LIKE 'AIITSA-%%'
+        """,
+        [engagement_id],
+    )
+    per: dict[str, tuple[str, dict]] = {}
+    for rid, role, qid, av, dk in cursor.fetchall():
+        per.setdefault(rid, (role, {}))[1][qid] = {"value": loads_maybe(av), "dont_know": bool(dk)}
+    return sorted(per.values(), key=lambda x: _rank(x[0]))
 
 
 def _selected(resp) -> str:
@@ -136,9 +154,17 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
         company = {"id": row[0], "name": row[1], "industry": row[2], "size_bracket": row[3]} if row else {}
         instrument = row[4] if row else "aiitsa"
         primary, by_q, n = load_aiitsa_responses(cursor, engagement_id)
+        per_resp = load_aiitsa_per_respondent(cursor, engagement_id)
         history = _prior_scores(cursor, company["id"], exclude_report_id) if company else []
 
-    result: AIITSAResult = score_aiitsa(primary, assessed_on=assessed_on)
+    from scoring.aiitsa import aggregate_aiitsa
+    if len(per_resp) > 1:
+        result, aggregation = aggregate_aiitsa(
+            [(role, score_aiitsa(answers, assessed_on=assessed_on)) for role, answers in per_resp],
+            assessed_on=assessed_on)
+    else:
+        result = score_aiitsa(primary, assessed_on=assessed_on)
+        aggregation = None
 
     areas = []
     for a in result.areas:
@@ -185,9 +211,21 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
         appendix.append({"qid": q["id"], "domain": q["domain_label"], "area": q["baseline_area"],
                          "question": q["question_text"], "answer": answer})
 
+    divergence = None
+    if aggregation and aggregation.get("dimensions"):
+        rows = [{"area": d["dimension"], "leadership": round(d["leadership_mean"]), "workforce": round(d["workforce_mean"]),
+                 "gap": round(d["divergence"]), "flagged": d["flagged"]}
+                for d in aggregation["dimensions"] if d.get("leadership_mean") is not None and d.get("workforce_mean") is not None]
+        rows.sort(key=lambda r: -abs(r["gap"]))
+        divergence = {"respondent_count": aggregation["respondent_count"],
+                      "roles": [_ROLE_LABELS.get(r, r) for r in aggregation["roles"]],
+                      "threshold": int(aggregation["divergence_threshold"]), "rows": rows,
+                      "flagged": [r for r in rows if r["flagged"]]}
+
     return {
         "company": company, "engagement_id": engagement_id, "instrument": instrument,
-        "assessed_on": result.assessed_on, "respondent_count": n,
+        "assessed_on": result.assessed_on, "respondent_count": n, "divergence": divergence,
+        "aggregation": aggregation,
         "baseline": {"score": result.baseline_score_0_100, "level": result.baseline_level,
                      "level_label": result.baseline_level_label,
                      "unknown_zone_pct": round(result.unknown_zone_ratio * 100),
@@ -201,6 +239,14 @@ def build_aiitsa_context(engagement_id: str, *, assessed_on: date | None = None,
 
 def render_aiitsa_pack_html(engagement_id: str, **kw) -> str:
     return render_to_string("reports/aiitsa_pack.html", build_aiitsa_context(engagement_id, **kw))
+
+
+def render_aiitsa_body_html(engagement_id: str, **kw) -> str:
+    """The four pages without cover or CSS, for embedding as Part II of a
+    combined report."""
+    ctx = build_aiitsa_context(engagement_id, **kw)
+    ctx["embedded"] = True
+    return render_to_string("reports/_aiitsa_body.html", ctx)
 
 
 def aiitsa_score_payload(ctx: dict[str, Any]) -> dict[str, Any]:
@@ -219,4 +265,5 @@ def aiitsa_score_payload(ctx: dict[str, Any]) -> dict[str, Any]:
                    "confidence_level": ("low" if a["answered"] and a["dont_know"] / a["answered"] >= 0.25 else "medium")}
                   for a in ctx["areas"]],
         "gaps": [w["area"] for w in ctx["weakest"]],
+        "aggregation": ctx.get("aggregation"),
     }

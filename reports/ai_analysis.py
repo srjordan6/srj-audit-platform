@@ -440,6 +440,7 @@ def analyze_report(engagement_id, context):
     client = anthropic.Anthropic(api_key=api_key)
 
     sections = {}
+    failures = []
     for section_key in SECTION_PROMPTS:
         try:
             result = _call_section(
@@ -448,17 +449,57 @@ def analyze_report(engagement_id, context):
             )
             if result:
                 sections[section_key] = result
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             logger.exception("ai_analysis: %s failed", section_key)
+            failures.append((section_key, str(exc)[:300]))
+            if _is_hard_stop(exc):
+                break   # quota or auth: every further call fails the same way
 
     # Opinion basis: evaluate answers against the 100-point checklist
-    try:
-        result = _call_opinion_basis(client, model, context)
-        if result:
-            sections["opinion_basis"] = result
-    except Exception:  # noqa: BLE001
-        logger.exception("ai_analysis: opinion_basis failed")
+    if not any(_is_hard_stop_text(f[1]) for f in failures):
+        try:
+            result = _call_opinion_basis(client, model, context)
+            if result:
+                sections["opinion_basis"] = result
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("ai_analysis: opinion_basis failed")
+            failures.append(("opinion_basis", str(exc)[:300]))
 
+    if failures:
+        # Loud, not silent. Between 2026-07-20 and 2026-09-28 every report
+        # shipped without the narrative because the API key was over its
+        # monthly limit and nothing recorded it.
+        _record_failure(engagement_id, model, failures, len(sections))
     if sections:
         _store(engagement_id, sections, model)
     return sections
+
+
+_HARD_STOP_MARKERS = ("usage limits", "rate_limit", "authentication", "invalid x-api-key",
+                      "permission", "billing", "credit balance", "not_found_error")
+
+
+def _is_hard_stop_text(text: str) -> bool:
+    t = (text or "").lower()
+    return any(m in t for m in _HARD_STOP_MARKERS)
+
+
+def _is_hard_stop(exc: Exception) -> bool:
+    return _is_hard_stop_text(str(exc))
+
+
+def _record_failure(engagement_id, model, failures, sections_ok):
+    """One event per generation attempt that lost narrative content, with
+    the first error verbatim, so the daily report and a human can see it."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO events (event_type, payload) VALUES (%s, %s)",
+                ["ai_analysis_failed", json.dumps({
+                    "engagement_id": str(engagement_id), "model": model,
+                    "sections_ok": sections_ok, "failed": [f[0] for f in failures],
+                    "first_error": failures[0][1], "hard_stop": _is_hard_stop_text(failures[0][1]),
+                })],
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("ai_analysis: could not record failure event")
