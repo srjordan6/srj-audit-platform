@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 from django.conf import settings
 from django.db import connection
@@ -413,6 +414,61 @@ def _store(engagement_id, sections, model):
 # Public entry point
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Ollama: a local model behind the same .messages.create() surface the
+# section and opinion calls already use, so neither call site changes.
+# ---------------------------------------------------------------------------
+
+class _OllamaText:
+    def __init__(self, text: str):
+        self.type = "text"
+        self.text = text
+
+
+class _OllamaMessage:
+    def __init__(self, text: str):
+        self.content = [_OllamaText(text)]
+
+
+class _OllamaMessages:
+    def __init__(self, base_url: str, api_key: str = ""):
+        self._url = base_url.rstrip("/") + "/api/chat"
+        self._api_key = api_key
+
+    def create(self, *, model, max_tokens, system, messages):
+        import urllib.request
+        body = {
+            "model": model,
+            "stream": False,
+            "format": "json",            # every prompt here asks for a JSON object
+            "think": _env_bool("OLLAMA_THINK_NARRATIVE", False),
+            "options": {"temperature": 0.2, "num_predict": int(max_tokens)},
+            "messages": [{"role": "system", "content": system}] + list(messages),
+        }
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"   # ollama.com cloud
+        req = urllib.request.Request(
+            self._url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST",
+        )
+        timeout = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "900"))
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return _OllamaMessage((data.get("message") or {}).get("content") or "")
+
+
+class OllamaClient:
+    def __init__(self, base_url: str, api_key: str = ""):
+        self.messages = _OllamaMessages(base_url, api_key)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    v = os.environ.get(name)
+    if v is None or v == "":
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "on")
+
+
 def analyze_report(engagement_id, context):
     """Return {"section1": {...}, ..., "section5": {...}} or {} on failure.
 
@@ -421,23 +477,39 @@ def analyze_report(engagement_id, context):
     """
     if not getattr(settings, "AI_ANALYSIS_ENABLED", True):
         return {}
-    api_key = getattr(settings, "ANTHROPIC_API_KEY", "")
-    if not api_key:
-        logger.info("ai_analysis: no ANTHROPIC_API_KEY - skipping")
-        return {}
 
     stored = _load_stored(engagement_id)
     if stored:
         return stored
 
-    try:
-        import anthropic
-    except ImportError:
-        logger.warning("ai_analysis: anthropic package not installed")
-        return {}
-
-    model = getattr(settings, "AI_ANALYSIS_MODEL", "claude-sonnet-4-5")
-    client = anthropic.Anthropic(api_key=api_key)
+    # Provider (2026-10-01 decision: Ollama only; no metered API spend).
+    #   AI_ANALYSIS_PROVIDER = ollama | anthropic   (default ollama)
+    #   OLLAMA_BASE_URL, OLLAMA_MODEL                (ollama)
+    #   ANTHROPIC_API_KEY, AI_ANALYSIS_MODEL         (anthropic, kept for an
+    #                                                 explicit opt-in only)
+    provider = (os.environ.get("AI_ANALYSIS_PROVIDER") or "ollama").strip().lower()
+    if provider == "anthropic":
+        api_key = getattr(settings, "ANTHROPIC_API_KEY", "")
+        if not api_key:
+            logger.info("ai_analysis: provider anthropic but no ANTHROPIC_API_KEY - skipping")
+            return {}
+        try:
+            import anthropic
+        except ImportError:
+            logger.warning("ai_analysis: anthropic package not installed")
+            return {}
+        model = getattr(settings, "AI_ANALYSIS_MODEL", "claude-sonnet-4-5")
+        client = anthropic.Anthropic(api_key=api_key)
+    else:
+        # Same variables the other SRJ pipelines use: OLLAMA_HOST (local
+        # daemon or https://ollama.com), OLLAMA_API_KEY (cloud only),
+        # OLLAMA_MODEL. OLLAMA_MODEL_NARRATIVE overrides the model for this
+        # layer alone.
+        model = os.environ.get("OLLAMA_MODEL_NARRATIVE") or os.environ.get("OLLAMA_MODEL") or "llama3.1:8b"
+        client = OllamaClient(
+            os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_BASE_URL") or "http://127.0.0.1:11434",
+            os.environ.get("OLLAMA_API_KEY", ""),
+        )
 
     sections = {}
     failures = []
@@ -476,7 +548,8 @@ def analyze_report(engagement_id, context):
 
 
 _HARD_STOP_MARKERS = ("usage limits", "rate_limit", "authentication", "invalid x-api-key",
-                      "permission", "billing", "credit balance", "not_found_error")
+                      "permission", "billing", "credit balance", "not_found_error",
+                      "connection refused", "urlopen error", "model not found", "timed out")
 
 
 def _is_hard_stop_text(text: str) -> bool:

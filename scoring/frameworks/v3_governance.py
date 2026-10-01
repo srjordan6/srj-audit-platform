@@ -382,10 +382,10 @@ def _score_step(
             contributions=[],
             weighted_mean_0_1=0.0,
             score_0_100=0.0,
-            maturity_level=1,
-            maturity_label="Absent",
+            maturity_level=0,
+            maturity_label="Not assessed",   # no answers is not "Absent" (defect D3)
             dk_ratio=0.0,
-            confidence_level="low",
+            confidence_level="none",
             expected_count=expected,
             answered_count=0,
             attached_non_dk_count=0,
