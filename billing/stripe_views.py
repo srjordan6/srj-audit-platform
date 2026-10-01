@@ -96,7 +96,7 @@ def create_tier2_checkout(request, engagement_id):
         return HttpResponseNotFound("engagement not found")
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT u.email, c.size_bracket, c.name, e.payment_status, e.tier "
+            "SELECT u.email, c.size_bracket, c.name, e.payment_status, e.tier, coalesce(e.instrument, 'tier_1') "
             "FROM engagements e JOIN users u ON u.id = e.buyer_user_id "
             "LEFT JOIN companies c ON c.id = e.company_id WHERE e.id = %s",
             (engagement_id,),
@@ -104,10 +104,12 @@ def create_tier2_checkout(request, engagement_id):
         row = cursor.fetchone()
     if row is None or row[4] != "tier_2":
         return HttpResponseNotFound("engagement not found")
-    buyer_email, bracket, company, payment_status, _ = row
+    buyer_email, bracket, company, payment_status, _, instrument = row
     if payment_status in ("paid", "comped"):
         return redirect("engagements:respondents", engagement_id=engagement_id)
-    cents = get_tier_2_price_cents(bracket)
+    cents = get_tier_2_price_cents(bracket, instrument)
+    what = {"aiitsa": "AI IT Security Audit",
+            "combined": "AI Audit Snapshot + AI IT Security Audit (second audit 25% off)"}.get(instrument, "AI Audit Snapshot")
     base = _base_url(request)
     try:
         session = stripe_service.create_checkout_session(
@@ -115,9 +117,10 @@ def create_tier2_checkout(request, engagement_id):
             buyer_email=buyer_email,
             success_url=f"{base}/e/{engagement_id}/respondents/?paid=1",
             cancel_url=f"{base}/e/{engagement_id}/respondents/",
-            price_id=os.environ.get("STRIPE_TIER_2_PRICE_ID_" + (bracket or "").replace("-", "_").replace("+", "plus")) or None,
+            price_id=(None if instrument == "combined" else
+                      os.environ.get("STRIPE_TIER_2_PRICE_ID_" + (bracket or "").replace("-", "_").replace("+", "plus")) or None),
             unit_amount_cents=cents,
-            product_name="AI Audit: Self-Service Audit (Tier 2)",
+            product_name=f"Tier 2 Self-Service: {what}",
             product_description=f"Multi-respondent audit for {company or 'your company'} ({bracket or 'size'} employees)",
             tier="tier_2",
         )

@@ -54,7 +54,31 @@
         {% csrf_token %}
 
         {% comment %}Marketing attribution — carried from the landing query string.{% endcomment %}
+        {% if tier == "tier_2" %}
+        <fieldset class="mb-4">
+          <legend class="h6 mb-2">Which audit?</legend>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="instrument" id="inst_t1" value="tier_1" {% if instrument != "aiitsa" and instrument != "combined" %}checked{% endif %}>
+            <label class="form-check-label" for="inst_t1">AI Audit Snapshot (governance, for the board)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="instrument" id="inst_sec" value="aiitsa" {% if instrument == "aiitsa" %}checked{% endif %}>
+            <label class="form-check-label" for="inst_sec">AI IT Security Audit (for the CISO)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="instrument" id="inst_both" value="combined" {% if instrument == "combined" %}checked{% endif %}>
+            <label class="form-check-label" for="inst_both">Both audits, two separate reports plus a combined board analysis (second audit 25% off)</label>
+          </div>
+          {% if copy.prices %}
+          <table class="table table-sm mt-3 mb-0" style="font-size:.9rem;max-width:420px;">
+            <thead><tr><th>Employees</th><th>One audit</th><th>Both audits</th></tr></thead>
+            <tbody>{% for r in copy.prices %}<tr><td>{{ r.bracket }}</td><td>{{ r.one }}</td><td>{{ r.both }}</td></tr>{% endfor %}</tbody>
+          </table>
+          {% endif %}
+        </fieldset>
+        {% else %}
         <input type="hidden" name="instrument" value="{{ instrument|default:'tier_1' }}">
+        {% endif %}
         <input type="hidden" name="tier" value="{{ tier|default:'tier_1' }}">
         <input type="hidden" name="utm_source" value="{{ utm.utm_source|default:'' }}">
         <input type="hidden" name="utm_medium" value="{{ utm.utm_medium|default:'' }}">

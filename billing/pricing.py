@@ -18,12 +18,33 @@ TIER_2_PRICE_BRACKETS_CENTS: dict[str, int] = {
 STRIPE_IDENTITY_REQUIRED_THRESHOLD_CENTS = 500_000
 
 
-def get_tier_2_price_cents(size_bracket: str | None) -> int:
-    """Price for a company size bracket. Unknown or missing bracket falls
-    to the largest price, never the smallest: a mis-keyed bracket must not
-    undercharge, and the buyer sees the amount before paying."""
+# OD-19 (2026-10-01): both audits at Tier 2 cost the bracket price plus the
+# same bracket price less 25% for the second audit ($2,500 bracket =
+# $4,375; $7,500 bracket = $13,125).
+SECOND_AUDIT_DISCOUNT = 0.25
+
+
+def _bracket_cents(size_bracket: str | None) -> int:
     return TIER_2_PRICE_BRACKETS_CENTS.get((size_bracket or "").strip(), 750_000)
 
 
-def tier_2_price_label(size_bracket: str | None) -> str:
-    return f"${get_tier_2_price_cents(size_bracket) / 100:,.0f}"
+def get_tier_2_price_cents(size_bracket: str | None, instrument: str | None = None) -> int:
+    """Price for a company size bracket and what is bought. Unknown or
+    missing bracket falls to the largest price, never the smallest: a
+    mis-keyed bracket must not undercharge, and the buyer sees the amount
+    before paying. "combined" is both audits with the second at 25% off."""
+    one = _bracket_cents(size_bracket)
+    if instrument == "combined":
+        return one + int(round(one * (1 - SECOND_AUDIT_DISCOUNT)))
+    return one
+
+
+def tier_2_price_label(size_bracket: str | None, instrument: str | None = None) -> str:
+    return f"${get_tier_2_price_cents(size_bracket, instrument) / 100:,.0f}"
+
+
+def tier_2_price_table() -> list[dict]:
+    """Rows for the start page: one audit and both audits, per bracket."""
+    return [{"bracket": b, "one": f"${c / 100:,.0f}",
+             "both": f"${get_tier_2_price_cents(b, 'combined') / 100:,.0f}"}
+            for b, c in TIER_2_PRICE_BRACKETS_CENTS.items()]

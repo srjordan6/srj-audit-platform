@@ -622,7 +622,7 @@ def create_engagement_and_respondent(
     price_cents = 0
     if tier == "tier_2":
         from billing.pricing import get_tier_2_price_cents
-        price_cents = get_tier_2_price_cents(company_size_bracket)
+        price_cents = get_tier_2_price_cents(company_size_bracket, instrument)
     if access_code_row is not None:
         # Comped engagement — no Stripe path, payment_status = 'comped'.
         cursor.execute(

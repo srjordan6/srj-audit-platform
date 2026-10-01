@@ -525,6 +525,9 @@ INSTRUMENT_COPY = {
 }
 
 
+from billing.pricing import tier_2_price_table
+
+
 def _instrument_from(request) -> str:
     v = (getattr(request, "_forced_instrument", None)
          or request.POST.get("instrument") or request.GET.get("instrument") or "tier_1")
@@ -541,8 +544,10 @@ TIER_2_COPY = {
     "title": "AI Audit: Self-Service Audit (Tier 2)", "price": "$2,500 to $7,500 by company size",
     "blurb": "A multi-respondent audit: you invite 3 to 25 people across leadership and the workforce, "
              "each answers for their role, and the compiled report shows where they agree and where they "
-             "do not. Priced by company size; you pay once, then invite your respondents.",
-    "meta": "Start a Tier 2 Self-Service AI Audit: multi-respondent, board-grade, priced $2,500 to $7,500 by company size.",
+             "do not. Priced by company size; you pay once, then invite your respondents. Buy both "
+             "audits and the second is 25% off.",
+    "meta": "Start a Tier 2 Self-Service AI Audit: multi-respondent, board-grade, priced $2,500 to $7,500 by company size; both audits with the second 25% off.",
+    "prices": tier_2_price_table(),
 }
 
 
