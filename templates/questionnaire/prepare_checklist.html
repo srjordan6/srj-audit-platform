@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Preparation checklist</title>
+<style>
+  @page { size: letter; margin: 2cm 2cm 2.2cm 2cm; @bottom-center { content: "SRJ Consulting & Services LLC  ·  aiauditforcompanies.com  ·  page " counter(page); font-size: 8pt; color: #6B7280; } }
+  body { font-family: Georgia, serif; font-size: 10pt; color: #1A1A2E; line-height: 1.45; }
+  h1 { font-family: Helvetica, Arial, sans-serif; color: #201868; font-size: 20pt; margin: 0 0 2pt 0; }
+  h2 { font-family: Helvetica, Arial, sans-serif; color: #201868; font-size: 13pt; margin: 16pt 0 4pt 0; border-bottom: 2pt solid #F07800; padding-bottom: 3pt; page-break-after: avoid; }
+  .sub { color: #6B7280; font-size: 10pt; margin: 0 0 12pt 0; }
+  .box { background: #FEF3E4; border: 0.75pt solid #F07800; padding: 8pt 10pt; margin: 10pt 0 14pt 0; font-size: 9.5pt; }
+  .prep { color: #201868; font-size: 9.5pt; margin: 0 0 6pt 0; }
+  ul.ck { list-style: none; padding: 0; margin: 0; }
+  ul.ck li { padding: 2pt 0 2pt 18pt; position: relative; page-break-inside: avoid; }
+  ul.ck li:before { content: ""; position: absolute; left: 0; top: 4pt; width: 9pt; height: 9pt; border: 0.9pt solid #201868; }
+  ul.rows { margin: 1pt 0 0 0; padding-left: 12pt; font-size: 8.5pt; color: #4B5563; }
+  .inst { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #F07800; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 14pt; }
+</style></head><body>
+<h1>Preparation checklist</h1>
+<p class="sub">{{ instrument_title }} &middot; for a {{ role_label }} &middot; {{ total }} questions, about {{ minutes }} minutes with the answers at hand</p>
+
+<div class="box">
+  <b>How to use this.</b> These are the questions you will be asked, in the order you will see them. Tick each one you can answer today; for the rest, note who in the company has the answer. You do not need to finish in one sitting: leave the questionnaire at any point and the resume link in your email brings you back with everything saved. "Don't know" is always an allowed answer and is treated as a finding about visibility, not as a mark against you.
+</div>
+
+{% regroup groups by instrument as by_inst %}
+{% for inst in by_inst %}
+  {% if by_inst|length > 1 %}<div class="inst">{{ inst.grouper }}</div>{% endif %}
+  {% for g in inst.list %}
+  <h2>{{ g.title }}</h2>
+  {% if g.prep %}<p class="prep"><b>Have at hand:</b> {{ g.prep }}</p>{% endif %}
+  <ul class="ck">
+    {% for q in g.questions %}
+    <li>{{ q.text }}{% if q.rows %}<ul class="rows">{% for r in q.rows %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+{% endfor %}
+
+<p style="margin-top:18pt; font-size:8.5pt; color:#6B7280;">Questions about this checklist or the audit: srj@srjconsultingservices.com, 415-413-7772. A person answers.</p>
+</body></html>
