@@ -499,6 +499,7 @@ def analyze_report(engagement_id, context):
             logger.warning("ai_analysis: anthropic package not installed")
             return {}
         model = getattr(settings, "AI_ANALYSIS_MODEL", "claude-sonnet-4-5")
+        findings_model = model
         client = anthropic.Anthropic(api_key=api_key)
     else:
         # Same variables the other SRJ pipelines use: OLLAMA_HOST (local
@@ -506,6 +507,9 @@ def analyze_report(engagement_id, context):
         # OLLAMA_MODEL. OLLAMA_MODEL_NARRATIVE overrides the model for this
         # layer alone.
         model = os.environ.get("OLLAMA_MODEL_NARRATIVE") or os.environ.get("OLLAMA_MODEL") or "llama3.1:8b"
+        # 2026-10-01 decision: the Audit Findings (section 1) get the pro
+        # model; every other section and the opinion checklist the flash one.
+        findings_model = os.environ.get("OLLAMA_MODEL_FINDINGS") or "deepseek-v4-pro"
         client = OllamaClient(
             os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_BASE_URL") or "http://127.0.0.1:11434",
             os.environ.get("OLLAMA_API_KEY", ""),
@@ -516,7 +520,7 @@ def analyze_report(engagement_id, context):
     for section_key in SECTION_PROMPTS:
         try:
             result = _call_section(
-                client, model, section_key,
+                client, (findings_model if section_key == "section1" else model), section_key,
                 _section_payload(section_key, context),
             )
             if result:
@@ -543,7 +547,8 @@ def analyze_report(engagement_id, context):
         # monthly limit and nothing recorded it.
         _record_failure(engagement_id, model, failures, len(sections))
     if sections:
-        _store(engagement_id, sections, model)
+        _store(engagement_id, sections,
+               model if findings_model == model else f"{model} (section1: {findings_model})")
     return sections
 
 
