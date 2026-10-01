@@ -76,9 +76,12 @@ Respond with a single JSON object, no prose outside it:
 
 def _catalog_for_prompt() -> list[dict]:
     """Flatten the CATEGORIES nested tuples into a compact prompt payload."""
+    from questionnaire.standards_catalog import FRAMEWORK_LAW_NAMES
     out = []
     for cat_name, items in LAW_CATEGORIES:
         for law_name, url in items:
+            if law_name in FRAMEWORK_LAW_NAMES:
+                continue           # frameworks are asked in T1-A-011
             out.append({"name": law_name, "category": cat_name})
     return out
 
@@ -149,7 +152,8 @@ def _parse_json(text: str) -> Optional[dict]:
 def _validate(parsed: Any) -> Optional[dict]:
     if not isinstance(parsed, dict):
         return None
-    valid_names = {name for _, items in LAW_CATEGORIES for name, _ in items}
+    from questionnaire.standards_catalog import FRAMEWORK_LAW_NAMES
+    valid_names = {name for _, items in LAW_CATEGORIES for name, _ in items} - FRAMEWORK_LAW_NAMES
     selected_raw = parsed.get("selected") or []
     if not isinstance(selected_raw, list):
         selected_raw = []

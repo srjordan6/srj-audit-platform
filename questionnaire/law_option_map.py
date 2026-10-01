@@ -23,19 +23,9 @@ from __future__ import annotations
 
 QUESTION_OPTION_LAW_MAP: dict[str, dict[str, object]] = {
 
-    # T1-A-011 — voluntary standards. Every option is a specific framework.
-    "T1-A-011": {
-        "ISO 42001 (AI management system)":                "ISO/IEC 42001",
-        "NIST AI RMF (AI Risk Management Framework)":      "NIST AI Risk Management Framework",
-        "ISO/IEC 22989 (AI terminology reference)":        "ISO/IEC 22989",
-        "NIST CSF (Cybersecurity Framework)":              "NIST Cybersecurity Framework and AI",
-        "ISO 27001 (Information security management)":     "ISO 27001 and AI",
-        "SOC 2":                                           "SOC 2 and AI",
-        "COSO ERM (Enterprise Risk Management)":           "COSO ERM and AI",
-        "DAMA-DMBOK (Data Management Body of Knowledge)":  "DAMA-DMBOK",
-        "DCAM (Data Management Capability Assessment Model)": "EDM Council DCAM",
-        "CDMC (Cloud Data Management Capabilities)":       "CDMC Cloud Data Management",
-    },
+    # T1-A-011 is no longer filtered by T1-A-006 (2026-10-01): it lists every
+    # voluntary standard, with AI suggestions and T1-A-006 carry-over. See
+    # questionnaire.standards_catalog.
 
     # T1-A-013 — contractual expectations. Only one item maps to laws in
     # the catalog (SBOM/AIBOM). The rest are contract-generic and always

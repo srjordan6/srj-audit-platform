@@ -416,6 +416,34 @@ def _load_respondent_context(cursor, respondent_id: str) -> dict:
         return {}
 
 
+def _decorate_standards(q, answered, ctx) -> None:
+    """T1-A-011 (2026-10-01): group headings, AI suggestions with reasons,
+    and pre-checks carried from frameworks ticked in T1-A-006 before they
+    moved here. Suggestions are shown, not ticked."""
+    from questionnaire.standards_catalog import GROUPS, LAW_NAME_TO_STANDARD
+    q.group_start = {labels[0]: g for g, labels in GROUPS}
+    law_answer = answered.get("T1-A-006") or {}
+    laws = law_answer.get("selected") if isinstance(law_answer, dict) else []
+    laws = laws if isinstance(laws, list) else [laws] if laws else []
+    q.prechecked = {LAW_NAME_TO_STANDARD[n] for n in laws if n in LAW_NAME_TO_STANDARD}
+    q.autocheck = q.id not in answered
+    rid = ctx.get("respondent_id")
+    try:
+        from questionnaire.standards_ai_recommender import suggest_standards
+        profile = {
+            "industry": ctx.get("company_industry"), "size_bracket": ctx.get("company_size_bracket"),
+            "annual_revenue": ctx.get("annual_revenue"), "geographic_footprint": ctx.get("geographic_footprint"),
+            "laws": [n for n in laws if n not in LAW_NAME_TO_STANDARD],
+        }
+        rec = suggest_standards(str(rid or ""), profile)
+    except Exception:  # noqa: BLE001
+        logger.exception("standards suggestions failed for %s", rid)
+        rec = {"suggested": [], "reasons": {}, "summary": ""}
+    q.suggested = set(rec.get("suggested") or [])
+    q.suggest_reasons = rec.get("reasons") or {}
+    q.suggest_summary = rec.get("summary") or ""
+
+
 def _decorate_question(q, answered, visible=None, respondent_ctx=None):
     """Inject dynamic context onto a question SimpleNamespace before render.
 
@@ -451,7 +479,12 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
         # DB-first (WordPress-synced), falling back to the shipped catalog.
         from questionnaire.synced_content import law_categories
         from questionnaire.law_recommender import recommend_laws
-        q.law_categories = law_categories()
+        # Laws and regulations only (2026-10-01): voluntary frameworks moved
+        # to T1-A-011.
+        from questionnaire.standards_catalog import FRAMEWORK_LAW_NAMES
+        q.law_categories = [(c, [it for it in items if it[0] not in FRAMEWORK_LAW_NAMES])
+                            for c, items in law_categories()]
+        q.law_categories = [(c, items) for c, items in q.law_categories if items]
         ctx = respondent_ctx or {}
         # Prefer signup-captured profile fields. Fall back to legacy
         # T1-A-005 / T1-A-007 answers for engagements that pre-date the
@@ -499,6 +532,8 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
                     "law AI auto-recommend failed for %s: %s", rid, exc
                 )
                 q.ai_recommendation = {"ok": False, "error": str(exc)}
+        q.recommended_laws = [n for n in q.recommended_laws if n not in FRAMEWORK_LAW_NAMES]
+        q.recommended_set = set(q.recommended_laws)
         # Pre-check state: on first view the recommendations come back
         # already ticked. Once the respondent has saved an answer their
         # choices win — we never re-tick something they deliberately
@@ -506,7 +541,10 @@ def _decorate_question(q, answered, visible=None, respondent_ctx=None):
         q.autocheck_recommended = q.id not in answered
         return
 
-    # T1-A-011 / T1-A-013 / T1-E-029: filter option list to only the
+    if q.id == "T1-A-011":
+        _decorate_standards(q, answered, respondent_ctx or {})
+
+    # T1-A-013 / T1-E-029: filter option list to only the
     # laws the respondent selected on T1-A-006. Universal options (not
     # in the option->law map) always remain.
     from questionnaire.law_option_map import (

@@ -95,8 +95,16 @@ engine treats {"selected": ["None of these"]} correctly regardless.
       </button>
     </div>
 
+    {% if question.suggested %}
+    <div class="alert alert-info small py-2 mb-3">
+      <strong>AI suggestions for a company like yours</strong> are marked <span class="badge text-bg-info">Suggested</span>.
+      {% if question.suggest_summary %}{{ question.suggest_summary }}{% endif %}
+      Tick only the standards your company actually aligns with or is required to follow.
+    </div>
+    {% endif %}
     <div class="srj-question__options">
       {% for option in question.options %}
+        {% if question.group_start %}{% for key, group in question.group_start.items %}{% if key == option %}<div class="fw-semibold small text-uppercase text-muted mt-3 mb-1">{{ group }}</div>{% endif %}{% endfor %}{% endif %}
         {% with input_id="opt-"|add:question.id|add:"-"|add:forloop.counter|stringformat:"s" %}
         <div class="form-check">
           <input class="form-check-input"
@@ -115,8 +123,9 @@ engine treats {"selected": ["None of these"]} correctly regardless.
                    w.style.display=on?'':'none';
                    if(!on){var i=w.querySelector('input[name=other_specify]'); if(i)i.value='';}
                  })(this)"
-                 {% if prior_answer and option in prior_answer.selected %}checked{% endif %}>
+                 {% if prior_answer and option in prior_answer.selected %}checked{% elif question.autocheck and option in question.prechecked %}checked{% endif %}>
           <label class="form-check-label" for="{{ input_id }}">{{ option }}</label>{{ option|glossary_link }}
+          {% if option in question.suggested %}<span class="badge text-bg-info ms-1">Suggested</span>{% for k, why in question.suggest_reasons.items %}{% if k == option %}<span class="small text-muted d-block ms-1">{{ why }}</span>{% endif %}{% endfor %}{% endif %}
         </div>
         {% endwith %}
       {% endfor %}
