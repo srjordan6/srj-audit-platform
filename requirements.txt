@@ -9,7 +9,7 @@
 # moved to requirements-dev.txt so they don't ship in the production image.
 
 Django==5.2.17
-psycopg[binary]==3.2.3
+psycopg[binary]==3.3.5
 django-environ==0.11.2
 gunicorn==26.1.0
 whitenoise==6.8.2
